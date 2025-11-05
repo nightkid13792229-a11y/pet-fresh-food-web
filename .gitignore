@@ -15,7 +15,8 @@
 *.tmp
 *.temp
 
-# 备份文件
+# 备份文件和目录
+.backups/
 *.backup
 *.bak
 *~
