@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import pkg from '../../../package.json' with { type: 'json' };
-import { getPool } from '../db/pool.js';
+import { getPool } from '../../db/pool.js';
 
 const router = Router();
 
