@@ -2,10 +2,14 @@ import config from './config/index.js';
 import app from './app.js';
 import { getPool } from './db/pool.js';
 import logger from './utils/logger.js';
+import { validateEnv } from './config/env-validator.js';
 
 async function startServer() {
   try {
-    // Test DB connection before starting server
+    // 1. 验证环境变量（在启动前）
+    validateEnv();
+    
+    // 2. 测试数据库连接
     const pool = await getPool();
     await pool.query('SELECT 1');
     logger.info('Database connection established');
