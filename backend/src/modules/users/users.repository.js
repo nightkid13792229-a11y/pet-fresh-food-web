@@ -1,4 +1,4 @@
-import { query } from '../../db/pool.js';
+import { query } from '../db/pool.js';
 
 const createUser = async ({ email, passwordHash, name, role }) => {
   const sql = `

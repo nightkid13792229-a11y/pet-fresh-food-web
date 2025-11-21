@@ -13,7 +13,7 @@ import {
 } from './users.repository.js';
 import { hashPassword, comparePassword } from '../../utils/password.js';
 import { signToken } from '../../utils/token.js';
-import { query } from '../../db/pool.js';
+import { query } from '../db/pool.js';
 
 // 检查用户资料是否完整（简化版，只检查是否有宠物）
 
