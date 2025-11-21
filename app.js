@@ -20,6 +20,19 @@ const store = {
   orderPageSize: 10
 };
 
+let currentQuoteCustomerId = null;
+let currentQuoteSelectedRecipeIds = new Set();
+let quoteRecipeFilter = { search: '', lifeStage: '' };
+const QUOTE_DAYS_OPTIONS = [7, 15, 30];
+const QUOTE_SHIPPING_OPTIONS = [
+  { value: 'remote', label: '异地快递' },
+  { value: 'local', label: '同城快递' },
+  { value: 'none', label: '无需快递' }
+];
+let quoteOverrides = null;
+let currentQuoteRenderState = null;
+
+// 后端 API 状态管理
 const API_BASE_STORAGE_KEY = 'pff-api-base-url';
 const API_TOKEN_STORAGE_KEY = 'pff-api-token';
 const API_USER_STORAGE_KEY = 'pff-api-user';
@@ -32,77 +45,140 @@ const defaultApiBaseUrl = (() => {
   try {
     const stored = localStorage.getItem(API_BASE_STORAGE_KEY);
     if (stored) return stored;
-  } catch (error) {
-    console.warn('读取后台接口地址失败，将使用默认值。', error);
-  }
-  if (detectedOrigin) return detectedOrigin;
-  return 'http://127.0.0.1:3000';
+  } catch (e) {}
+  return detectedOrigin || 'http://8.137.166.134:3000';
 })();
 
 const backendState = {
-  baseUrl: defaultApiBaseUrl.replace(/\/$/, ''),
-  token: (() => {
-    try {
-      return localStorage.getItem(API_TOKEN_STORAGE_KEY) || null;
-    } catch (error) {
-      console.warn('读取后台令牌失败:', error);
-      return null;
-    }
-  })(),
-  user: null,
-  orders: [],
-  loading: false,
-  error: null,
-  lastLoadedAt: null
+  baseUrl: defaultApiBaseUrl,
+  token: null,
+  user: null
 };
 
-try {
-  const storedUser = localStorage.getItem(API_USER_STORAGE_KEY);
-  if (storedUser) {
-    backendState.user = JSON.parse(storedUser);
+// 从 localStorage 恢复后端状态
+function loadBackendAuth() {
+  try {
+    const token = localStorage.getItem(API_TOKEN_STORAGE_KEY);
+    const userStr = localStorage.getItem(API_USER_STORAGE_KEY);
+    if (token) {
+      backendState.token = token;
+      if (userStr) {
+        try {
+          backendState.user = JSON.parse(userStr);
+        } catch (e) {
+          backendState.user = null;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('加载后端认证信息失败:', e);
   }
-} catch (error) {
-  console.warn('解析后台用户信息失败:', error);
-  backendState.user = null;
 }
 
-const BACKEND_ORDER_STATUS_LABELS = {
-  pending: '待处理',
-  paid: '已付款',
-  in_production: '制作中',
-  ready: '待发货',
-  shipped: '已发货',
-  completed: '已完成',
-  cancelled: '已取消'
-};
+// 清除后端认证信息
+function clearBackendAuth(skipRedirect = false) {
+  backendState.token = null;
+  backendState.user = null;
+  try {
+    localStorage.removeItem(API_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(API_USER_STORAGE_KEY);
+  } catch (e) {
+    console.warn('清除后端认证信息失败:', e);
+  }
+  updateAuthUI();
+}
 
-const BACKEND_PAYMENT_STATUS_LABELS = {
-  unpaid: '未支付',
-  paid: '已支付',
-  refunding: '退款中',
-  refunded: '已退款'
-};
+// 后端 API 请求函数
+async function backendRequest(path, options = {}) {
+  if (!backendState.baseUrl) {
+    throw new Error('未配置后台接口地址');
+  }
+  const url = backendState.baseUrl.replace(/\/$/, '') + path;
+  const fetchOptions = {
+    method: options.method || 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...(options.headers || {})
+    }
+  };
+  if (options.body !== undefined) {
+    if (typeof options.body === 'string') {
+      fetchOptions.body = options.body;
+      if (!fetchOptions.headers['Content-Type']) {
+        fetchOptions.headers['Content-Type'] = 'application/json';
+      }
+    } else {
+      fetchOptions.headers['Content-Type'] = 'application/json';
+      fetchOptions.body = JSON.stringify(options.body);
+    }
+  }
+  if (!options.skipAuth && backendState.token) {
+    fetchOptions.headers.Authorization = `Bearer ${backendState.token}`;
+  }
+  let response;
+  try {
+    response = await fetch(url, fetchOptions);
+  } catch (error) {
+    console.warn('后台请求失败:', error);
+    throw new Error('无法连接后台服务，请检查网络或接口地址。');
+  }
+  let data = null;
+  const contentType = response.headers ? response.headers.get('content-type') : '';
+  if (contentType && contentType.includes('application/json')) {
+    try {
+      data = await response.json();
+    } catch (error) {
+      console.warn('解析后台返回数据失败:', error);
+      data = null;
+    }
+  } else {
+    try {
+      const text = await response.text();
+      if (text) {
+        data = { message: text };
+      }
+    } catch (error) {
+      data = null;
+    }
+  }
+  if (response.status === 401) {
+    clearBackendAuth(true);
+    throw new Error('登录已过期，请重新登录。');
+  }
+  if (!response.ok) {
+    const message = data && typeof data === 'object'
+      ? data.message || data.error || `请求失败 (${response.status})`
+      : `请求失败 (${response.status})`;
+    throw new Error(message);
+  }
+  if (data && typeof data === 'object' && data.success === false) {
+    throw new Error(data.message || '请求失败');
+  }
+  return data;
+}
 
-let currentQuoteCustomerId = null;
-let currentQuoteSelectedRecipeIds = new Set();
-let quoteRecipeFilter = { search: '', lifeStage: '' };
-const QUOTE_DAYS_OPTIONS = [7, 15, 30];
-const QUOTE_SHIPPING_OPTIONS = [
-  { value: 'remote', label: '异地快递' },
-  { value: 'local', label: '同城快递' },
-  { value: 'none', label: '无需快递' }
-];
-let quoteOverrides = { servingWeight: null, shippingType: 'remote' };
-let currentQuoteRenderState = null;
-let quotePreviewImageDataUrl = null;
-let quotePreviewImageFileName = '';
-let procurementMode = false;
-const procurementSelection = new Set();
-let currentProcurementDate = null;
-let currentProductionOrderId = null;
-
-const STORAGE_KEY_PREVIEW_MODE = 'pff-preview-mode';
-let currentPreviewMode = 'desktop';
+// 后端登录函数
+async function backendLogin(email, password) {
+  const payload = await backendRequest('/api/v1/auth/login', {
+    method: 'POST',
+    body: { email, password },
+    skipAuth: true
+  });
+  if (!payload || payload.success !== true || !payload.data) {
+    throw new Error((payload && payload.message) || '登录失败，请检查账号或密码。');
+  }
+  const { token, user } = payload.data;
+  backendState.token = token;
+  backendState.user = user;
+  try {
+    localStorage.setItem(API_TOKEN_STORAGE_KEY, token);
+    localStorage.setItem(API_USER_STORAGE_KEY, JSON.stringify(user));
+  } catch (e) {
+    console.warn('保存后端认证信息失败:', e);
+  }
+  updateAuthUI();
+  return { token, user };
+}
 
 // CKU/FCI 犬种分类数据（按FCI标准分组）
 const CKU_BREEDS = [
@@ -387,6 +463,7 @@ function saveAppWithoutBackup() {
     return false;
   }
 }
+
 function saveApp() {
   try {
     const dataToSave = { 
@@ -510,467 +587,6 @@ function loadApp() {
 
 function genId() { return 'id_' + Math.random().toString(36).slice(2, 9); }
 
-function normalizeBaseUrl(value) {
-  if (!value) return '';
-  const trimmed = String(value).trim();
-  if (!trimmed) return '';
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
-  try {
-    const url = new URL(withProtocol);
-    return url.origin.replace(/\/$/, '');
-  } catch (error) {
-    console.warn('接口地址格式不正确:', value, error);
-    return '';
-  }
-}
-
-function setBackendBaseUrl(url) {
-  const normalized = normalizeBaseUrl(url);
-  if (!normalized) return false;
-  backendState.baseUrl = normalized;
-  try {
-    localStorage.setItem(API_BASE_STORAGE_KEY, normalized);
-  } catch (error) {
-    console.warn('保存接口地址失败:', error);
-  }
-  return true;
-}
-
-function saveBackendAuth(token, user) {
-  backendState.token = token;
-  backendState.user = user || null;
-  backendState.error = null;
-  backendState.lastLoadedAt = null;
-  try {
-    if (token) {
-      localStorage.setItem(API_TOKEN_STORAGE_KEY, token);
-    } else {
-      localStorage.removeItem(API_TOKEN_STORAGE_KEY);
-    }
-  } catch (error) {
-    console.warn('保存后台令牌失败:', error);
-  }
-  try {
-    if (user) {
-      localStorage.setItem(API_USER_STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(API_USER_STORAGE_KEY);
-    }
-  } catch (error) {
-    console.warn('保存后台用户信息失败:', error);
-  }
-}
-
-function clearBackendAuth(silent = false) {
-  backendState.token = null;
-  backendState.user = null;
-  backendState.orders = [];
-  backendState.error = null;
-  backendState.lastLoadedAt = null;
-  try {
-    localStorage.removeItem(API_TOKEN_STORAGE_KEY);
-  } catch (error) {
-    console.warn('清除后台令牌失败:', error);
-  }
-  try {
-    localStorage.removeItem(API_USER_STORAGE_KEY);
-  } catch (error) {
-    console.warn('清除后台用户信息失败:', error);
-  }
-  updateAuthUI();
-  renderBackendOrders();
-  if (!silent) {
-    alert('已退出后台登录');
-  }
-}
-
-function updateAuthUI() {
-  const statusEl = $('auth-status');
-  const loginBtn = $('btn-open-login');
-  const logoutBtn = $('btn-logout');
-  if (backendState.token && backendState.user) {
-    if (statusEl) {
-      const name = backendState.user.name || backendState.user.email || '管理员';
-      statusEl.textContent = `已登录：${name}`;
-    }
-    if (loginBtn) loginBtn.style.display = 'none';
-    if (logoutBtn) logoutBtn.style.display = 'inline-flex';
-    // 如果当前在品种视图，重新加载数据
-    const breedsView = $('view-breeds');
-    if (breedsView && breedsView.style.display !== 'none') {
-      setTimeout(async () => {
-        await loadBreeds();
-        await loadBreedCategories();
-        renderBreedsList();
-      }, 100);
-    }
-    // 如果当前在用户管理视图，重新加载数据
-    const usersView = $('view-users');
-    if (usersView && usersView.style.display !== 'none') {
-      setTimeout(async () => {
-        await loadUsers();
-        renderUsersList();
-      }, 100);
-    }
-    return;
-  }
-  if (backendState.token) {
-    if (statusEl) statusEl.textContent = '已登录：后台用户';
-    if (loginBtn) loginBtn.style.display = 'none';
-    if (logoutBtn) logoutBtn.style.display = 'inline-flex';
-    // 如果当前在品种视图，重新加载数据
-    const breedsView = $('view-breeds');
-    if (breedsView && breedsView.style.display !== 'none') {
-      setTimeout(async () => {
-        await loadBreeds();
-        await loadBreedCategories();
-        renderBreedsList();
-      }, 100);
-    }
-    // 如果当前在用户管理视图，重新加载数据
-    const usersView = $('view-users');
-    if (usersView && usersView.style.display !== 'none') {
-      setTimeout(async () => {
-        await loadUsers();
-        renderUsersList();
-      }, 100);
-    }
-    return;
-  }
-  if (statusEl) statusEl.textContent = '未登录';
-  if (loginBtn) loginBtn.style.display = 'inline-flex';
-  if (logoutBtn) logoutBtn.style.display = 'none';
-}
-
-function openAuthDialog() {
-  const dialog = $('auth-dialog');
-  if (dialog) {
-    dialog.style.display = 'flex';
-  }
-  const errorEl = $('auth-error');
-  if (errorEl) {
-    errorEl.textContent = '';
-    errorEl.style.display = 'none';
-  }
-  const submitBtn = $('auth-submit');
-  if (submitBtn) {
-    submitBtn.disabled = false;
-    submitBtn.textContent = '登录';
-  }
-}
-
-function closeAuthDialog() {
-  const dialog = $('auth-dialog');
-  if (dialog) {
-    dialog.style.display = 'none';
-  }
-  const form = $('auth-form');
-  if (form) {
-    form.reset();
-  }
-  const errorEl = $('auth-error');
-  if (errorEl) {
-    errorEl.textContent = '';
-    errorEl.style.display = 'none';
-  }
-  const submitBtn = $('auth-submit');
-  if (submitBtn) {
-    submitBtn.disabled = false;
-    submitBtn.textContent = '登录';
-  }
-}
-
-async function backendRequest(path, options = {}) {
-  if (!backendState.baseUrl) {
-    throw new Error('未配置后台接口地址');
-  }
-  const url = backendState.baseUrl.replace(/\/$/, '') + path;
-  const fetchOptions = {
-    method: options.method || 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...(options.headers || {})
-    }
-  };
-  if (options.body !== undefined) {
-    if (typeof options.body === 'string') {
-      fetchOptions.body = options.body;
-      if (!fetchOptions.headers['Content-Type']) {
-        fetchOptions.headers['Content-Type'] = 'application/json';
-      }
-    } else {
-      fetchOptions.headers['Content-Type'] = 'application/json';
-      fetchOptions.body = JSON.stringify(options.body);
-    }
-  }
-  if (!options.skipAuth && backendState.token) {
-    fetchOptions.headers.Authorization = `Bearer ${backendState.token}`;
-  }
-  let response;
-  try {
-    response = await fetch(url, fetchOptions);
-  } catch (error) {
-    console.warn('后台请求失败:', error);
-    throw new Error('无法连接后台服务，请检查网络或接口地址。');
-  }
-  let data = null;
-  const contentType = response.headers ? response.headers.get('content-type') : '';
-  if (contentType && contentType.includes('application/json')) {
-    try {
-      data = await response.json();
-    } catch (error) {
-      console.warn('解析后台返回数据失败:', error);
-      data = null;
-    }
-  } else {
-    try {
-      const text = await response.text();
-      if (text) {
-        data = { message: text };
-      }
-    } catch (error) {
-      data = null;
-    }
-  }
-  if (response.status === 401) {
-    clearBackendAuth(true);
-    throw new Error('登录已过期，请重新登录。');
-  }
-  if (!response.ok) {
-    const message = data && typeof data === 'object'
-      ? data.message || data.error || `请求失败 (${response.status})`
-      : `请求失败 (${response.status})`;
-    throw new Error(message);
-  }
-  if (data && typeof data === 'object' && data.success === false) {
-    throw new Error(data.message || '请求失败');
-  }
-  return data;
-}
-
-async function backendLogin(email, password) {
-  const payload = await backendRequest('/api/v1/auth/login', {
-    method: 'POST',
-    body: { email, password },
-    skipAuth: true
-  });
-  if (!payload || payload.success !== true || !payload.data) {
-    throw new Error((payload && payload.message) || '登录失败，请检查账号或密码。');
-  }
-  return payload.data;
-}
-
-async function loadBackendOrders(showAlertOnError = false) {
-  const statusEl = $('backend-orders-status');
-  if (!backendState.token) {
-    backendState.orders = [];
-    backendState.lastLoadedAt = null;
-    backendState.error = null;
-    renderBackendOrders();
-    if (statusEl) statusEl.textContent = '请先登录后台。';
-    return;
-  }
-  backendState.loading = true;
-  backendState.error = null;
-  renderBackendOrders();
-  try {
-    const response = await backendRequest('/api/v1/orders?page=1&pageSize=100');
-    const items = response && response.data && Array.isArray(response.data.items)
-      ? response.data.items
-      : [];
-    backendState.orders = items;
-    backendState.lastLoadedAt = Date.now();
-  } catch (error) {
-    backendState.error = error.message || '加载失败';
-    if (showAlertOnError) {
-      alert(backendState.error);
-    }
-  } finally {
-    backendState.loading = false;
-    renderBackendOrders();
-  }
-}
-
-function renderBackendOrders() {
-  const statusEl = $('backend-orders-status');
-  const tableWrapper = $('backend-orders-table-wrapper');
-  const tbody = $('backend-orders-tbody');
-  if (!statusEl || !tableWrapper || !tbody) return;
-  if (!backendState.token) {
-    statusEl.textContent = '请先登录后台。';
-    tableWrapper.style.display = 'none';
-    tbody.innerHTML = '';
-    return;
-  }
-  if (backendState.loading) {
-    statusEl.textContent = '正在加载订单数据...';
-    tableWrapper.style.display = 'none';
-    tbody.innerHTML = '';
-    return;
-  }
-  if (backendState.error) {
-    statusEl.textContent = backendState.error;
-    tableWrapper.style.display = 'none';
-    tbody.innerHTML = '';
-    return;
-  }
-  if (!backendState.orders.length) {
-    statusEl.textContent = '暂无订单数据。';
-    tableWrapper.style.display = 'none';
-    tbody.innerHTML = '';
-    return;
-  }
-  const refreshedAt = backendState.lastLoadedAt ? formatDateTime(backendState.lastLoadedAt) : '';
-  statusEl.textContent = refreshedAt
-    ? `已加载 ${backendState.orders.length} 条订单（${refreshedAt} 更新）`
-    : `已加载 ${backendState.orders.length} 条订单。`;
-  tableWrapper.style.display = 'block';
-  tbody.innerHTML = backendState.orders.map((order) => {
-    const orderNumber = escapeHtml(order.orderNumber || '-');
-    const customerName = escapeHtml(order.customerName || order.customerEmail || '-');
-    const petName = escapeHtml(order.petName || '-');
-    const statusText = escapeHtml(BACKEND_ORDER_STATUS_LABELS[order.status] || order.status || '-');
-    const paymentText = escapeHtml(BACKEND_PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus || '-');
-    const priceValue = Number(order.totalPrice);
-    const priceText = Number.isFinite(priceValue) ? `¥${priceValue.toFixed(2)}` : '-';
-    const productionDate = escapeHtml(normalizeDateString(order.productionDate) || '-');
-    const updatedAt = escapeHtml(formatDateTime(order.updatedAt));
-    return `
-      <tr>
-        <td>${orderNumber}</td>
-        <td>${customerName}</td>
-        <td>${petName}</td>
-        <td>${statusText}</td>
-        <td>${paymentText}</td>
-        <td>${escapeHtml(priceText)}</td>
-        <td>${productionDate}</td>
-        <td>${updatedAt}</td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function setupBackendIntegration() {
-  updateAuthUI();
-  renderBackendOrders();
-
-  const loginBtn = $('btn-open-login');
-  if (loginBtn) {
-    loginBtn.addEventListener('click', () => {
-      openAuthDialog();
-    });
-  }
-
-  const logoutBtn = $('btn-logout');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-      if (confirm('确定要退出后台登录吗？')) {
-        clearBackendAuth();
-      }
-    });
-  }
-
-  const overlay = $('auth-dialog-overlay');
-  if (overlay) {
-    overlay.addEventListener('click', () => closeAuthDialog());
-  }
-  const closeBtn = $('auth-dialog-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => closeAuthDialog());
-  }
-  const cancelBtn = $('auth-cancel');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => closeAuthDialog());
-  }
-
-  const form = $('auth-form');
-  if (form) {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const email = ($('auth-email')?.value || '').trim();
-      const password = $('auth-password')?.value || '';
-      const errorEl = $('auth-error');
-      const submitBtn = $('auth-submit');
-      if (errorEl) {
-        errorEl.textContent = '';
-        errorEl.style.display = 'none';
-      }
-      if (!email || !password) {
-        if (errorEl) {
-          errorEl.textContent = '邮箱和密码均不能为空。';
-          errorEl.style.display = 'block';
-          errorEl.style.color = '#d14343';
-        } else {
-          alert('邮箱和密码均不能为空。');
-        }
-        return;
-      }
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '登录中...';
-      }
-      try {
-        const { token, user } = await backendLogin(email, password);
-        saveBackendAuth(token, user);
-        updateAuthUI();
-        closeAuthDialog();
-        await loadBackendOrders(true);
-      } catch (error) {
-        console.error('后台登录失败:', error);
-        if (errorEl) {
-          errorEl.textContent = error.message || '登录失败，请稍后重试。';
-          errorEl.style.display = 'block';
-          errorEl.style.color = '#d14343';
-        } else {
-          alert(error.message || '登录失败，请稍后重试。');
-        }
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = '登录';
-        }
-      }
-    });
-  }
-
-  const refreshBtn = $('btn-refresh-backend-orders');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      loadBackendOrders(true);
-    });
-  }
-
-  const apiBaseInput = $('settings-api-base');
-  if (apiBaseInput) {
-    apiBaseInput.value = backendState.baseUrl;
-  }
-  const saveBaseBtn = $('btn-save-api-base');
-  if (saveBaseBtn) {
-    saveBaseBtn.addEventListener('click', () => {
-      const inputEl = $('settings-api-base');
-      const normalized = normalizeBaseUrl(inputEl ? inputEl.value : '');
-      if (!normalized) {
-        alert('请输入有效的接口地址，例如：http://127.0.0.1:3000');
-        return;
-      }
-      setBackendBaseUrl(normalized);
-      if (inputEl) {
-        inputEl.value = backendState.baseUrl;
-      }
-      alert('接口地址已保存。');
-      if (backendState.token) {
-        loadBackendOrders(true);
-      } else {
-        renderBackendOrders();
-      }
-    });
-  }
-
-  if (backendState.token) {
-    loadBackendOrders();
-  }
-}
-
 function switchView(view) {
   console.log('切换视图到:', view);
   document.querySelectorAll('.view').forEach(v => {
@@ -988,6 +604,14 @@ function switchView(view) {
         renderIngredientsList();
       }, 100);
     }
+    // 如果切换到品种管理视图，加载数据
+    if (view === 'breeds' && backendState.token) {
+      setTimeout(async () => {
+        await loadBreeds();
+        await loadBreedCategories();
+        renderBreedsList();
+      }, 100);
+    }
     // 如果切换到食谱视图，重新渲染列表
     if (view === 'recipes') {
       setTimeout(() => {
@@ -1002,21 +626,6 @@ function switchView(view) {
     if (view === 'orders') {
       setTimeout(() => {
         renderOrdersList();
-      }, 100);
-    }
-    // 如果切换到品种视图，加载数据
-    if (view === 'breeds' && backendState.token) {
-      setTimeout(async () => {
-        await loadBreeds();
-        await loadBreedCategories();
-        renderBreedsList();
-      }, 100);
-    }
-    // 如果切换到用户管理视图，加载数据
-    if (view === 'users' && backendState.token) {
-      setTimeout(async () => {
-        await loadUsers();
-        renderUsersList();
       }, 100);
     }
   } else {
@@ -1179,56 +788,6 @@ function computeAndFillEstKcal() {
   }
 }
 
-function formatDateTime(value) {
-  if (!value && value !== 0) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
-}
-
-function toDateInputValue(date) {
-  if (!(date instanceof Date)) return '';
-  if (Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function normalizeDateString(value) {
-  if (!value) return '';
-  if (value instanceof Date) {
-    return toDateInputValue(value);
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      return trimmed;
-    }
-    const parsed = new Date(trimmed);
-    if (!Number.isNaN(parsed.getTime())) {
-      return toDateInputValue(parsed);
-    }
-  }
-  return '';
-}
-
-function getDefaultProcurementDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return toDateInputValue(date);
-}
-
-function formatFileTimestamp(date = new Date()) {
-  const pad = (num) => String(num).padStart(2, '0');
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
-}
 // 填充品种下拉框
 function populateBreedSelect() {
   const select = $('c-breed');
@@ -1278,39 +837,6 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function toDateInputValue(date) {
-  if (!(date instanceof Date)) return '';
-  if (Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function normalizeDateString(value) {
-  if (!value) return '';
-  if (value instanceof Date) {
-    return toDateInputValue(value);
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      return trimmed;
-    }
-    const parsed = new Date(trimmed);
-    if (!Number.isNaN(parsed.getTime())) {
-      return toDateInputValue(parsed);
-    }
-  }
-  return '';
-}
-
-function getDefaultProcurementDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return toDateInputValue(date);
-}
-
 function formatFileTimestamp(date = new Date()) {
   const pad = (num) => String(num).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
@@ -1337,6 +863,7 @@ function formatNumber(value, digits = 2) {
   if (!Number.isFinite(num)) return '-';
   return num.toFixed(digits);
 }
+
 function formatPercentInteger(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return '-';
@@ -1375,7 +902,7 @@ function buildDetailTable(rows) {
 
 function buildDetailGrid(rows, options = {}) {
   if (!rows || rows.length === 0) {
-    return options.hideEmpty ? '' : '<div class="detail-empty">暂无数据</div>';
+    return '<div class="detail-empty">暂无数据</div>';
   }
   const columns = options.columns || 2;
   const compact = options.compact ? ' compact' : '';
@@ -1388,8 +915,7 @@ function buildDetailGrid(rows, options = {}) {
     } else {
       value = raw ? row.value : escapeHtml(row.value);
     }
-    const fieldAttr = row.field ? ` data-field="${row.field}"` : '';
-    return `<div class="detail-grid-item"${fieldAttr}><div class="detail-grid-label">${label}</div><div class="detail-grid-value">${value}</div></div>`;
+    return `<div class="detail-grid-item"><div class="detail-grid-label">${label}</div><div class="detail-grid-value">${value}</div></div>`;
   }).join('');
   return `<div class="detail-grid${compact}" style="--detail-grid-columns:${columns};">${items}</div>`;
 }
@@ -1423,42 +949,30 @@ function describeEstKcal(customer) {
   const info = getEstKcalInfo(customer);
   return `${escapeHtml(info.valueText)}<div class="detail-hint">计算公式：${escapeHtml(info.formulaText)}</div>`;
 }
+
 function buildQuoteCustomerSummary(customer) {
   if (!customer) return '<div class="detail-empty">未找到顾客信息</div>';
   const rows = [
-    { label: '宠物昵称', value: customer.petName || '-', field: 'petName' },
-    { label: '品种', value: customer.breed || '-', field: 'breed' },
-    { label: '年龄/月龄', value: formatAgeDisplay(customer), field: 'age' },
-    { label: '体重', value: customer.weightKg != null ? `${formatNumber(customer.weightKg, 2)} kg` : '-', field: 'weight' },
-    { label: '每日吃几顿饭', value: customer.mealsPerDay != null ? customer.mealsPerDay : '-', field: 'meals' },
-    { label: '日均活动水平', value: customer.activity ? `${zh(customer.activity, actMap)}（热量系数 ${customer.kcalFactor != null ? customer.kcalFactor : activityKcalFactor(customer.activity)}）` : '-', field: 'activity' },
-    { label: '挑食/尽量不吃', value: formatMultiline(customer.avoid), raw: true, field: 'avoid' },
-    { label: '过敏/不耐受', value: formatMultiline(customer.allergies), raw: true, field: 'allergies' },
-    { label: '非常喜欢吃', value: formatMultiline(customer.fav), raw: true, field: 'fav' }
+    { label: '宠物昵称', value: customer.petName || '-' },
+    { label: '品种', value: customer.breed || '-' },
+    { label: '年龄/月龄', value: formatAgeDisplay(customer) },
+    { label: '体重', value: customer.weightKg != null ? `${formatNumber(customer.weightKg, 2)} kg` : '-' },
+    { label: '每日吃几顿饭', value: customer.mealsPerDay != null ? customer.mealsPerDay : '-' },
+    { label: '日均活动水平', value: customer.activity ? `${zh(customer.activity, actMap)}（热量系数 ${customer.kcalFactor != null ? customer.kcalFactor : activityKcalFactor(customer.activity)}）` : '-' },
+    { label: '挑食/尽量不吃', value: formatMultiline(customer.avoid), raw: true },
+    { label: '过敏/不耐受', value: formatMultiline(customer.allergies), raw: true },
+    { label: '非常喜欢吃', value: formatMultiline(customer.fav), raw: true }
   ];
   const { valueText } = getEstKcalInfo(customer);
-  const isMobile = document.body && document.body.classList.contains('mode-mobile');
-  const displayRows = isMobile ? rows.filter(row => !['activity', 'avoid', 'allergies'].includes(row.field)) : rows;
-  const infoHtml = displayRows.map(row => {
+  const infoHtml = rows.map(row => {
     const label = escapeHtml(row.label || '-');
-    let displayValue;
+    let value;
     if (row.raw) {
-      const rawValue = row.value || '-';
-      if (isMobile && row.field && ['avoid', 'allergies', 'fav'].includes(row.field)) {
-        displayValue = escapeHtml(rawValue.replace(/<br\s*\/?\s*>/gi, '、'));
-      } else {
-        displayValue = rawValue;
-      }
+      value = row.value || '-';
     } else {
-      const rawText = row.value != null && row.value !== '' ? row.value : '-';
-      if (isMobile && row.field === 'activity') {
-        displayValue = escapeHtml(String(rawText).replace(/\n+/g, ' '));
-      } else {
-        displayValue = escapeHtml(rawText);
-      }
+      value = escapeHtml(row.value != null && row.value !== '' ? row.value : '-');
     }
-    const fieldAttr = row.field ? ` data-field="${row.field || ''}"` : '';
-    return `<div class="quote-summary-grid-item"${fieldAttr}><div class="quote-summary-label">${label}</div><div class="quote-summary-value">${displayValue}</div></div>`;
+    return `<div class="quote-summary-grid-item"><div class="quote-summary-label">${label}</div><div class="quote-summary-value">${value}</div></div>`;
   }).join('');
   return `
     <div class="quote-summary-card">
@@ -1589,7 +1103,7 @@ function calculateQuoteIngredientDetails(recipe, ratio, mealsPerDay, totalWeight
     const category = ingredient ? (ingredient.category || '-') : '-';
     const project = ingredient ? (ingredient.name || '-') : '-';
     const description = ingredient ? (ingredient.description || '') : '';
-    const ingredientName = project || '-';
+    const ingredientName = description ? `${project}-${description}` : project;
     const brand = ingredient ? (ingredient.brand || ingredient.source || '-') : '-';
     const mainFunction = ingredient ? (ingredient.mainFunction || '-') : '-';
     const unit = item.unit || (ingredient ? ingredient.unit : 'g');
@@ -1611,8 +1125,6 @@ function calculateQuoteIngredientDetails(recipe, ratio, mealsPerDay, totalWeight
       index: idx + 1,
       category,
       ingredientName,
-      ingredientProject: project || '-',
-      ingredientDescription: description,
       brand,
       ratioText,
       amountText,
@@ -1625,6 +1137,7 @@ function calculateQuoteIngredientDetails(recipe, ratio, mealsPerDay, totalWeight
 function resetQuoteOverrides() {
   quoteOverrides = { servingWeight: null, shippingType: 'remote' };
 }
+
 resetQuoteOverrides();
 
 function calculateQuoteCostForDays(recipe, customer, baseData, days, overrides = {}) {
@@ -1734,20 +1247,20 @@ function generateQuoteComparison() {
     if (!recipe) return;
     const baseData = calculateQuoteBaseData(recipe, customer);
     const basicRows = [
-      { field: 'lifeStage', label: '适用生命阶段', value: zh(recipe.lifeStage, lifeMap) },
-      { field: 'nutritionStandard', label: '营养参考标准', value: nutritionLabelMap[recipe.nutritionStandard] || (recipe.nutritionStandard || '-') },
-      { field: 'recipeType', label: '食谱类型', value: recipeTypeLabelMap[recipe.recipeType] || '-' },
-      { field: 'software', label: '食谱制作软件', value: recipe.software || '-' }
+      { label: '适用生命阶段', value: zh(recipe.lifeStage, lifeMap) },
+      { label: '营养参考标准', value: nutritionLabelMap[recipe.nutritionStandard] || (recipe.nutritionStandard || '-') },
+      { label: '食谱类型', value: recipeTypeLabelMap[recipe.recipeType] || '-' },
+      { label: '食谱制作软件', value: recipe.software || '-' }
     ];
     const nutritionRows = [
-      { label: '蛋白质（干物质占比）', value: recipe.protein != null ? formatPercentInteger(recipe.protein) : '-', field: 'protein' },
-      { label: '脂肪（干物质占比）', value: recipe.fat != null ? formatPercentInteger(recipe.fat) : '-', field: 'fat' },
-      { label: '碳水化合物（干物质占比）', value: recipe.carb != null ? formatPercentInteger(recipe.carb) : '-', field: 'carb' },
-      { label: '膳食纤维（干物质占比）', value: recipe.fiber != null ? formatPercentInteger(recipe.fiber) : '-', field: 'fiber' },
-      { label: '灰分（干物质占比）', value: recipe.ash != null ? formatPercentInteger(recipe.ash) : '-', field: 'ash' },
-      { label: '水分', value: recipe.moisture != null ? formatPercentInteger(recipe.moisture) : '-', field: 'moisture' },
-      { label: '钙磷比', value: recipe.caPratio || '-', field: 'caPratio' },
-      { label: '热量密度', value: recipe.kcalDensity != null ? `${Math.round(recipe.kcalDensity)} kcal/kg` : '-', field: 'kcalDensity' }
+      { label: '蛋白质（干物质占比）', value: recipe.protein != null ? formatPercentInteger(recipe.protein) : '-' },
+      { label: '脂肪（干物质占比）', value: recipe.fat != null ? formatPercentInteger(recipe.fat) : '-' },
+      { label: '碳水化合物（干物质占比）', value: recipe.carb != null ? formatPercentInteger(recipe.carb) : '-' },
+      { label: '膳食纤维（干物质占比）', value: recipe.fiber != null ? formatPercentInteger(recipe.fiber) : '-' },
+      { label: '灰分（干物质占比）', value: recipe.ash != null ? formatPercentInteger(recipe.ash) : '-' },
+      { label: '水分', value: recipe.moisture != null ? formatPercentInteger(recipe.moisture) : '-' },
+      { label: '钙磷比', value: recipe.caPratio || '-' },
+      { label: '热量密度', value: recipe.kcalDensity != null ? `${Math.round(recipe.kcalDensity)} kcal/kg` : '-' }
     ];
     items.push({
       recipe,
@@ -1769,51 +1282,28 @@ function generateQuoteComparison() {
   closeQuoteRecipeSelector();
 }
 
-function buildQuoteIngredientsTable(details, options = {}) {
-  if (!details || details.length === 0) return '<div class="detail-empty">暂无数据</div>';
-  const isMobile = options.isMobile === true;
-  if (isMobile) {
-    const rowsMobile = details.map(item => `
-      <tr>
-        <td class="col-ingredient" data-label="食谱原材料">${escapeHtml(item.ingredientProject || item.ingredientName || '-')}</td>
-        <td class="col-brand" data-label="品牌/来源">${escapeHtml(item.brand || '-')}</td>
-      </tr>
-    `).join('');
-    return `
-      <table class="detail-table quote-ingredients-table">
-        <thead>
-          <tr>
-            <th class="col-ingredient">食谱原材料</th>
-            <th class="col-brand">品牌/来源</th>
-          </tr>
-        </thead>
-        <tbody>${rowsMobile}</tbody>
-      </table>
-    `;
-  }
+function buildQuoteIngredientsTable(details) {
+  if (!details || details.length === 0) return '<div class="detail-empty">未配置原料</div>';
   const rowsHtml = details.map(item => `
     <tr>
-      <td class="col-index" data-label="序号">${item.index}</td>
-      <td class="col-category" data-label="类别">${escapeHtml(item.category)}</td>
-      <td class="col-ingredient" data-label="食谱原材料">
-        <span class="ingredient-project">${escapeHtml(item.ingredientProject || item.ingredientName || '-')}</span>
-        ${item.ingredientDescription ? `<span class="ingredient-description">${escapeHtml(`（${item.ingredientDescription}）`)}</span>` : ''}
-      </td>
-      <td class="col-brand" data-label="品牌/来源">${escapeHtml(item.brand || '-')}</td>
-      <td class="col-usage" data-label="重量占比/用量">${getRatioUsageText(item)}</td>
-      <td class="col-nutrition" data-label="主要营养价值">${escapeHtml(item.nutritionValue || '-')}</td>
+      <td>${item.index}</td>
+      <td>${escapeHtml(item.category)}</td>
+      <td>${escapeHtml(item.ingredientName)}</td>
+      <td>${escapeHtml(item.brand || '-')}</td>
+      <td>${getRatioUsageText(item)}</td>
+      <td>${escapeHtml(item.nutritionValue || '-')}</td>
     </tr>
   `).join('');
   return `
     <table class="detail-table quote-ingredients-table">
       <thead>
         <tr>
-          <th class="col-index" style="width:50px;">序号</th>
-          <th class="col-category" style="width:130px;">类别</th>
-          <th class="col-ingredient" style="width:220px;">食谱原材料</th>
-          <th class="col-brand" style="width:180px;">品牌/来源</th>
-          <th class="col-usage" style="width:150px;">重量占比/用量</th>
-          <th class="col-nutrition">本食谱中的主要营养价值</th>
+          <th style="width:50px;">序号</th>
+          <th style="width:130px;">类别</th>
+          <th style="width:220px;">食谱原材料</th>
+          <th style="width:180px;">品牌/来源</th>
+          <th style="width:150px;">重量占比/用量</th>
+          <th>本食谱中的主要营养价值</th>
         </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>
@@ -1856,59 +1346,39 @@ function buildQuoteOverrideControls(options = {}) {
     </div>
   `;
 }
-function buildQuoteCostTable(costComparison, options = {}) {
-  if (!costComparison || costComparison.length === 0) return '<div class="detail-empty">暂无数据</div>';
-  const isMobile = options.isMobile === true;
+
+function buildQuoteCostTable(costComparison) {
+  if (!costComparison || costComparison.length === 0) return '<div class="detail-empty">暂无费用数据</div>';
   const rowsHtml = costComparison.map(item => {
     const servingText = item.servingWeight > 0 ? `${Math.round(item.servingWeight)} g` : '-';
-    const totalWeightKg = item.totalWeight > 0 ? `${(item.totalWeight / 1000).toFixed(1)} kg` : '-';
-    const totalWeightText = isMobile ? totalWeightKg : (item.totalWeight > 0 ? `${Math.round(item.totalWeight)} g` : '-');
+    const totalWeightText = item.totalWeight > 0 ? `${Math.round(item.totalWeight)} g` : '-';
     const totalPriceText = item.totalPrice > 0 ? formatCurrency(item.totalPrice, 0) : '-';
-    const avgValue = (item.totalServings > 0 && item.averagePerServing > 0) ? formatCurrency(item.averagePerServing, 1) : '-';
-    const avgDesktopText = avgValue !== '-' ? `${avgValue}/份` : '-';
-    const avgMobileText = avgValue !== '-' ? `（${avgValue}/份）` : '（-）';
-    const totalServings = item.totalServings > 0 ? item.totalServings : '-';
-    const daysLabel = isMobile && totalServings !== '-' ? `${item.days} 天（共${totalServings}份）` : `${item.days} 天`;
-    const servingsCell = isMobile ? '' : `<td>${totalServings}</td>`;
-    const priceCell = isMobile
-      ? `<td class="quote-cost-total">${totalPriceText}<br><span class="quote-cost-per">${avgMobileText}</span></td>`
-      : `<td class="quote-cost-total">${totalPriceText}</td>`;
-    const avgCell = isMobile ? '' : `<td>${avgDesktopText}</td>`;
+    const avgText = (item.totalServings > 0 && item.averagePerServing > 0) ? `${formatCurrency(item.averagePerServing, 1)}/份` : '-';
     return `<tr>
-      <td>${daysLabel}</td>
+      <td>${item.days} 天</td>
       <td>${servingText}</td>
-      ${servingsCell}
+      <td>${item.totalServings > 0 ? item.totalServings : '-'}</td>
       <td>${totalWeightText}</td>
-      ${priceCell}
-      ${avgCell}
+      <td class="quote-cost-total">${totalPriceText}</td>
+      <td>${avgText}</td>
     </tr>`;
   }).join('');
-  const headerHtml = isMobile ? `
-      <tr>
-        <th>制作天数</th>
-        <th>每份重量</th>
-        <th>总净重</th>
-        <th>价格</th>
-      </tr>
-  ` : `
-      <tr>
-        <th>制作天数</th>
-        <th>每份重量</th>
-        <th>总份数</th>
-        <th>总净重</th>
-        <th>订单总价</th>
-        <th>平均每份费用</th>
-      </tr>
-  `;
   const tableHtml = `
     <table class="quote-cost-table">
       <thead>
-        ${headerHtml}
+        <tr>
+          <th>制作天数</th>
+          <th>每份重量</th>
+          <th>总份数</th>
+          <th>总净重</th>
+          <th>订单总价</th>
+          <th>平均每份费用</th>
+        </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>
     </table>
   `;
-  const notesHtml = isMobile ? '' : `
+  const notesHtml = `
     <div class="quote-cost-notes">
       <div>1、制作天数/份数可自选，表中为参考用量；</div>
       <div>2、按小家伙的进餐习惯，每顿饭分装为1份。每份重量根据食谱的热量密度和小家伙的每日能量需求计算得出，需要调整也可以告诉我。</div>
@@ -1916,6 +1386,7 @@ function buildQuoteCostTable(costComparison, options = {}) {
   `;
   return `<div class="quote-cost-wrapper">${tableHtml}${notesHtml}</div>`;
 }
+
 function renderQuoteResult(customer, results, options = {}) {
   const contentEl = $('quote-result-content');
   const resultCard = $('quote-result-card');
@@ -1925,53 +1396,24 @@ function renderQuoteResult(customer, results, options = {}) {
     overrides: options.overrides,
     defaultServingWeight: options.defaultServingWeight
   }) : '';
-  const isMobileMode = document.body && document.body.classList.contains('mode-mobile');
   const recipeHtml = results.map(item => {
-    const ingredientTable = buildQuoteIngredientsTable(item.ingredientDetails, { isMobile: isMobileMode });
-    const basicSource = isMobileMode ? item.basicRows.filter(row => !['lifeStage', 'nutritionStandard', 'recipeType', 'software'].includes(row.field)) : item.basicRows;
-    const basicContent = () => {
-      if (!isMobileMode) {
-        return buildDetailGrid(basicSource, { columns: 4, compact: true });
-      }
-      const listHtml = basicSource
-        .filter(row => !['activity', 'avoid', 'allergies'].includes(row.field))
-        .map(row => {
-          const label = escapeHtml(row.label || '-');
-          let valueHtml;
-          if (row.raw) {
-            const rawValue = row.value || '-';
-            valueHtml = escapeHtml(rawValue.replace(/<br\s*\/?\s*>/gi, '、'));
-          } else {
-            const rawText = row.value != null && row.value !== '' ? row.value : '-';
-            valueHtml = escapeHtml(String(rawText).replace(/\n+/g, ' '));
-          }
-          return `<div class="quote-summary-line" data-field="${row.field || ''}"><span class="quote-summary-line-label">${label}</span><span class="quote-summary-line-value">${valueHtml}</span></div>`;
-        }).join('');
-      return `<div class="quote-summary-mobile">${listHtml}</div>`;
-    };
-    const costTable = buildQuoteCostTable(item.costComparison, { isMobile: isMobileMode });
+    const ingredientTable = buildQuoteIngredientsTable(item.ingredientDetails);
+    const costTable = buildQuoteCostTable(item.costComparison);
     const headerHtml = `
       <div class="quote-recipe-header">
         <h4 class="quote-recipe-title">${escapeHtml(item.recipe.name || '-')}</h4>
         <div class="quote-recipe-subtitle">编号：${escapeHtml(item.recipe.code || '-')}</div>
       </div>
     `;
-    const nutritionHtml = isMobileMode ? '' : `
-        <div class="detail-section-title">营养数据</div>
-        ${buildDetailGrid(item.nutritionRows, { columns: 4, compact: true })}`;
-    const ingredientsSection = isMobileMode ? `
-        ${ingredientTable}
-    ` : `
-        <div class="detail-section-title">原料组成</div>
-        ${ingredientTable}`;
-    const costTitleClass = isMobileMode ? 'detail-section-title detail-section-title-cost' : 'detail-section-title';
     return `
       <div class="quote-block">
         ${headerHtml}
-        ${basicContent()}
-        ${ingredientsSection}
-        ${nutritionHtml}
-        <div class="${costTitleClass}">费用对比</div>
+        ${buildDetailGrid(item.basicRows, { columns: 4, compact: true })}
+        <div class="detail-section-title">原料组成</div>
+        ${ingredientTable}
+        <div class="detail-section-title">营养数据</div>
+        ${buildDetailGrid(item.nutritionRows, { columns: 4, compact: true })}
+        <div class="detail-section-title">费用对比</div>
         ${costTable}
       </div>
     `;
@@ -2032,103 +1474,6 @@ function triggerDownload(dataUrl, fileName) {
   document.body.removeChild(link);
 }
 
-function applyPreviewMode(mode, options = {}) {
-  const normalized = mode === 'mobile' ? 'mobile' : 'desktop';
-  currentPreviewMode = normalized;
-  const body = document.body;
-  if (body) {
-    body.classList.toggle('mode-mobile', normalized === 'mobile');
-    body.classList.toggle('mode-desktop', normalized === 'desktop');
-  }
-  if (!options.skipSave) {
-    try {
-      localStorage.setItem(STORAGE_KEY_PREVIEW_MODE, normalized);
-    } catch (error) {
-      console.warn('无法保存预览模式到 localStorage:', error);
-    }
-  }
-  const selectEl = $('preview-mode-select');
-  if (selectEl && selectEl.value !== normalized) {
-    selectEl.value = normalized;
-  }
-  if (options.refresh !== false) {
-    const list = $('customers-list');
-    if (list) {
-      renderCustomersList();
-    }
-    if (currentQuoteRenderState) {
-      renderQuoteResultWithOverrides({ silent: true });
-    }
-  }
-}
-
-function setupPreviewMode() {
-  const selectEl = $('preview-mode-select');
-  let initialMode = 'desktop';
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_PREVIEW_MODE);
-    if (saved === 'mobile' || saved === 'desktop') {
-      initialMode = saved;
-    }
-  } catch (error) {
-    console.warn('读取预览模式失败:', error);
-  }
-  applyPreviewMode(initialMode, { skipSave: true });
-  if (selectEl) {
-    selectEl.value = initialMode;
-    selectEl.addEventListener('change', (event) => {
-      const value = event.target.value === 'mobile' ? 'mobile' : 'desktop';
-      applyPreviewMode(value);
-    });
-  }
-}
-
-function showQuoteImagePreview(dataUrl, fileName) {
-  const previewContainer = $('quote-image-preview');
-  const previewImage = $('quote-preview-image');
-  const downloadBtn = $('quote-preview-download');
-  const previewBody = previewContainer ? previewContainer.querySelector('.quote-preview-body') : null;
-  quotePreviewImageDataUrl = dataUrl;
-  quotePreviewImageFileName = fileName;
-  if (previewImage) {
-    const onLoad = () => {
-      if (previewBody) previewBody.scrollTop = 0;
-      previewImage.removeEventListener('load', onLoad);
-    };
-    previewImage.addEventListener('load', onLoad);
-    previewImage.src = dataUrl;
-  }
-  if (previewContainer) {
-    previewContainer.style.display = 'flex';
-    previewContainer.classList.add('show');
-  }
-  if (previewBody) {
-    previewBody.scrollTop = 0;
-    previewBody.scrollLeft = 0;
-  }
-  if (downloadBtn) {
-    downloadBtn.disabled = false;
-  }
-}
-
-function hideQuoteImagePreview() {
-  const previewContainer = $('quote-image-preview');
-  const previewImage = $('quote-preview-image');
-  const previewBody = previewContainer ? previewContainer.querySelector('.quote-preview-body') : null;
-  if (previewContainer) {
-    previewContainer.style.display = 'none';
-    previewContainer.classList.remove('show');
-  }
-  if (previewImage) {
-    previewImage.src = '';
-  }
-  if (previewBody) {
-    previewBody.scrollTop = 0;
-    previewBody.scrollLeft = 0;
-  }
-  quotePreviewImageDataUrl = null;
-  quotePreviewImageFileName = '';
-}
 async function exportQuoteImage() {
   const exportBtn = $('btn-export-quote-image');
   const resultCard = $('quote-result-card');
@@ -2137,14 +1482,11 @@ async function exportQuoteImage() {
     alert('请先生成食谱对比单');
     return;
   }
-  const useHtmlToImage = window.htmlToImage && typeof window.htmlToImage.toPng === 'function';
-  const canUseHtml2Canvas = window.html2canvas && typeof window.html2canvas === 'function';
-  if (!useHtmlToImage && !canUseHtml2Canvas) {
-    alert('当前环境缺少截图库，请确保已引入 html-to-image 或 html2canvas');
+  if (!window.htmlToImage || typeof window.htmlToImage.toPng !== 'function') {
+    alert('当前环境暂不支持生成图片，请升级浏览器后重试');
     return;
   }
   let scrollY = window.scrollY || 0;
-  const enableMobileLayout = currentPreviewMode === 'mobile';
   try {
     if (exportBtn) {
       exportBtn.disabled = true;
@@ -2152,9 +1494,6 @@ async function exportQuoteImage() {
       exportBtn.textContent = '生成中...';
     }
     resultCard.classList.add('quote-export-mode');
-    if (enableMobileLayout) {
-      resultCard.classList.add('quote-export-mobile');
-    }
     window.scrollTo({ top: resultCard.offsetTop, behavior: 'instant' });
 
     if (document.fonts && document.fonts.ready) {
@@ -2162,33 +1501,24 @@ async function exportQuoteImage() {
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-    let dataUrl;
-    if (useHtmlToImage) {
-      const pixelRatio = Math.min(3, (window.devicePixelRatio || 1) * 1.6);
-      dataUrl = await window.htmlToImage.toPng(resultCard, {
-        pixelRatio,
-        cacheBust: true,
-        backgroundColor: '#ffffff'
-      });
-    } else {
-      const canvas = await window.html2canvas(resultCard, { scale: 2, backgroundColor: '#ffffff' });
-      dataUrl = canvas.toDataURL('image/png');
-    }
+    const pixelRatio = Math.min(3, (window.devicePixelRatio || 1) * 1.6);
+    const dataUrl = await window.htmlToImage.toPng(resultCard, {
+      pixelRatio,
+      cacheBust: true,
+      backgroundColor: '#ffffff'
+    });
     const fileName = `quote-${formatFileTimestamp()}.png`;
-    showQuoteImagePreview(dataUrl, fileName);
+    triggerDownload(dataUrl, fileName);
   } catch (error) {
     console.error('生成图片失败:', error);
-    alert('生成图片失败，请检查浏览器是否支持截图或稍后重试');
+    alert('生成图片失败，请重试');
   } finally {
     resultCard.classList.remove('quote-export-mode');
-    if (enableMobileLayout) {
-      resultCard.classList.remove('quote-export-mobile');
-    }
     window.scrollTo({ top: scrollY, behavior: 'instant' });
     if (exportBtn) {
       exportBtn.disabled = false;
       exportBtn.dataset.loading = 'false';
-      exportBtn.textContent = '预览图片';
+      exportBtn.textContent = '生成图片';
     }
   }
 }
@@ -2199,6 +1529,7 @@ function closeQuoteResult() {
   if (resultCard) resultCard.style.display = 'none';
   if (contentEl) contentEl.innerHTML = '';
 }
+
 function formatDetails(c) {
   const parts = [];
   const years = calcAgeYears(c.birthday);
@@ -2255,36 +1586,11 @@ function paginatedCustomers() {
 function renderCustomersList() {
   const list = $('customers-list');
   const { pageItems, total, totalPages } = paginatedCustomers();
-  const isMobileMode = document.body && document.body.classList.contains('mode-mobile');
   if (pageItems.length === 0) {
     list.innerHTML = '<div class="muted">暂无记录</div>';
   } else {
     list.innerHTML = pageItems.map((c, i) => {
       const idx = (store.page - 1) * store.pageSize + i + 1;
-      const actionsHtml = `
-          <div class="item-actions">
-            <button class="btn small" data-quote="${c.id}">筛选食谱</button>
-            <button class="btn small" data-detail="${c.id}">详细信息</button>
-            <button class="btn small" data-edit="${c.id}">编辑</button>
-            <button class="btn small" data-del="${c.id}">删除</button>
-          </div>
-        `;
-      if (isMobileMode) {
-        const namePart = c.petName || '-';
-        const breedPart = c.breed ? `（${c.breed}）` : '';
-        const nameLine = `${namePart}${breedPart}`;
-        const wechatText = c.wechat ? `主人微信（${c.wechat}）` : '主人微信（-）';
-        const addressText = c.address ? `收货信息：${c.address}` : '收货信息：-';
-        return `
-        <div class="list-item" data-id="${c.id}">
-          <div class="customer-card-mobile">
-            <div class="customer-mobile-name">${nameLine}</div>
-            <div class="customer-mobile-row">${wechatText}</div>
-            <div class="customer-mobile-row">${addressText}</div>
-          </div>
-          ${actionsHtml}
-        </div>`;
-      }
       return `
         <div class="list-item" data-id="${c.id}">
           <div class="list-item-row">
@@ -2294,7 +1600,12 @@ function renderCustomersList() {
             <div>${c.wechat || '-'}</div>
             <div>${c.address || '-'}</div>
           </div>
-          ${actionsHtml}
+          <div class="item-actions">
+            <button class="btn small" data-quote="${c.id}">筛选食谱</button>
+            <button class="btn small" data-detail="${c.id}">详细信息</button>
+            <button class="btn small" data-edit="${c.id}">编辑</button>
+            <button class="btn small" data-del="${c.id}">删除</button>
+          </div>
         </div>`;
     }).join('');
   }
@@ -2386,6 +1697,7 @@ function deleteCustomer(id) {
   saveApp();
   renderCustomersList();
 }
+
 function setupCustomersModule() {
   populateBreedSelect();
   const newBtn = $('btn-new-customer');
@@ -2520,32 +1832,6 @@ function setupCustomersModule() {
       exportQuoteImage();
     });
   }
-  const quotePreviewCloseBtn = $('quote-preview-close');
-  if (quotePreviewCloseBtn) {
-    quotePreviewCloseBtn.addEventListener('click', () => {
-      hideQuoteImagePreview();
-    });
-  }
-  const quotePreviewCancelBtn = $('quote-preview-cancel');
-  if (quotePreviewCancelBtn) {
-    quotePreviewCancelBtn.addEventListener('click', () => {
-      hideQuoteImagePreview();
-    });
-  }
-  const quotePreviewOverlay = $('quote-preview-overlay');
-  if (quotePreviewOverlay) {
-    quotePreviewOverlay.addEventListener('click', () => {
-      hideQuoteImagePreview();
-    });
-  }
-  const quotePreviewDownloadBtn = $('quote-preview-download');
-  if (quotePreviewDownloadBtn) {
-    quotePreviewDownloadBtn.addEventListener('click', () => {
-      if (quotePreviewImageDataUrl) {
-        triggerDownload(quotePreviewImageDataUrl, quotePreviewImageFileName || `quote-${formatFileTimestamp()}.png`);
-      }
-    });
-  }
 }
 
 // ========== 原料管理模块 ==========
@@ -2580,6 +1866,7 @@ function populateCategorySelects() {
     updateNameFilterSelect();
   }
 }
+
 // 更新项目名称筛选下拉框
 function updateNameFilterSelect() {
   const nameFilterSelect = $('ingredient-name-filter');
@@ -2596,6 +1883,7 @@ function updateNameFilterSelect() {
     nameFilterSelect.appendChild(opt);
   });
 }
+
 function calculatePricePer500(cost, quantity, unit) {
   if (!cost || !quantity || quantity <= 0) return 0;
   
@@ -2671,6 +1959,7 @@ function updateNameSelectByCategory() {
     if (codeEl) codeEl.value = '';
   }
 }
+
 // 自动生成编号（当类别和项目都填写后）
 function autoGenerateCode() {
   const category = $('i-category').value.trim();
@@ -2697,6 +1986,7 @@ function autoGenerateCode() {
     }
   }
 }
+
 // 格式化原料详细信息
 function formatIngredientDetails(ing) {
   const parts = [];
@@ -2718,6 +2008,7 @@ function formatIngredientDetails(ing) {
   if (ing.mainFunction) parts.push(`主要作用：${ing.mainFunction}`);
   return `<div class="item-details">${parts.map(t => `<div>${t}</div>`).join('')}</div>`;
 }
+
 function renderIngredientsList() {
   const list = $('ingredients-list');
   if (!list) return;
@@ -2963,6 +2254,7 @@ function generateMissingCodes() {
     alert('保存失败，请重试');
   }
 }
+
 function importFromExcel(file) {
   if (!file) return;
   
@@ -2974,6 +2266,7 @@ function importFromExcel(file) {
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      
       let imported = 0;
       let skipped = 0;
       
@@ -3291,6 +2584,7 @@ function setupIngredientsModule() {
     const el = $(id);
     if (el) el.addEventListener('input', updateIngredientPriceFields);
   });
+  
   // 表单提交
   const form = $('ingredient-form');
   if (form) {
@@ -3614,6 +2908,7 @@ function renderRecipeIngredientsList() {
       }
     });
   });
+  
   // 绑定编辑按钮
   listEl.querySelectorAll('[data-edit-ingredient]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -3760,6 +3055,7 @@ function updateIndicesAfterDrag(fromIndex, toIndex) {
     }
   }
 }
+
 // 生成食谱编号
 // 规则：生命阶段 + 营养参考标准 + 食谱类型 + 升序三位数
 // 生命阶段：成犬="C", 幼犬="Y", 老年犬="L", 哺乳期="B", 妊娠期="R"
@@ -4274,6 +3570,7 @@ function openRecipeForm(id = null) {
   card.style.display = 'block';
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
 // 删除食谱
 function deleteRecipe(id) {
   if (!confirm('确定要删除这个食谱吗？')) return;
@@ -4429,7 +3726,7 @@ function setupRecipesModule() {
       const caPratioInput = $('r-caPratio').value.trim();
       let caPratio = null;
       if (caPratioInput) {
-        // 验证格式：数字:数字，如 1.2:1，不支持整数格式，必须是比例格式
+        // 验证格式：数字:数字，如 1.2:1
         const ratioPattern = /^[0-9]+(\.[0-9]+)?:[0-9]+(\.[0-9]+)?$/;
         if (!ratioPattern.test(caPratioInput)) {
           alert('钙磷比格式不正确，请输入如 1.2:1 的格式');
@@ -4503,825 +3800,6 @@ function setupRecipesModule() {
 window.openRecipeForm = openRecipeForm;
 window.deleteRecipe = deleteRecipe;
 
-// ========== Breeds Module ==========
-let breedsState = {
-  breeds: [],
-  page: 1,
-  pageSize: 20,
-  total: 0,
-  categories: []
-};
-
-async function loadBreeds() {
-  if (!backendState.token) {
-    breedsState.breeds = [];
-    breedsState.total = 0;
-    return;
-  }
-  
-  try {
-    const params = new URLSearchParams({
-      page: breedsState.page,
-      pageSize: breedsState.pageSize
-    });
-    
-    const search = $('breed-search')?.value.trim();
-    if (search) params.append('search', search);
-    
-    const category = $('breed-category-filter')?.value;
-    if (category) params.append('category', category);
-    
-    const sizeCategory = $('breed-size-filter')?.value;
-    if (sizeCategory) params.append('sizeCategory', sizeCategory);
-    
-    const breeds = await backendRequest(`/api/v1/breeds?${params.toString()}`);
-    breedsState.breeds = Array.isArray(breeds) ? breeds : [];
-    // 由于后端没有返回总数，暂时使用当前页数据长度
-    // 如果需要准确总数，需要后端API返回分页信息
-    breedsState.total = breedsState.breeds.length;
-  } catch (error) {
-    console.error('Load breeds failed:', error);
-    breedsState.breeds = [];
-    breedsState.total = 0;
-  }
-}
-
-async function loadBreedCategories() {
-  if (!backendState.token) return;
-  
-  try {
-    const response = await backendRequest('/api/v1/breeds/categories');
-breedsState.categories = Array.isArray(response?.data) ? response.data : [];
-    
-    const filterEl = $('breed-category-filter');
-    if (filterEl) {
-      const currentValue = filterEl.value;
-      filterEl.innerHTML = '<option value="">全部分类</option>';
-      breedsState.categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.category;
-        option.textContent = cat.category;
-        filterEl.appendChild(option);
-      });
-      if (currentValue) filterEl.value = currentValue;
-    }
-  } catch (error) {
-    console.error('Load breed categories failed:', error);
-  }
-}
-
-function renderBreedsList() {
-  const listEl = $('breeds-list');
-  const totalEl = $('breeds-total');
-  const pageInfoEl = $('breeds-pageinfo');
-  
-  if (!listEl) return;
-  
-  if (!backendState.token) {
-    listEl.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">请先登录后台</div>';
-    if (totalEl) totalEl.textContent = '共 0 条';
-    if (pageInfoEl) pageInfoEl.textContent = '';
-    return;
-  }
-  
-  if (breedsState.breeds.length === 0) {
-    listEl.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">暂无品种数据</div>';
-    if (totalEl) totalEl.textContent = '共 0 条';
-    if (pageInfoEl) pageInfoEl.textContent = '';
-    return;
-  }
-  
-  const sizeCategoryMap = {
-    small: '小型',
-    medium: '中型',
-    large: '大型',
-    xlarge: '超大型'
-  };
-  
-  listEl.innerHTML = breedsState.breeds.map(breed => {
-    const weightRange = breed.weightMin && breed.weightMax 
-      ? `${breed.weightMin}-${breed.weightMax}`
-      : breed.weightMin 
-        ? `≥${breed.weightMin}`
-        : breed.weightMax
-          ? `≤${breed.weightMax}`
-          : '-';
-    
-    return `
-      <div class="list-item" style="display: grid; grid-template-columns: 1.5fr 1fr 0.8fr 1fr 1fr 1.2fr; gap: 12px; align-items: center;">
-        <div>${escapeHtml(breed.category || '-')}</div>
-        <div>${escapeHtml(breed.name || '-')}</div>
-        <div>${sizeCategoryMap[breed.sizeCategory] || '-'}</div>
-        <div>${weightRange}</div>
-        <div>${breed.maturityMonths ? breed.maturityMonths + '个月' : '-'}</div>
-        <div style="display:flex; gap:8px; justify-content:flex-end;">
-          <button class="btn small" onclick="editBreed(${breed.id})">编辑</button>
-          <button class="btn small ghost" onclick="deleteBreed(${breed.id})">删除</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  if (totalEl) totalEl.textContent = `共 ${breedsState.total} 条`;
-  
-  const totalPages = Math.ceil(breedsState.total / breedsState.pageSize);
-  if (pageInfoEl) pageInfoEl.textContent = `第 ${breedsState.page} / ${totalPages} 页`;
-}
-
-function openBreedForm(breedId = null) {
-  const card = $('breed-form-card');
-  const title = $('breed-form-title');
-  const form = $('breed-form');
-  
-  if (!card || !title || !form) return;
-  
-  if (breedId) {
-    const breed = breedsState.breeds.find(b => b.id === breedId);
-    if (breed) {
-      title.textContent = '编辑品种';
-      $('breed-id').value = breed.id;
-      $('b-category').value = breed.category || '';
-      $('b-name').value = breed.name || '';
-      $('b-sizeCategory').value = breed.sizeCategory || '';
-      $('b-weightMin').value = breed.weightMin || '';
-      $('b-weightMax').value = breed.weightMax || '';
-      $('b-maturityMonths').value = breed.maturityMonths || '';
-    }
-  } else {
-    title.textContent = '新增品种';
-    form.reset();
-    $('breed-id').value = '';
-  }
-  
-  card.style.display = 'block';
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-async function deleteBreed(breedId) {
-  if (!confirm('确定要删除这个品种吗？')) return;
-  
-  if (!backendState.token) {
-    alert('请先登录后台');
-    return;
-  }
-  
-  try {
-    await backendRequest(`/api/v1/breeds/${breedId}`, { method: 'DELETE' });
-    await loadBreeds();
-    renderBreedsList();
-  } catch (error) {
-    alert('删除失败：' + (error.message || '未知错误'));
-  }
-}
-
-window.editBreed = openBreedForm;
-window.deleteBreed = deleteBreed;
-
-function setupBreedsModule() {
-  const newBtn = $('btn-new-breed');
-  if (newBtn) newBtn.addEventListener('click', () => openBreedForm());
-  
-  const cancelBtn = $('breed-form-cancel');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      const card = $('breed-form-card');
-      if (card) card.style.display = 'none';
-    });
-  }
-  
-  // 搜索和筛选
-  const searchEl = $('breed-search');
-  if (searchEl) {
-    let searchTimeout;
-    searchEl.addEventListener('input', () => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(async () => {
-        breedsState.page = 1;
-        await loadBreeds();
-        renderBreedsList();
-      }, 300);
-    });
-  }
-  
-  const categoryFilterEl = $('breed-category-filter');
-  if (categoryFilterEl) {
-    categoryFilterEl.addEventListener('change', async () => {
-      breedsState.page = 1;
-      await loadBreeds();
-      renderBreedsList();
-    });
-  }
-  
-  const sizeFilterEl = $('breed-size-filter');
-  if (sizeFilterEl) {
-    sizeFilterEl.addEventListener('change', async () => {
-      breedsState.page = 1;
-      await loadBreeds();
-      renderBreedsList();
-    });
-  }
-  
-  // 分页
-  const prevBtn = $('breeds-prev');
-  if (prevBtn) {
-    prevBtn.addEventListener('click', async () => {
-      if (breedsState.page > 1) {
-        breedsState.page--;
-        await loadBreeds();
-        renderBreedsList();
-      }
-    });
-  }
-  
-  const nextBtn = $('breeds-next');
-  if (nextBtn) {
-    nextBtn.addEventListener('click', async () => {
-      const totalPages = Math.ceil(breedsState.total / breedsState.pageSize);
-      if (breedsState.page < totalPages) {
-        breedsState.page++;
-        await loadBreeds();
-        renderBreedsList();
-      }
-    });
-  }
-  
-  // 表单提交
-  const form = $('breed-form');
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      if (!backendState.token) {
-        alert('请先登录后台');
-        return;
-      }
-      
-      const category = $('b-category').value.trim();
-      const name = $('b-name').value.trim();
-      const sizeCategory = $('b-sizeCategory').value;
-      
-      if (!category || !name || !sizeCategory) {
-        alert('请填写品种分类、品种名称和体型分类');
-        return;
-      }
-      
-      const weightMin = $('b-weightMin').value ? parseFloat($('b-weightMin').value) : null;
-      const weightMax = $('b-weightMax').value ? parseFloat($('b-weightMax').value) : null;
-      const maturityMonths = $('b-maturityMonths').value ? parseInt($('b-maturityMonths').value) : null;
-      
-      if (weightMin !== null && weightMax !== null && weightMin > weightMax) {
-        alert('体重最小值不能大于最大值');
-        return;
-      }
-      
-      const payload = {
-        category,
-        name,
-        sizeCategory,
-        weightMin,
-        weightMax,
-        maturityMonths
-      };
-      
-      try {
-        const breedId = $('breed-id').value;
-        if (breedId) {
-          await backendRequest(`/api/v1/breeds/${breedId}`, {
-            method: 'PUT',
-            body: payload
-          });
-        } else {
-          await backendRequest('/api/v1/breeds', {
-            method: 'POST',
-            body: payload
-          });
-        }
-        
-        const card = $('breed-form-card');
-        if (card) card.style.display = 'none';
-        
-        await loadBreeds();
-        await loadBreedCategories();
-        renderBreedsList();
-      } catch (error) {
-        alert('保存失败：' + (error.message || '未知错误'));
-      }
-    });
-  }
-  
-  // 监听视图切换，加载数据（在switchView函数中处理）
-  // 监听登录状态变化（在updateAuthUI函数中处理）
-}
-
-// ========== 用户管理模块 ==========
-let usersState = {
-  users: [],
-  page: 1,
-  pageSize: 20,
-  total: 0
-};
-
-let auditLogsState = {
-  logs: [],
-  page: 1,
-  pageSize: 50,
-  total: 0
-};
-
-async function loadUsers() {
-  if (!backendState.token) {
-    usersState.users = [];
-    usersState.total = 0;
-    return;
-  }
-  
-  try {
-    const params = new URLSearchParams({
-      page: usersState.page,
-      pageSize: usersState.pageSize
-    });
-    
-    const search = $('user-search')?.value.trim();
-    if (search) params.append('search', search);
-    
-    const role = $('user-role-filter')?.value;
-    if (role) params.append('role', role);
-    
-    const status = $('user-status-filter')?.value;
-    if (status) params.append('status', status);
-    
-    const response = await backendRequest(`/api/v1/users?${params.toString()}`);
-    usersState.users = Array.isArray(response.items) ? response.items : [];
-    usersState.total = response.total || 0;
-  } catch (error) {
-    console.error('Load users failed:', error);
-    usersState.users = [];
-    usersState.total = 0;
-  }
-}
-
-function renderUsersList() {
-  const listEl = $('users-list');
-  const totalEl = $('users-total');
-  const pageInfoEl = $('users-pageinfo');
-  
-  if (!listEl) return;
-  
-  if (!backendState.token) {
-    listEl.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">请先登录后台</div>';
-    if (totalEl) totalEl.textContent = '共 0 条';
-    if (pageInfoEl) pageInfoEl.textContent = '';
-    return;
-  }
-  
-  if (usersState.users.length === 0) {
-    listEl.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">暂无用户数据</div>';
-    if (totalEl) totalEl.textContent = '共 0 条';
-    if (pageInfoEl) pageInfoEl.textContent = '';
-    return;
-  }
-  
-  const roleMap = {
-    admin: '管理员',
-    employee: '员工',
-    customer: '顾客'
-  };
-  
-  const statusMap = {
-    active: '启用',
-    disabled: '禁用'
-  };
-  
-  listEl.innerHTML = usersState.users.map(user => {
-    const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleString('zh-CN') : '-';
-    const isWeChatUser = user.email && user.email.includes('@wechat.petfresh');
-    
-    return `
-      <div class="list-item" style="grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 1fr 1.5fr;">
-        <div>${escapeHtml(user.email || '-')} ${isWeChatUser ? '<span class="muted" style="font-size:0.85em">(微信)</span>' : ''}</div>
-        <div>${escapeHtml(user.name || '-')}</div>
-        <div>${roleMap[user.role] || user.role}</div>
-        <div><span class="${user.status === 'active' ? '' : 'muted'}">${statusMap[user.status] || user.status}</span></div>
-        <div class="muted" style="font-size:0.9em">${createdAt}</div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn small" onclick="editUser(${user.id})">编辑</button>
-          ${user.status === 'active' 
-            ? `<button class="btn small ghost" onclick="disableUser(${user.id})">禁用</button>`
-            : `<button class="btn small" onclick="enableUser(${user.id})">启用</button>`
-          }
-          <button class="btn small ghost" onclick="resetUserPassword(${user.id})">重置密码</button>
-          ${user.role !== 'admin' ? `<button class="btn small ghost" onclick="deleteUser(${user.id})">删除</button>` : ''}
-          <button class="btn small ghost" onclick="viewUserAuditLogs(${user.id})">操作日志</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  if (totalEl) totalEl.textContent = `共 ${usersState.total} 条`;
-  
-  const totalPages = Math.ceil(usersState.total / usersState.pageSize);
-  if (pageInfoEl) pageInfoEl.textContent = `第 ${usersState.page} / ${totalPages} 页`;
-}
-
-function openUserForm(userId = null) {
-  const card = $('user-form-card');
-  const title = $('user-form-title');
-  const form = $('user-form');
-  const passwordLabel = $('u-password-label');
-  const statusLabel = $('u-status-label');
-  
-  if (!card || !title || !form) return;
-  
-  if (userId) {
-    const user = usersState.users.find(u => u.id === userId);
-    if (user) {
-      title.textContent = '编辑用户';
-      $('user-id').value = user.id;
-      $('u-email').value = user.email || '';
-      $('u-email').disabled = true; // 编辑时不允许修改邮箱
-      $('u-name').value = user.name || '';
-      $('u-role').value = user.role || '';
-      $('u-status').value = user.status || 'active';
-      passwordLabel.style.display = 'none';
-      $('u-password').required = false;
-      statusLabel.style.display = 'block';
-    }
-  } else {
-    title.textContent = '新增用户';
-    form.reset();
-    $('user-id').value = '';
-    $('u-email').disabled = false;
-    passwordLabel.style.display = 'block';
-    $('u-password').required = true;
-    statusLabel.style.display = 'none';
-  }
-  
-  card.style.display = 'block';
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-async function deleteUser(userId) {
-  if (!confirm('确定要删除这个用户吗？此操作不可恢复！')) return;
-  
-  if (!backendState.token) {
-    alert('请先登录后台');
-    return;
-  }
-  
-  try {
-    await backendRequest(`/api/v1/users/${userId}`, { method: 'DELETE' });
-    await loadUsers();
-    renderUsersList();
-  } catch (error) {
-    alert('删除失败：' + (error.message || '未知错误'));
-  }
-}
-
-async function enableUser(userId) {
-  if (!confirm('确定要启用这个用户吗？')) return;
-  
-  if (!backendState.token) {
-    alert('请先登录后台');
-    return;
-  }
-  
-  try {
-    await backendRequest(`/api/v1/users/${userId}`, {
-      method: 'PUT',
-      body: { status: 'active' }
-    });
-    await loadUsers();
-    renderUsersList();
-  } catch (error) {
-    alert('启用失败：' + (error.message || '未知错误'));
-  }
-}
-
-async function disableUser(userId) {
-  if (!confirm('确定要禁用这个用户吗？')) return;
-  
-  if (!backendState.token) {
-    alert('请先登录后台');
-    return;
-  }
-  
-  try {
-    await backendRequest(`/api/v1/users/${userId}`, {
-      method: 'PUT',
-      body: { status: 'disabled' }
-    });
-    await loadUsers();
-    renderUsersList();
-  } catch (error) {
-    alert('禁用失败：' + (error.message || '未知错误'));
-  }
-}
-
-async function resetUserPassword(userId) {
-  const newPassword = prompt('请输入新密码（至少8个字符）：');
-  if (!newPassword) return;
-  
-  if (newPassword.length < 8) {
-    alert('密码至少需要8个字符');
-    return;
-  }
-  
-  if (!confirm('确定要重置这个用户的密码吗？')) return;
-  
-  if (!backendState.token) {
-    alert('请先登录后台');
-    return;
-  }
-  
-  try {
-    await backendRequest(`/api/v1/users/${userId}/reset-password`, {
-      method: 'POST',
-      body: { newPassword }
-    });
-    alert('密码重置成功');
-  } catch (error) {
-    alert('密码重置失败：' + (error.message || '未知错误'));
-  }
-}
-
-async function loadAuditLogs(options = {}) {
-  if (!backendState.token) {
-    auditLogsState.logs = [];
-    auditLogsState.total = 0;
-    return;
-  }
-  
-  try {
-    const params = new URLSearchParams({
-      page: auditLogsState.page,
-      pageSize: auditLogsState.pageSize
-    });
-    
-    if (options.userId) params.append('userId', options.userId);
-    if (options.action) params.append('action', options.action);
-    
-    const response = await backendRequest(`/api/v1/audit?${params.toString()}`);
-    auditLogsState.logs = Array.isArray(response.items) ? response.items : [];
-    auditLogsState.total = response.total || 0;
-  } catch (error) {
-    console.error('Load audit logs failed:', error);
-    auditLogsState.logs = [];
-    auditLogsState.total = 0;
-  }
-}
-
-function renderAuditLogs() {
-  const listEl = $('audit-logs-list');
-  const totalEl = $('audit-logs-total');
-  const pageInfoEl = $('audit-logs-pageinfo');
-  
-  if (!listEl) return;
-  
-  if (auditLogsState.logs.length === 0) {
-    listEl.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">暂无操作日志</div>';
-    if (totalEl) totalEl.textContent = '共 0 条';
-    if (pageInfoEl) pageInfoEl.textContent = '';
-    return;
-  }
-  
-  const actionMap = {
-    login: '登录',
-    logout: '登出',
-    create_user: '创建用户',
-    update_user: '更新用户',
-    delete_user: '删除用户',
-    enable_user: '启用用户',
-    disable_user: '禁用用户',
-    reset_password: '重置密码'
-  };
-  
-  listEl.innerHTML = auditLogsState.logs.map(log => {
-    const createdAt = log.createdAt ? new Date(log.createdAt).toLocaleString('zh-CN') : '-';
-    return `
-      <div class="list-item" style="grid-template-columns: 1fr 1fr 1fr 2fr 1fr;">
-        <div>${actionMap[log.action] || log.action}</div>
-        <div>${escapeHtml(log.userName || log.userEmail || `用户${log.userId}`)}</div>
-        <div>${log.resourceType ? `${log.resourceType} #${log.resourceId}` : '-'}</div>
-        <div>${escapeHtml(log.description || '-')}</div>
-        <div class="muted" style="font-size:0.9em">${createdAt}</div>
-      </div>
-    `;
-  }).join('');
-  
-  if (totalEl) totalEl.textContent = `共 ${auditLogsState.total} 条`;
-  
-  const totalPages = Math.ceil(auditLogsState.total / auditLogsState.pageSize);
-  if (pageInfoEl) pageInfoEl.textContent = `第 ${auditLogsState.page} / ${totalPages} 页`;
-}
-
-function viewUserAuditLogs(userId) {
-  const card = $('audit-logs-card');
-  if (!card) return;
-  
-  auditLogsState.page = 1;
-  $('audit-user-filter').value = userId;
-  $('audit-action-filter').value = '';
-  loadAuditLogs({ userId }).then(() => {
-    renderAuditLogs();
-    card.style.display = 'block';
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
-}
-
-window.editUser = openUserForm;
-window.deleteUser = deleteUser;
-window.enableUser = enableUser;
-window.disableUser = disableUser;
-window.resetUserPassword = resetUserPassword;
-window.viewUserAuditLogs = viewUserAuditLogs;
-
-function setupUsersModule() {
-  const newBtn = $('btn-new-user');
-  if (newBtn) newBtn.addEventListener('click', () => openUserForm());
-  
-  const cancelBtn = $('user-form-cancel');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      const card = $('user-form-card');
-      if (card) card.style.display = 'none';
-    });
-  }
-  
-  // 搜索和筛选
-  const searchEl = $('user-search');
-  if (searchEl) {
-    let searchTimeout;
-    searchEl.addEventListener('input', () => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(async () => {
-        usersState.page = 1;
-        await loadUsers();
-        renderUsersList();
-      }, 300);
-    });
-  }
-  
-  const roleFilterEl = $('user-role-filter');
-  if (roleFilterEl) {
-    roleFilterEl.addEventListener('change', async () => {
-      usersState.page = 1;
-      await loadUsers();
-      renderUsersList();
-    });
-  }
-  
-  const statusFilterEl = $('user-status-filter');
-  if (statusFilterEl) {
-    statusFilterEl.addEventListener('change', async () => {
-      usersState.page = 1;
-      await loadUsers();
-      renderUsersList();
-    });
-  }
-  
-  // 分页
-  const prevBtn = $('users-prev');
-  if (prevBtn) {
-    prevBtn.addEventListener('click', async () => {
-      if (usersState.page > 1) {
-        usersState.page--;
-        await loadUsers();
-        renderUsersList();
-      }
-    });
-  }
-  
-  const nextBtn = $('users-next');
-  if (nextBtn) {
-    nextBtn.addEventListener('click', async () => {
-      const totalPages = Math.ceil(usersState.total / usersState.pageSize);
-      if (usersState.page < totalPages) {
-        usersState.page++;
-        await loadUsers();
-        renderUsersList();
-      }
-    });
-  }
-  
-  // 表单提交
-  const form = $('user-form');
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      if (!backendState.token) {
-        alert('请先登录后台');
-        return;
-      }
-      
-      const email = $('u-email').value.trim();
-      const name = $('u-name').value.trim();
-      const role = $('u-role').value;
-      const password = $('u-password').value;
-      const status = $('u-status').value;
-      
-      if (!email || !name || !role) {
-        alert('请填写邮箱、姓名和角色');
-        return;
-      }
-      
-      const userId = $('user-id').value;
-      
-      try {
-        if (userId) {
-          // 更新用户
-          const payload = { name, role };
-          if (status) payload.status = status;
-          await backendRequest(`/api/v1/users/${userId}`, {
-            method: 'PUT',
-            body: payload
-          });
-        } else {
-          // 创建用户
-          if (!password || password.length < 8) {
-            alert('密码至少需要8个字符');
-            return;
-          }
-          await backendRequest('/api/v1/users', {
-            method: 'POST',
-            body: { email, password, name, role }
-          });
-        }
-        
-        const card = $('user-form-card');
-        if (card) card.style.display = 'none';
-        
-        await loadUsers();
-        renderUsersList();
-      } catch (error) {
-        alert('保存失败：' + (error.message || '未知错误'));
-      }
-    });
-  }
-  
-  // 操作日志相关
-  const closeAuditBtn = $('btn-close-audit-logs');
-  if (closeAuditBtn) {
-    closeAuditBtn.addEventListener('click', () => {
-      const card = $('audit-logs-card');
-      if (card) card.style.display = 'none';
-    });
-  }
-  
-  const auditActionFilter = $('audit-action-filter');
-  if (auditActionFilter) {
-    auditActionFilter.addEventListener('change', async () => {
-      auditLogsState.page = 1;
-      const userId = $('audit-user-filter').value ? parseInt($('audit-user-filter').value) : undefined;
-      await loadAuditLogs({ userId, action: auditActionFilter.value || undefined });
-      renderAuditLogs();
-    });
-  }
-  
-  const auditUserFilter = $('audit-user-filter');
-  if (auditUserFilter) {
-    let filterTimeout;
-    auditUserFilter.addEventListener('input', () => {
-      clearTimeout(filterTimeout);
-      filterTimeout = setTimeout(async () => {
-        auditLogsState.page = 1;
-        const userId = auditUserFilter.value ? parseInt(auditUserFilter.value) : undefined;
-        const action = auditActionFilter.value || undefined;
-        await loadAuditLogs({ userId, action });
-        renderAuditLogs();
-      }, 300);
-    });
-  }
-  
-  // 操作日志分页
-  const auditPrevBtn = $('audit-logs-prev');
-  if (auditPrevBtn) {
-    auditPrevBtn.addEventListener('click', async () => {
-      if (auditLogsState.page > 1) {
-        auditLogsState.page--;
-        const userId = $('audit-user-filter').value ? parseInt($('audit-user-filter').value) : undefined;
-        const action = $('audit-action-filter').value || undefined;
-        await loadAuditLogs({ userId, action });
-        renderAuditLogs();
-      }
-    });
-  }
-  
-  const auditNextBtn = $('audit-logs-next');
-  if (auditNextBtn) {
-    auditNextBtn.addEventListener('click', async () => {
-      const totalPages = Math.ceil(auditLogsState.total / auditLogsState.pageSize);
-      if (auditLogsState.page < totalPages) {
-        auditLogsState.page++;
-        const userId = $('audit-user-filter').value ? parseInt($('audit-user-filter').value) : undefined;
-        const action = $('audit-action-filter').value || undefined;
-        await loadAuditLogs({ userId, action });
-        renderAuditLogs();
-      }
-    });
-  }
-}
-
 function setupNav() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
@@ -5376,6 +3854,7 @@ function renderBackupsList() {
     `;
   }).join('');
 }
+
 // 获取相对时间
 function getTimeAgo(timestamp) {
   const now = Date.now();
@@ -5438,6 +3917,7 @@ function getOrderTypeLabel(orderType) {
   };
   return fallback[orderType] || '';
 }
+
 // 生成订单编号
 // 规则：订单类型拼音首字母集 + 日期(YYYYMMDD) + 4位序号
 function generateOrderNumber(orderType, orderDate, excludeId = null) {
@@ -5686,6 +4166,7 @@ function renderOrderCustomerInfo(customerId) {
   tableEl.innerHTML = html;
   infoEl.style.display = 'block';
 }
+
 // 搜索原料（用于订单中的食谱录入）
 function searchIngredientsForOrderRecipe(query) {
   const resultsEl = $('or-ingredient-search-results');
@@ -5754,6 +4235,7 @@ function searchIngredientsForOrderRecipe(query) {
   
   resultsEl.style.display = 'block';
 }
+
 // 渲染订单中食谱的食材列表
 function renderOrderRecipeIngredientsList() {
   const listEl = $('order-recipe-ingredients-list');
@@ -6099,6 +4581,7 @@ function calculateOrderRecipeTotalWeight() {
   
   calculateOrderRecipeKcalDensity();
 }
+
 // 计算订单中食谱的热量密度
 function calculateOrderRecipeKcalDensity() {
   const totalKcalEl = $('or-totalKcal');
@@ -6172,6 +4655,7 @@ function addCookingStepToOrderRecipe() {
     }
   }, 100);
 }
+
 // 自动生成订单中食谱的编号
 function autoGenerateOrderRecipeCode() {
   const lifeStage = $('or-lifeStage').value || 'adult';
@@ -6727,6 +5211,7 @@ function calculateFoodMakingIngredients() {
       manualFoodMakingOrderPrice = displayOrderTotalPriceRounded;
     }
     const orderPriceDescText = manualFoodMakingOrderPrice != null ? '（已手动改价）' : '（自动计算并取整数）';
+    
     html += `
         </tbody>
       </table>
@@ -7031,6 +5516,7 @@ function setupFoodMakingCostCalculation() {
         }
       }
     });
+    
     // 包装清单输入框变化时更新数据并重新计算总价
     packagingList.addEventListener('input', (e) => {
       if (e.target.hasAttribute('data-packaging-quantity')) {
@@ -7094,6 +5580,7 @@ function setupFoodMakingCostCalculation() {
   // 预估快递费用现在是自动计算的，不需要手动输入
   // 优惠折扣已移除，订单总价直接乘以2
 }
+
 // 更新鲜食制作订单总价
 function updateFoodMakingOrderTotalPrice() {
   // 重新计算所有费用
@@ -7371,7 +5858,7 @@ function calculateOrderTotals() {
       recipeCost += cost;
       
       return {
-        ingredientId: ingItem.ingredientId || null,
+        ingredientId: ingItem.ingredientId,
         ingredientName: ingredient.name || '',
         recipeAmount: ingItem.weight,
         orderAmount: orderAmount,
@@ -7719,6 +6206,7 @@ function buildFoodMakingSection(order, customer) {
     </div>
   `;
 }
+
 function buildRecipeSection(order) {
   if (!order.recipeData) {
     return '';
@@ -7837,339 +6325,6 @@ function closeOrderDetail() {
   if (content) content.innerHTML = '';
 }
 
-function getIngredientSupplier(ingredient) {
-  if (!ingredient) return '-';
-  return ingredient.brand || ingredient.source || ingredient.origin || '-';
-}
-function calculateFoodMakingMetrics(order) {
-  if (!order || !order.foodMakingData) return null;
-  const data = order.foodMakingData;
-  const recipe = data.recipeId ? store.recipes.find(r => r.id === data.recipeId) : null;
-  if (!recipe || !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
-    return null;
-  }
-  const customer = store.customers.find(c => c.id === order.customerId);
-  const days = data.days || 1;
-  const mealsPerDay = customer && customer.mealsPerDay ? customer.mealsPerDay : 1;
-  const estKcal = customer && customer.estKcal ? customer.estKcal : 0;
-  const recipeTotalKcal = recipe.totalKcal || 0;
-  const baseRecipeWeight = recipe.totalWeight || 0;
-
-  let ratio = 0;
-  if (estKcal > 0 && recipeTotalKcal > 0 && mealsPerDay > 0) {
-    ratio = estKcal / recipeTotalKcal;
-  }
-  const totalServings = mealsPerDay * days;
-  let servingWeight = 0;
-  if (ratio > 0 && mealsPerDay > 0) {
-    servingWeight = baseRecipeWeight * ratio / mealsPerDay;
-  } else if (order.totalWeight && totalServings > 0) {
-    servingWeight = order.totalWeight / totalServings;
-  }
-
-  let weightMultiplier = 0;
-  if (ratio > 0) {
-    weightMultiplier = ratio * days;
-  } else if (order.totalWeight && baseRecipeWeight > 0) {
-    weightMultiplier = order.totalWeight / baseRecipeWeight;
-  } else {
-    weightMultiplier = days;
-  }
-
-  const cookingLoss = recipe.cookingLoss != null ? recipe.cookingLoss : 0;
-  const ingredients = [];
-  recipe.ingredients.forEach(item => {
-    const ingredient = store.ingredients.find(ing => ing.id === item.ingredientId);
-    const baseWeight = parseFloat(item.weight) || 0;
-    if (!(baseWeight > 0)) return;
-    const unit = item.unit || (ingredient && ingredient.unit) || 'g';
-    const name = ingredient ? (ingredient.name || '-') : (item.ingredientName || '-');
-    const amount = baseWeight * weightMultiplier;
-    if (!(amount > 0)) return;
-    const amountWithLoss = amount * (1 + cookingLoss / 100);
-    ingredients.push({
-      ingredientId: item.ingredientId || null,
-      name,
-      unit,
-      amount: amountWithLoss,
-      supplier: getIngredientSupplier(ingredient)
-    });
-  });
-
-  return {
-    recipe,
-    customer,
-    ingredients,
-    totalServings,
-    servingWeight,
-    cookingLoss
-  };
-}
-
-function aggregateProcurementData(orderIds = []) {
-  const aggregated = new Map();
-  const relatedOrders = [];
-  orderIds.forEach(id => {
-    const order = store.orders.find(o => String(o.id) === String(id));
-    if (!order) return;
-    const metrics = calculateFoodMakingMetrics(order);
-    if (!metrics) return;
-    relatedOrders.push(order);
-    metrics.ingredients.forEach(item => {
-      const key = `${item.ingredientId || item.name}|${item.unit}`;
-      if (!aggregated.has(key)) {
-        aggregated.set(key, {
-          ingredientId: item.ingredientId || null,
-          name: item.name,
-          unit: item.unit,
-          amount: 0,
-          supplier: item.supplier || '-'
-        });
-      }
-      const entry = aggregated.get(key);
-      entry.amount += item.amount;
-      if (!entry.supplier || entry.supplier === '-') {
-        entry.supplier = item.supplier || '-';
-      }
-    });
-  });
-  const items = Array.from(aggregated.values());
-  const isGramUnit = (unit) => {
-    if (!unit) return false;
-    const trimmed = String(unit).trim();
-    const lower = trimmed.toLowerCase();
-    if (lower === 'g') return true;
-    return trimmed === '克';
-  };
-  items.sort((a, b) => {
-    const aGram = isGramUnit(a.unit);
-    const bGram = isGramUnit(b.unit);
-    if (aGram !== bGram) {
-      return aGram ? -1 : 1;
-    }
-    const diff = (Number(b.amount) || 0) - (Number(a.amount) || 0);
-    if (diff !== 0) return diff;
-    return (a.name || '').localeCompare(b.name || '', 'zh-CN');
-  });
-  return {
-    items,
-    orders: relatedOrders
-  };
-}
-
-function renderProcurementPanel(data, options = {}) {
-  const panel = $('procurement-panel');
-  const summaryEl = $('procurement-summary');
-  const tbody = panel ? panel.querySelector('#procurement-table tbody') : null;
-  const dateInput = $('procurement-date');
-  if (!panel || !summaryEl || !tbody) return;
-  const hasItems = !!(data && Array.isArray(data.items) && data.items.length);
-  let resolvedDate = normalizeDateString(options.date || currentProcurementDate) || getDefaultProcurementDate();
-  currentProcurementDate = resolvedDate;
-  panel.style.display = 'block';
-  if (dateInput) {
-    dateInput.value = resolvedDate;
-    dateInput.onchange = (event) => {
-      const nextValue = normalizeDateString(event.target.value);
-      const finalValue = nextValue || getDefaultProcurementDate();
-      currentProcurementDate = finalValue;
-      event.target.value = finalValue;
-      if (hasItems) {
-        const orderCount = data.orders ? data.orders.length : 0;
-        summaryEl.textContent = `采购日期：${finalValue}，共 ${orderCount} 个订单，涉及 ${data.items.length} 种原料`;
-      } else {
-        summaryEl.textContent = `采购日期：${finalValue}，未能生成采购单，请检查订单是否为鲜食制作类型。`;
-      }
-    };
-  }
-  if (!hasItems) {
-    summaryEl.textContent = `采购日期：${currentProcurementDate}，未能生成采购单，请检查订单是否为鲜食制作类型。`;
-    tbody.innerHTML = `<tr><td colspan="3" class="muted">暂无可采购的原料</td></tr>`;
-  } else {
-    const orderCount = data.orders ? data.orders.length : 0;
-    summaryEl.textContent = `采购日期：${currentProcurementDate}，共 ${orderCount} 个订单，涉及 ${data.items.length} 种原料`;
-    tbody.innerHTML = data.items
-      .map(item => {
-        const amountText = `${formatNumber(item.amount, item.unit === 'g' ? 0 : 2)} ${item.unit}`;
-        const supplier = item.supplier || '-';
-        return `<tr><td>${escapeHtml(item.name || '-')}</td><td>${escapeHtml(supplier)}</td><td>${amountText}</td></tr>`;
-      }).join('');
-  }
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function hideProcurementPanel() {
-  const panel = $('procurement-panel');
-  if (panel) panel.style.display = 'none';
-}
-
-function updateProcurementControls() {
-  const btn = $('btn-procurement');
-  const cancelBtn = $('btn-procurement-cancel');
-  if (!btn || !cancelBtn) return;
-  if (!procurementMode) {
-    btn.textContent = '生成采购单';
-    btn.disabled = false;
-    cancelBtn.style.display = 'none';
-  } else {
-    const count = procurementSelection.size;
-    btn.textContent = count > 0 ? `开始生成（${count}）` : '开始生成';
-    btn.disabled = count === 0;
-    cancelBtn.style.display = 'inline-flex';
-  }
-}
-
-function setProcurementMode(enabled, options = {}) {
-  const { preservePanel = false } = options;
-  procurementMode = enabled;
-  if (enabled) {
-    currentProcurementDate = null;
-  }
-  if (!enabled) {
-    procurementSelection.clear();
-  }
-  updateProcurementControls();
-  renderOrdersList();
-  if (!enabled && !preservePanel) {
-    hideProcurementPanel();
-  }
-}
-
-function handleProcurementButtonClick() {
-  if (!procurementMode) {
-    setProcurementMode(true);
-    hideProcurementPanel();
-    return;
-  }
-  if (procurementSelection.size === 0) {
-    return;
-  }
-  const defaultDate = normalizeDateString(currentProcurementDate) || getDefaultProcurementDate();
-  let resolvedDate = defaultDate;
-  const selectedIds = Array.from(procurementSelection);
-  const mismatched = [];
-  const validOrderIds = [];
-  selectedIds.forEach(id => {
-    const order = store.orders.find(o => String(o.id) === String(id));
-    if (!order) return;
-    const productionDate = normalizeDateString(order.productionDate);
-    if (!productionDate) {
-      mismatched.push({ id, order, productionDate: '未填写' });
-      return;
-    }
-    if (productionDate !== resolvedDate) {
-      mismatched.push({ id, order, productionDate });
-      return;
-    }
-    validOrderIds.push(id);
-  });
-
-  if (mismatched.length > 0) {
-    const listText = mismatched.map(item => {
-      const orderLabel = item.order.orderNumber || item.order.id;
-      return `• 订单 ${orderLabel}（制作日期：${item.productionDate}）`;
-    }).join('\n');
-    const confirmRemove = window.confirm(`以下订单的订单制作日期与采购日期 ${resolvedDate} 不一致，是否将它们从采购单中剔除？\n${listText}`);
-    if (confirmRemove) {
-      const mismatchedIds = new Set(mismatched.map(item => item.id));
-      selectedIds.forEach(id => {
-        if (mismatchedIds.has(id)) {
-          procurementSelection.delete(id);
-        }
-      });
-      if (validOrderIds.length === 0) {
-        alert('已剔除不匹配的订单，请重新选择需要生成的采购单。');
-        updateProcurementControls();
-        renderOrdersList();
-        return;
-      }
-    } else {
-      return;
-    }
-  }
-
-  const finalIds = validOrderIds.length > 0 ? validOrderIds : selectedIds;
-  const data = aggregateProcurementData(finalIds);
-  resolvedDate = normalizeDateString(resolvedDate) || getDefaultProcurementDate();
-  currentProcurementDate = resolvedDate;
-  renderProcurementPanel(data, { date: resolvedDate });
-  setProcurementMode(false, { preservePanel: true });
-}
-
-function renderProductionPreview(orderId) {
-  const panel = $('production-preview-panel');
-  const bodyEl = $('production-preview-body');
-  if (!panel || !bodyEl) return;
-  const order = store.orders.find(o => String(o.id) === String(orderId));
-  if (!order) {
-    panel.style.display = 'none';
-    currentProductionOrderId = null;
-    return;
-  }
-  if (!order.foodMakingData) {
-    bodyEl.innerHTML = '<div class="muted">该订单不是鲜食制作类型，暂无制作单信息。</div>';
-    panel.style.display = 'block';
-    currentProductionOrderId = String(orderId);
-    return;
-  }
-  const metrics = calculateFoodMakingMetrics(order);
-  if (!metrics) {
-    bodyEl.innerHTML = '<div class="muted">未找到对应食谱或原料数据，无法生成制作单。</div>';
-    panel.style.display = 'block';
-    currentProductionOrderId = String(orderId);
-    return;
-  }
-  const { recipe, customer, ingredients, totalServings, servingWeight } = metrics;
-  const totalWeightG = ingredients.reduce((sum, item) => item.unit === 'g' ? sum + item.amount : sum, 0);
-  const recipeName = recipe ? (recipe.name || '-') : '-';
-  const productionDate = order.productionDate || order.orderDate || '-';
-  const petName = customer ? (customer.petName || '-') : '-';
-  const addressHtml = customer ? formatMultiline(customer.address || '-') : '-';
-  const ingredientRows = ingredients.length > 0 ? ingredients.map(item => {
-    const amountText = `${formatNumber(item.amount, item.unit === 'g' ? 0 : 2)} ${item.unit}`;
-    return `<tr><td>${escapeHtml(item.name || '-')}</td><td>${amountText}</td><td></td></tr>`;
-  }).join('') : '<tr><td colspan="3" class="muted">暂无原料数据</td></tr>';
-  bodyEl.innerHTML = `
-    <div class="production-preview-header">
-      <h3>${escapeHtml(recipeName)}</h3>
-      <div class="muted">订单制作日期：${escapeHtml(productionDate)}</div>
-    </div>
-    <div class="production-preview-meta">
-      <div class="production-preview-meta-item"><span>宠物昵称</span><strong>${escapeHtml(petName)}</strong></div>
-      <div class="production-preview-meta-item"><span>每袋净重</span><strong>${servingWeight > 0 ? formatNumber(servingWeight, 0) + ' g' : '-'}</strong></div>
-      <div class="production-preview-meta-item"><span>总份数</span><strong>${totalServings || '-'}</strong></div>
-      <div class="production-preview-meta-item"><span>总重量</span><strong>${totalWeightG > 0 ? formatNumber(totalWeightG, 0) + ' g' : '-'}</strong></div>
-    </div>
-    <div class="production-preview-ingredients">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:40%">原料</th>
-            <th style="width:30%">用量</th>
-            <th style="width:30%">处理/加工方式</th>
-          </tr>
-        </thead>
-        <tbody>${ingredientRows}</tbody>
-      </table>
-    </div>
-    <div class="production-preview-footer">
-      <div><span>收货信息</span>${addressHtml}</div>
-    </div>
-  `;
-  panel.style.display = 'block';
-  panel.classList.remove('print-preview-active');
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  currentProductionOrderId = String(orderId);
-}
-
-function hideProductionPreview() {
-  const panel = $('production-preview-panel');
-  if (panel) {
-    panel.style.display = 'none';
-    panel.classList.remove('print-preview-active');
-  }
-  currentProductionOrderId = null;
-}
 function renderOrdersList() {
   const list = $('orders-list');
   if (!list) return;
@@ -8244,7 +6399,6 @@ function renderOrdersList() {
   };
   
   list.innerHTML = pageItems.map(order => {
-    const orderId = String(order.id);
     const customer = store.customers.find(c => c.id === order.customerId);
     const petName = customer ? (customer.petName || '') : '';
     const wechat = customer ? (customer.wechat || '') : '';
@@ -8283,65 +6437,36 @@ function renderOrdersList() {
       totalPrice = fallbackPrice > 0 ? fallbackPrice : 0;
     }
     const paymentDisplay = Math.round(totalPrice || 0);
-    const isSelected = procurementSelection.has(orderId);
-    const classes = ['list-item'];
-    if (isSelected) classes.push('procurement-selected');
-    const checkboxHtml = procurementMode ? `<label class="order-select-checkbox"><input type="checkbox" data-proc-select="${orderId}" ${isSelected ? 'checked' : ''}><span>加入采购</span></label>` : '';
+    
     return `
-      <div class="${classes.join(' ')}" data-id="${orderId}">
+      <div class="list-item" data-id="${order.id}">
         <div class="list-item-row" style="grid-template-columns: 1.2fr 1.4fr 1fr 1fr 1.4fr 1fr;">
           <div>${orderDate || '-'}</div>
           <div>${customerLabel}</div>
           <div>${orderType}</div>
           <div>${status}</div>
           <div>${recipeName || '-'}</div>
-          <div class="order-total-cell">¥${paymentDisplay}${checkboxHtml}</div>
+          <div>¥${paymentDisplay}</div>
         </div>
         <div class="item-actions">
-          <button class="btn small" data-detail="${orderId}">详细信息</button>
-          <button class="btn small" data-production="${orderId}">开始制作</button>
-          <button class="btn small" data-edit="${orderId}">编辑</button>
-          <button class="btn small" data-del="${orderId}">删除</button>
+          <button class="btn small" data-detail="${order.id}">详细信息</button>
+          <button class="btn small" data-edit="${order.id}">编辑</button>
+          <button class="btn small" data-del="${order.id}">删除</button>
         </div>
       </div>
     `;
   }).join('');
   
-  if (procurementMode) {
-    list.querySelectorAll('[data-proc-select]').forEach(input => {
-      input.addEventListener('change', (event) => {
-        const id = event.target.dataset.procSelect;
-        if (!id) return;
-        if (event.target.checked) {
-          procurementSelection.add(id);
-          event.target.closest('.list-item')?.classList.add('procurement-selected');
-        } else {
-          procurementSelection.delete(id);
-          event.target.closest('.list-item')?.classList.remove('procurement-selected');
-        }
-        updateProcurementControls();
-      });
-    });
-  }
-  
-  // 绑定操作按钮（详细信息、编辑、删除、制作）
+  // 绑定操作按钮（详细信息、编辑、删除）
   list.querySelectorAll('[data-detail]').forEach(btn => {
     btn.addEventListener('click', () => {
       openOrderDetail(btn.dataset.detail);
     });
   });
   
-  list.querySelectorAll('[data-production]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      renderProductionPreview(btn.dataset.production);
-    });
-  });
-  
   list.querySelectorAll('[data-edit]').forEach(btn => {
     btn.addEventListener('click', () => {
       openOrderForm(btn.dataset.edit);
-      const formCard = $('order-form-card');
-      if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
   
@@ -8362,8 +6487,8 @@ function renderOrdersList() {
   $('orders-pageinfo').textContent = `第 ${store.orderPage}/${totalPages} 页`;
   $('orders-prev').disabled = store.orderPage <= 1;
   $('orders-next').disabled = store.orderPage >= totalPages;
-  updateProcurementControls();
 }
+
 // 打开订单表单
 function openOrderForm(id = null) {
   const card = $('order-form-card');
@@ -8386,6 +6511,7 @@ function openOrderForm(id = null) {
       customerSelect.appendChild(option);
     });
   }
+  
   let order = null; // 在函数作用域内声明order变量
   if (id) {
     order = store.orders.find(x => x.id === id);
@@ -8591,50 +6717,6 @@ function setupOrdersModule() {
   const newBtn = $('btn-new-order');
   if (newBtn) newBtn.addEventListener('click', () => openOrderForm());
   
-  const procurementBtn = $('btn-procurement');
-  if (procurementBtn) {
-    procurementBtn.addEventListener('click', handleProcurementButtonClick);
-  }
-  const procurementCancelBtn = $('btn-procurement-cancel');
-  if (procurementCancelBtn) {
-    procurementCancelBtn.addEventListener('click', () => {
-      setProcurementMode(false);
-      hideProcurementPanel();
-    });
-  }
-  const procurementCloseBtn = $('btn-procurement-close');
-  if (procurementCloseBtn) {
-    procurementCloseBtn.addEventListener('click', hideProcurementPanel);
-  }
-
-  const productionCloseBtn = $('btn-production-close');
-  if (productionCloseBtn) {
-    productionCloseBtn.addEventListener('click', hideProductionPreview);
-  }
-  const productionPreviewBtn = $('btn-production-preview');
-  if (productionPreviewBtn) {
-    productionPreviewBtn.addEventListener('click', () => {
-      const panel = $('production-preview-panel');
-      if (!panel || panel.style.display === 'none') return;
-      panel.classList.toggle('print-preview-active');
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }
-  const productionPrintBtn = $('btn-production-print');
-  if (productionPrintBtn) {
-    productionPrintBtn.addEventListener('click', () => {
-      if (!currentProductionOrderId) {
-        alert('请先选择需要制作的订单');
-        return;
-      }
-      const panel = $('production-preview-panel');
-      if (panel) {
-        panel.classList.add('print-preview-active');
-      }
-      window.print();
-    });
-  }
-
   const cancelBtn = $('btn-cancel-order');
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
@@ -8704,6 +6786,7 @@ function setupOrdersModule() {
       }
     });
   }
+  
   // 成本字段变化时重新计算总售价（仅对需要成本计算的订单类型）
   ['o-packagingCost', 'o-laborCost', 'o-shippingCost'].forEach(fieldId => {
     const fieldEl = $(fieldId);
@@ -8715,6 +6798,7 @@ function setupOrdersModule() {
       });
     }
   });
+  
   // 订单类型变化时切换显示内容并重新生成编号
   const orderTypeEl = $('o-orderType');
   if (orderTypeEl) {
@@ -8758,6 +6842,7 @@ function setupOrdersModule() {
       
     });
   }
+
   const orderFormCard = $('order-form-card');
   if (orderFormCard && !orderFormCard.dataset.costHandlers) {
     orderFormCard.addEventListener('change', (event) => {
@@ -8918,6 +7003,7 @@ function setupOrdersModule() {
       }
     });
   }
+  
   // 表单提交
   const form = $('order-form');
   if (form) {
@@ -9159,11 +7245,361 @@ function setupOrdersModule() {
   // 初始渲染
   renderOrdersList();
 }
-function setupSettingsModule() {
-  const apiBaseInput = $('settings-api-base');
-  if (apiBaseInput) {
-    apiBaseInput.value = backendState.baseUrl;
+
+// 更新认证 UI
+function updateAuthUI() {
+  const statusEl = $('auth-status');
+  const loginBtn = $('btn-open-login');
+  const logoutBtn = $('btn-logout');
+  
+  if (backendState.token && backendState.user) {
+    if (statusEl) {
+      const roleMap = { admin: '管理员', employee: '员工', customer: '顾客' };
+      statusEl.textContent = `已登录:${roleMap[backendState.user.role] || backendState.user.role}`;
+    }
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+    
+    // 如果当前在品种管理视图，重新加载数据
+    const breedsView = $('view-breeds');
+    if (breedsView && breedsView.style.display !== 'none') {
+      setTimeout(async () => {
+        await loadBreeds();
+        await loadBreedCategories();
+        renderBreedsList();
+      }, 100);
+    }
+    return;
   }
+  if (statusEl) statusEl.textContent = '未登录';
+  if (loginBtn) loginBtn.style.display = 'inline-flex';
+  if (logoutBtn) logoutBtn.style.display = 'none';
+}
+
+// 品种管理状态
+let breedsState = {
+  breeds: [],
+  categories: [],
+  page: 1,
+  pageSize: 10,
+  total: 0
+};
+
+// 加载品种列表
+async function loadBreeds() {
+  if (!backendState.token) {
+    breedsState.breeds = [];
+    breedsState.total = 0;
+    return;
+  }
+  
+  try {
+    const params = new URLSearchParams({
+      page: breedsState.page,
+      pageSize: breedsState.pageSize
+    });
+    
+    const search = $('breed-search')?.value.trim();
+    if (search) params.append('search', search);
+    
+    const category = $('breed-category-filter')?.value;
+    if (category) params.append('category', category);
+    
+    const sizeCategory = $('breed-size-filter')?.value;
+    if (sizeCategory) params.append('sizeCategory', sizeCategory);
+    
+    const response = await backendRequest(`/api/v1/breeds?${params.toString()}`);
+    
+    // 后端返回格式：{ success: true, data: [...] }
+    // backendRequest 返回整个响应对象
+    let breedsArray = [];
+    if (response && response.data && Array.isArray(response.data)) {
+      breedsArray = response.data;
+    } else if (Array.isArray(response)) {
+      // 如果直接是数组（兼容处理）
+      breedsArray = response;
+    } else {
+      console.warn('无法解析品种数据格式:', response);
+      breedsArray = [];
+    }
+    
+    breedsState.breeds = breedsArray;
+    breedsState.total = breedsArray.length;
+  } catch (error) {
+    console.error('Load breeds failed:', error);
+    breedsState.breeds = [];
+    breedsState.total = 0;
+  }
+}
+
+// 加载品种分类
+async function loadBreedCategories() {
+  if (!backendState.token) return;
+  
+  try {
+    const response = await backendRequest('/api/v1/breeds/categories');
+    breedsState.categories = Array.isArray(response?.data) ? response.data : [];
+    
+    const filterEl = $('breed-category-filter');
+    if (filterEl) {
+      const currentValue = filterEl.value;
+      filterEl.innerHTML = '<option value="">全部分类</option>';
+      breedsState.categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.category;
+        option.textContent = cat.category;
+        filterEl.appendChild(option);
+      });
+      if (currentValue) filterEl.value = currentValue;
+    }
+  } catch (error) {
+    console.error('Load breed categories failed:', error);
+    breedsState.categories = [];
+  }
+}
+
+// 渲染品种列表
+function renderBreedsList() {
+  const listEl = $('breeds-list');
+  if (!listEl) return;
+  
+  if (breedsState.breeds.length === 0) {
+    listEl.innerHTML = '<div class="list-empty">暂无品种数据</div>';
+    const totalEl = $('breeds-total');
+    if (totalEl) totalEl.textContent = '共 0 条';
+    const pageInfoEl = $('breeds-pageinfo');
+    if (pageInfoEl) pageInfoEl.textContent = '';
+    return;
+  }
+  
+  const sizeCategoryMap = {
+    small: '小型',
+    medium: '中型',
+    large: '大型',
+    xlarge: '超大型'
+  };
+  
+  listEl.innerHTML = breedsState.breeds.map(breed => {
+    const weightRange = breed.weightMin && breed.weightMax
+      ? `${breed.weightMin}-${breed.weightMax}`
+      : breed.weightMin
+      ? `≥${breed.weightMin}`
+      : breed.weightMax
+      ? `≤${breed.weightMax}`
+      : '-';
+    
+    return `
+      <div class="list-item" style="display: grid; grid-template-columns: 1.5fr 1fr 0.8fr 1fr 1fr 1.2fr; gap: 12px; align-items: center;">
+        <div>${escapeHtml(breed.category || '-')}</div>
+        <div>${escapeHtml(breed.name || '-')}</div>
+        <div>${sizeCategoryMap[breed.sizeCategory] || '-'}</div>
+        <div>${weightRange}</div>
+        <div>${breed.maturityMonths ? breed.maturityMonths + '个月' : '-'}</div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn small" onclick="editBreed(${breed.id})">编辑</button>
+          <button class="btn small ghost" onclick="deleteBreed(${breed.id})">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  const totalEl = $('breeds-total');
+  if (totalEl) totalEl.textContent = `共 ${breedsState.total} 条`;
+  
+  const totalPages = Math.ceil(breedsState.total / breedsState.pageSize);
+  const pageInfoEl = $('breeds-pageinfo');
+  if (pageInfoEl) pageInfoEl.textContent = `第 ${breedsState.page} / ${totalPages} 页`;
+}
+
+// 编辑品种
+async function editBreed(breedId) {
+  try {
+    const breed = await backendRequest(`/api/v1/breeds/${breedId}`);
+    if (!breed || !breed.data) {
+      alert('未找到该品种信息');
+      return;
+    }
+    
+    const breedData = breed.data;
+    $('breed-id').value = breedData.id;
+    $('breed-form-title').textContent = '编辑品种';
+    $('b-category').value = breedData.category || '';
+    $('b-name').value = breedData.name || '';
+    $('b-sizeCategory').value = breedData.sizeCategory || '';
+    $('b-weightMin').value = breedData.weightMin || '';
+    $('b-weightMax').value = breedData.weightMax || '';
+    $('b-maturityMonths').value = breedData.maturityMonths || '';
+    
+    const formCard = $('breed-form-card');
+    if (formCard) {
+      formCard.style.display = 'block';
+      formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } catch (error) {
+    console.error('Load breed failed:', error);
+    alert('加载品种信息失败：' + error.message);
+  }
+}
+
+// 删除品种
+async function deleteBreed(breedId) {
+  if (!confirm('确定要删除这个品种吗？')) return;
+  
+  try {
+    await backendRequest(`/api/v1/breeds/${breedId}`, { method: 'DELETE' });
+    await loadBreeds();
+    renderBreedsList();
+  } catch (error) {
+    console.error('Delete breed failed:', error);
+    alert('删除失败：' + error.message);
+  }
+}
+
+// 设置品种管理模块
+function setupBreedsModule() {
+  // 搜索和筛选
+  const searchEl = $('breed-search');
+  if (searchEl) {
+    searchEl.addEventListener('input', async () => {
+      breedsState.page = 1;
+      await loadBreeds();
+      renderBreedsList();
+    });
+  }
+  
+  const categoryFilterEl = $('breed-category-filter');
+  if (categoryFilterEl) {
+    categoryFilterEl.addEventListener('change', async () => {
+      breedsState.page = 1;
+      await loadBreeds();
+      renderBreedsList();
+    });
+  }
+  
+  const sizeFilterEl = $('breed-size-filter');
+  if (sizeFilterEl) {
+    sizeFilterEl.addEventListener('change', async () => {
+      breedsState.page = 1;
+      await loadBreeds();
+      renderBreedsList();
+    });
+  }
+  
+  // 新增按钮
+  const newBtn = $('btn-new-breed');
+  if (newBtn) {
+    newBtn.addEventListener('click', () => {
+      $('breed-id').value = '';
+      $('breed-form-title').textContent = '新增品种';
+      $('breed-form').reset();
+      const formCard = $('breed-form-card');
+      if (formCard) {
+        formCard.style.display = 'block';
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+  
+  // 取消按钮
+  const cancelBtn = $('breed-form-cancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      const formCard = $('breed-form-card');
+      if (formCard) formCard.style.display = 'none';
+    });
+  }
+  
+  // 表单提交
+  const formEl = $('breed-form');
+  if (formEl) {
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const breedId = $('breed-id').value;
+      const payload = {
+        category: $('b-category').value.trim(),
+        name: $('b-name').value.trim(),
+        sizeCategory: $('b-sizeCategory').value,
+        weightMin: $('b-weightMin').value ? parseFloat($('b-weightMin').value) : null,
+        weightMax: $('b-weightMax').value ? parseFloat($('b-weightMax').value) : null,
+        maturityMonths: $('b-maturityMonths').value ? parseInt($('b-maturityMonths').value, 10) : null
+      };
+      
+      try {
+        if (breedId) {
+          await backendRequest(`/api/v1/breeds/${breedId}`, {
+            method: 'PUT',
+            body: payload
+          });
+        } else {
+          await backendRequest('/api/v1/breeds', {
+            method: 'POST',
+            body: payload
+          });
+        }
+        
+        const formCard = $('breed-form-card');
+        if (formCard) formCard.style.display = 'none';
+        
+        await loadBreeds();
+        renderBreedsList();
+      } catch (error) {
+        console.error('Save breed failed:', error);
+        alert('保存失败：' + error.message);
+      }
+    });
+  }
+  
+  // 分页
+  const prevBtn = $('breeds-prev');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', async () => {
+      if (breedsState.page > 1) {
+        breedsState.page--;
+        await loadBreeds();
+        renderBreedsList();
+      }
+    });
+  }
+  
+  const nextBtn = $('breeds-next');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', async () => {
+      const totalPages = Math.ceil(breedsState.total / breedsState.pageSize);
+      if (breedsState.page < totalPages) {
+        breedsState.page++;
+        await loadBreeds();
+        renderBreedsList();
+      }
+    });
+  }
+  
+  // 视图切换时加载数据
+  const breedsView = $('view-breeds');
+  if (breedsView) {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+          const isVisible = breedsView.style.display !== 'none';
+          if (isVisible && backendState.token) {
+            setTimeout(async () => {
+              await loadBreeds();
+              await loadBreedCategories();
+              renderBreedsList();
+            }, 100);
+          }
+        }
+      });
+    });
+    observer.observe(breedsView, { attributes: true, attributeFilter: ['style'] });
+  }
+}
+
+// 暴露给全局
+window.editBreed = editBreed;
+window.deleteBreed = deleteBreed;
+
+function setupSettingsModule() {
   // 导出数据
   const exportBtn = $('btn-export-json');
   if (exportBtn) {
@@ -9285,7 +7721,7 @@ function setupSettingsModule() {
         '原料数量': store.ingredients.length,
         '食谱数量': store.recipes.length,
         '订单数量': store.orders.length,
-        'Service Worker': (navigator.serviceWorker && navigator.serviceWorker.controller) ? '已注册' : '未注册'
+        'Service Worker': navigator.serviceWorker.controller ? '已注册' : '未注册'
       };
       debugEl.innerHTML = Object.entries(info).map(([k, v]) => `${k}: ${v}`).join('<br>');
     }
@@ -9298,16 +7734,6 @@ function setupSettingsModule() {
   // 初始渲染备份列表
   renderBackupsList();
 }
-
-window.addEventListener('afterprint', () => {
-  const panel = $('production-preview-panel');
-  if (panel) {
-    panel.classList.remove('print-preview-active');
-  }
-});
-
-window.addEventListener('DOMContentLoaded', init);
-
 function init() {
   console.log('App init');
   console.log('检查localStorage中的键:');
@@ -9319,25 +7745,50 @@ function init() {
   }
   
   loadApp();
+  loadBackendAuth();
   console.log('初始化后 - 顾客数据:', store.customers.length, '条');
   console.log('初始化后 - 原料数据:', store.ingredients.length, '条');
   console.log('初始化后 - 食谱数据:', store.recipes.length, '条');
   console.log('初始化后 - 订单数据:', store.orders.length, '条');
   
-  setupBackendIntegration();
   setupNav();
-  setupPreviewMode();
   setupPWA();
   setupCustomersModule();
   setupIngredientsModule();
   setupRecipesModule();
-  setupBreedsModule();
-  setupUsersModule();
   setupOrdersModule();
+  setupBreedsModule();
   setupSettingsModule();
+  updateAuthUI();
   renderCustomersList();
   switchView('customers');
   const printBtn = $('btn-print'); if (printBtn) printBtn.addEventListener('click', () => window.print());
+  
+  // 登录按钮
+  const loginBtn = $('btn-open-login');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+      const email = prompt('请输入邮箱:');
+      if (!email) return;
+      const password = prompt('请输入密码:');
+      if (!password) return;
+      backendLogin(email, password).then(() => {
+        alert('登录成功！');
+      }).catch(err => {
+        alert('登录失败：' + err.message);
+      });
+    });
+  }
+  
+  // 退出按钮
+  const logoutBtn = $('btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      if (confirm('确定要退出登录吗？')) {
+        clearBackendAuth();
+      }
+    });
+  }
 }
 
 if (document.readyState === 'loading') {
