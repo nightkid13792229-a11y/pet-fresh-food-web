@@ -24,13 +24,12 @@ const logger = winston.createLogger({
   ]
 });
 
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(
-    new winston.transports.Console({
-      format: combine(colorize(), ...formats)
-    })
-  );
-}
+// 始终输出到控制台（包括生产环境），方便 PM2 查看日志
+logger.add(
+  new winston.transports.Console({
+    format: combine(colorize(), ...formats)
+  })
+);
 
 logger.stream = {
   write: (message) => {
