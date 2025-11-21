@@ -6,7 +6,7 @@ set -e  # 遇到错误立即退出
 
 BACKEND_DIR="/root/web-admin/backend"
 POST_DEPLOY_SCRIPT="$BACKEND_DIR/scripts/post-deploy.sh"
-PM2_CONFIG="$BACKEND_DIR/ecosystem.config.js"
+PM2_CONFIG="$BACKEND_DIR/ecosystem.config.cjs"
 
 echo "=========================================="
 echo "=== 后端应用部署脚本 ==="
@@ -91,13 +91,13 @@ fi
 echo ""
 echo "5. 重启 PM2 应用..."
 if [ -f "$PM2_CONFIG" ]; then
-  # 使用 ecosystem.config.js
+  # 使用 ecosystem.config.cjs
   if pm2 list | grep -q "petfresh-api"; then
     echo "   重启现有应用..."
-    pm2 restart ecosystem.config.js --update-env
+    pm2 restart ecosystem.config.cjs --update-env
   else
     echo "   启动新应用..."
-    pm2 start ecosystem.config.js
+    pm2 start ecosystem.config.cjs
   fi
 else
   # 回退到直接启动
