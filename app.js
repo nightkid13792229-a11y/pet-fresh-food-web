@@ -7281,7 +7281,7 @@ let breedsState = {
   breeds: [],
   categories: [],
   page: 1,
-  pageSize: 10,
+  pageSize: 1000,  // 一次加载所有数据
   total: 0
 };
 
