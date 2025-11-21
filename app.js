@@ -7698,6 +7698,10 @@ function setupSettingsModule() {
     unregisterBtn.addEventListener('click', async () => {
       if (confirm('确定要取消注册Service Worker吗？这将清除所有缓存。')) {
         try {
+          if (!navigator.serviceWorker) {
+            alert('当前浏览器不支持 Service Worker');
+            return;
+          }
           const registrations = await navigator.serviceWorker.getRegistrations();
           await Promise.all(registrations.map(reg => reg.unregister()));
           const cacheNames = await caches.keys();
@@ -7721,7 +7725,7 @@ function setupSettingsModule() {
         '原料数量': store.ingredients.length,
         '食谱数量': store.recipes.length,
         '订单数量': store.orders.length,
-        'Service Worker': navigator.serviceWorker.controller ? '已注册' : '未注册'
+        'Service Worker': (navigator.serviceWorker && navigator.serviceWorker.controller) ? '已注册' : '未注册'
       };
       debugEl.innerHTML = Object.entries(info).map(([k, v]) => `${k}: ${v}`).join('<br>');
     }
