@@ -172,6 +172,32 @@ const updateUser = async (id, payload) => {
   return findUserById(id);
 };
 
+const updateUserProfile = async (id, { name, contactInfo }) => {
+  const fields = [];
+  const params = [];
+
+  if (name !== undefined) {
+    fields.push('name = ?');
+    params.push(name);
+  }
+
+  if (contactInfo !== undefined) {
+    fields.push('contact_info = ?');
+    params.push(typeof contactInfo === 'string' ? contactInfo : JSON.stringify(contactInfo));
+  }
+
+  if (fields.length === 0) {
+    return findUserById(id);
+  }
+
+  fields.push('updated_at = NOW()');
+  params.push(id);
+
+  const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+  await query(sql, params);
+  return findUserById(id);
+};
+
 const deleteUser = async (id) => {
   const sql = 'DELETE FROM users WHERE id = ?';
   const result = await query(sql, [id]);
@@ -187,5 +213,6 @@ export {
   findAllUsers,
   countUsers,
   updateUser,
+  updateUserProfile,
   deleteUser
 };
