@@ -4429,7 +4429,7 @@ function setupRecipesModule() {
       const caPratioInput = $('r-caPratio').value.trim();
       let caPratio = null;
       if (caPratioInput) {
-        // 验证格式：数字:数字，如 1.2:1
+        // 验证格式：数字:数字，如 1.2:1，不支持整数格式，必须是比例格式
         const ratioPattern = /^[0-9]+(\.[0-9]+)?:[0-9]+(\.[0-9]+)?$/;
         if (!ratioPattern.test(caPratioInput)) {
           alert('钙磷比格式不正确，请输入如 1.2:1 的格式');
