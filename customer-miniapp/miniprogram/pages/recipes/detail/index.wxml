@@ -1,0 +1,21 @@
+<view wx:if="{{loading}}" class="loading">
+  <text>加载中...</text>
+</view>
+
+<view wx:if="{{error}}" class="error">
+  <text>{{error}}</text>
+</view>
+
+<view wx:if="{{recipe && !loading}}" class="card">
+  <view class="section">
+    <view class="title">食谱信息</view>
+    <view class="item">名称：{{recipe.name}}</view>
+    <view class="item">描述：{{recipe.description || '-'}}</view>
+    <view class="item">生命阶段：{{recipe.lifeStage || '-'}}</view>
+    <view class="item">食谱类型：{{recipe.recipeType || '-'}}</view>
+    <view class="item">基础价格：¥{{recipe.basePrice || '-'}}</view>
+    <view class="item">默认份数：{{recipe.defaultServings || '-'}}</view>
+  </view>
+</view>
+
+

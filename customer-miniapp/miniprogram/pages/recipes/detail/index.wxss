@@ -1,0 +1,39 @@
+.loading,
+.error {
+  text-align: center;
+  padding: 40rpx;
+  color: #999;
+}
+
+.error {
+  color: #f56c6c;
+}
+
+.card {
+  margin: 20rpx;
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 30rpx;
+}
+
+.section {
+  margin-bottom: 30rpx;
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-bottom: 10rpx;
+  border-bottom: 2rpx solid #eee;
+}
+
+.item {
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+  line-height: 1.6;
+}
+
+

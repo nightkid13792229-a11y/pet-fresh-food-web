@@ -1,0 +1,54 @@
+.order-item {
+  padding: 20rpx 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.order-item:last-child {
+  border-bottom: none;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.meta,
+.sub {
+  color: #6b7280;
+  font-size: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.empty,
+.loading,
+.error {
+  margin: 60rpx auto;
+  text-align: center;
+  color: #6b7280;
+}
+
+.profile-banner {
+  margin: 24rpx;
+  padding: 24rpx;
+  background-color: #fef3c7;
+  color: #92400e;
+  border-radius: 16rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 26rpx;
+}
+
+.banner-action {
+  padding: 12rpx 24rpx;
+  background-color: #10b981;
+  color: #ffffff;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+}
+
+

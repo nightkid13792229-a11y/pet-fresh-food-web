@@ -1,0 +1,85 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <view wx:if="{{error}}" class="error">
+    <text>{{error}}</text>
+  </view>
+
+  <view wx:if="{{!loading && !error}}" class="form-card">
+    <view class="form-item">
+      <view class="label">联系人姓名</view>
+      <input
+        class="input"
+        type="text"
+        value="{{form.contactName}}"
+        data-field="contactName"
+        bindinput="handleInput"
+        placeholder="请输入联系人姓名"
+        maxlength="60"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="label">联系电话</view>
+      <input
+        class="input"
+        type="text"
+        value="{{form.contactPhone}}"
+        data-field="contactPhone"
+        bindinput="handleInput"
+        placeholder="请输入联系电话"
+        maxlength="30"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="label">所在地区</view>
+      <picker
+        mode="region"
+        value="{{regionValue}}"
+        bindchange="handleRegionChange"
+      >
+        <view class="picker-value">
+          {{form.region || '请选择省市区'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">详细地址</view>
+      <textarea
+        class="textarea"
+        value="{{form.detail}}"
+        data-field="detail"
+        bindinput="handleInput"
+        placeholder="请输入街道、门牌号等详细地址"
+        maxlength="255"
+        auto-height
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="switch-item">
+        <text class="label">设为默认地址</text>
+        <switch
+          checked="{{form.isDefault}}"
+          bindchange="handleSwitchChange"
+          color="#10b981"
+        />
+      </view>
+    </view>
+
+    <button
+      class="submit-btn"
+      loading="{{submitting}}"
+      disabled="{{submitting}}"
+      bindtap="handleSubmit"
+    >
+      {{addressId ? '更新地址' : '添加地址'}}
+    </button>
+  </view>
+</view>
+
+

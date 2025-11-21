@@ -1,0 +1,84 @@
+<view class="page">
+  <view class="section-card" wx:if="{{user}}">
+    <view class="section-title">主人信息</view>
+    
+    <view class="info-item">
+      <view class="info-content">
+        <text class="info-label">主人昵称：</text>
+        <view wx:if="{{!editingName}}" class="info-value">{{user.name || '-'}}</view>
+        <input wx:else class="info-input" type="text" value="{{editingUser.name}}" data-field="name" bindinput="handleInput" placeholder="请输入昵称" />
+      </view>
+      <view class="info-action">
+        <text wx:if="{{!editingName}}" class="edit-btn" data-field="name" bindtap="handleStartEdit">编辑</text>
+        <view wx:else class="action-btns">
+          <text class="cancel-btn" data-field="name" bindtap="handleCancelEdit">取消</text>
+          <text class="save-btn" data-field="name" bindtap="handleSaveField">保存</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="info-item">
+      <view class="info-content">
+        <text class="info-label">微信号/手机号：</text>
+        <view wx:if="{{!editingContactInfo}}" class="info-value">{{user.contactInfo || '未填写'}}</view>
+        <input wx:else class="info-input" type="text" value="{{editingUser.contactInfo}}" data-field="contactInfo" bindinput="handleInput" placeholder="请输入微信号或手机号" />
+      </view>
+      <view class="info-action">
+        <text wx:if="{{!editingContactInfo}}" class="edit-btn" data-field="contactInfo" bindtap="handleStartEdit">编辑</text>
+        <view wx:else class="action-btns">
+          <text class="cancel-btn" data-field="contactInfo" bindtap="handleCancelEdit">取消</text>
+          <text class="save-btn" data-field="contactInfo" bindtap="handleSaveField">保存</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="info-item address-section">
+      <view class="info-content full-width">
+        <view class="address-header">
+          <text class="info-label">收货地址：</text>
+          <text class="edit-btn" bindtap="openAddressForm">管理</text>
+        </view>
+        <view wx:if="{{loading}}" class="muted">加载中...</view>
+        <view wx:elif="{{defaultAddress}}" class="address-list">
+          <view class="address-item">
+            <view class="address-text">{{defaultAddress.label}}</view>
+            <view class="address-tag">默认</view>
+          </view>
+        </view>
+        <view wx:else class="muted">暂无默认地址</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-title">宠物信息</view>
+    <view wx:if="{{loading}}">
+      <text class="muted">加载中...</text>
+    </view>
+    <view wx:elif="{{pets.length}}">
+      <view class="pet" wx:for="{{pets}}" wx:key="id">
+        <view class="pet-header">
+          <view class="item strong">{{item.name}}</view>
+          <view class="pet-actions">
+            <button class="btn-small" data-pet="{{item}}" bindtap="handleEditPet">编辑</button>
+            <button class="btn-small ghost" data-id="{{item.id}}" bindtap="handleDeletePet">删除</button>
+          </view>
+        </view>
+        <view class="item">品种：{{item.breed || '-'}}</view>
+        <view class="item">城市：{{item.city || '-'}}</view>
+        <view class="item">体重：{{item.weightKg || '-'}} kg</view>
+        <view class="item">性别：{{item.sex === 'male' ? '公' : item.sex === 'female' ? '母' : '未知'}}</view>
+        <view class="item">绝育：{{item.neutered ? '是' : '否'}}</view>
+        <view class="item">生命阶段：{{item.lifeStage || '-'}}</view>
+        <view class="item">活动水平：{{item.activityLevel || '-'}}</view>
+        <view class="item">能量系数：{{item.energyMultiplier || '-'}}</view>
+        <view class="item">每日能量估算：{{item.dailyEnergyKcal || '-'}} kcal</view>
+      </view>
+    </view>
+    <view wx:else>
+      <text class="muted">暂无宠物信息</text>
+    </view>
+    <button class="button-primary" bindtap="handleCreatePet">新增爱犬</button>
+  </view>
+</view>
+

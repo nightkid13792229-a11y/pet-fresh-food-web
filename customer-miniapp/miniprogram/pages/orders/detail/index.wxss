@@ -1,0 +1,24 @@
+.section {
+  margin-bottom: 24rpx;
+}
+
+.title {
+  font-weight: 600;
+  margin-bottom: 12rpx;
+  color: #111827;
+}
+
+.item {
+  color: #4b5563;
+  font-size: 26rpx;
+  margin-bottom: 6rpx;
+}
+
+.loading,
+.error {
+  margin: 60rpx auto;
+  text-align: center;
+  color: #6b7280;
+}
+
+

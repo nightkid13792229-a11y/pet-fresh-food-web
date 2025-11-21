@@ -1,0 +1,40 @@
+<view wx:if="{{loading}}" class="loading">
+  <text>加载中...</text>
+</view>
+
+<view wx:if="{{error}}" class="error">
+  <text>{{error}}</text>
+</view>
+
+<view wx:if="{{order && !loading}}" class="card">
+  <view class="section">
+    <view class="title">订单信息</view>
+    <view class="item">订单编号：{{order.orderNumber || '-'}}</view>
+    <view class="item">状态：{{order.statusLabel}}</view>
+    <view class="item">支付状态：{{order.paymentStatusLabel}}</view>
+    <view class="item">制作日期：{{order.productionDate || '-'}}</view>
+    <block wx:if="{{order.showMetrics}}">
+      <view class="item">总份数：{{order.totalServings || '-'}}</view>
+      <view class="item">总金额：¥{{order.totalPrice || '-'}}</view>
+    </block>
+    <view class="item muted" wx:else>完善资料后可查看饭量与价格</view>
+  </view>
+
+  <view class="section">
+    <view class="title">宠物信息</view>
+    <view class="item">宠物昵称：{{order.petName || '-'}}</view>
+    <view class="item">顾客邮箱：{{order.customerEmail || '-'}}</view>
+  </view>
+
+  <view class="section">
+    <view class="title">食谱与原料</view>
+    <view class="item">食谱名称：{{order.recipeName || '-'}}</view>
+    <view wx:if="{{order.items && order.items.length}}">
+      <view class="item" wx:for="{{order.items}}" wx:key="id">
+        - {{item.ingredientName}}：{{item.quantity}}{{item.unit}}
+      </view>
+    </view>
+    <view class="item" wx:else>暂无原料明细</view>
+  </view>
+</view>
+

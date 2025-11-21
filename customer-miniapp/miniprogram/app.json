@@ -1,0 +1,55 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/recipes/list/index",
+    "pages/orders/list/index",
+    "pages/profile/index",
+    "pages/orders/detail/index",
+    "pages/orders/create/index",
+    "pages/pets/edit/index",
+    "pages/recipes/detail/index",
+    "pages/addresses/list/index",
+    "pages/addresses/edit/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#10B981",
+    "navigationBarTitleText": "宠鲜订单",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#10B981",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "images/home.png",
+        "selectedIconPath": "images/home-active.png"
+      },
+      {
+        "pagePath": "pages/recipes/list/index",
+        "text": "所有食谱",
+        "iconPath": "images/recipes.png",
+        "selectedIconPath": "images/recipes-active.png"
+      },
+      {
+        "pagePath": "pages/orders/list/index",
+        "text": "我的订单",
+        "iconPath": "images/orders.png",
+        "selectedIconPath": "images/orders-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的爱犬",
+        "iconPath": "images/pets.png",
+        "selectedIconPath": "images/pets-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
+

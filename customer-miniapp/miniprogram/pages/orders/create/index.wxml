@@ -1,0 +1,54 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="muted text-center">加载中...</view>
+  <view wx:elif="{{error}}" class="error text-center">{{error}}</view>
+  <view wx:else class="card form">
+    <view class="form-item">
+      <view class="label">选择宠物</view>
+      <picker mode="selector" range="{{pets}}" range-key="name" bindchange="handlePickerChangePet" value="{{petIndex}}" disabled="{{!pets.length}}">
+        <view class="picker-value">
+          {{pets.length && petIndex >= 0 ? (pets[petIndex].name || '请选择') : '暂无宠物'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">选择地址</view>
+      <picker mode="selector" range="{{addresses}}" range-key="label" bindchange="handlePickerChangeAddress" value="{{addressIndex}}" disabled="{{!addresses.length}}">
+        <view class="picker-value">
+          {{addresses.length && addressIndex >= 0 ? addresses[addressIndex].label : '暂无地址'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">选择食谱</view>
+      <picker mode="selector" range="{{recipes}}" range-key="name" bindchange="handlePickerChangeRecipe" value="{{recipeIndex}}" disabled="{{!recipes.length}}">
+        <view class="picker-value">
+          {{recipes.length && recipeIndex >= 0 ? (recipes[recipeIndex].name || '请选择') : '暂无食谱'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">制作日期</view>
+      <picker mode="date" value="{{form.productionDate}}" bindchange="handlePickerChangeDate">
+        <view class="picker-value">{{form.productionDate || '请选择日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">份数</view>
+      <input type="number" data-field="totalServings" value="{{form.totalServings}}" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">预计金额（元）</view>
+      <input type="digit" data-field="totalPrice" value="{{form.totalPrice}}" bindinput="handleInput" placeholder="例如 199.00" />
+    </view>
+
+    <button class="button-primary" loading="{{submitting}}" disabled="{{submitting || pets.length === 0 || recipes.length === 0}}" bindtap="submitOrder">
+      提交订单
+    </button>
+  </view>
+</view>
+

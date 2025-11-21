@@ -1,3 +1,38 @@
+.quote-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  margin-left: auto;
+}
+
+.quote-check input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.quote-check input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.quote-check input[type="checkbox"]:checked::after {
+  content: '\2713';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  color: #fff;
+  font-size: 14px;
+}
 /* 苹果风格UI设计 - macOS Big Sur/Monterey 风格 */
 
 :root {
@@ -62,7 +97,7 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 12px 24px;
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: saturate(180%) blur(20px);
@@ -72,6 +107,7 @@ body {
   top: 0;
   z-index: 1000;
   box-shadow: var(--shadow-sm);
+  gap: 16px;
 }
 
 .app-header h1 {
@@ -87,6 +123,64 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.preview-mode-control {
+  margin-left: 0;
+  display: flex;
+  align-items: center;
+}
+
+.auth-panel {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-mode-select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 32px 8px 12px;
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23686868' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.preview-mode-select:hover {
+  border-color: var(--border-strong);
+}
+
+.preview-mode-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-light);
 }
 
 .nav-btn {
@@ -163,6 +257,15 @@ body {
   color: var(--text-primary);
   margin: 0 0 16px 0;
   letter-spacing: -0.01em;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 /* 表单样式 */
@@ -295,11 +398,13 @@ select {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
+  overflow-x: auto;
 }
 
 .list {
   display: grid;
   gap: 8px;
+  overflow-x: auto;
 }
 
 .list-item {
@@ -345,6 +450,96 @@ select {
 
 .list-item .item-details div {
   margin-bottom: 6px;
+}
+
+/* 食谱对比单图片预览 */
+.quote-preview {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  pointer-events: none;
+  padding: 24px;
+}
+
+.quote-preview.show {
+  pointer-events: auto;
+}
+
+.quote-preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.quote-preview-dialog {
+  position: relative;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 16px 20px 20px;
+  width: min(92vw, 960px);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 1;
+}
+
+.quote-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quote-preview-header h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.quote-preview-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+
+.quote-preview-close:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+}
+
+.quote-preview-body {
+  flex: 1;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  padding: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.quote-preview-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.quote-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 /* 分页 */
@@ -421,7 +616,7 @@ select {
 
 /* 隐藏视图 - 默认所有视图隐藏 */
 .view {
-  display: none;
+  display: none !important;
 }
 
 /* 当通过内联样式设置为block时显示 */
@@ -501,6 +696,15 @@ select {
   .grid {
     grid-template-columns: 1fr;
   }
+
+  .quote-preview-dialog {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .quote-preview {
+    padding: 12px;
+  }
 }
 
 /* 滚动条样式 - 苹果风格 */
@@ -547,4 +751,1176 @@ select {
 *:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* 拖拽样式 */
+.recipe-ingredient-item.dragging {
+  opacity: 0.5;
+}
+
+.recipe-ingredient-item.drag-over {
+  border-top: 2px solid var(--primary);
+  background: var(--primary-light);
+}
+
+.recipe-ingredient-item:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 8px 0;
+}
+
+.quote-recipe-header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.quote-recipe-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.quote-recipe-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.detail-table thead th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.detail-table th,
+.detail-table td {
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--border);
+  border-right: 0.5px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.detail-table th:last-child,
+.detail-table td:last-child {
+  border-right: none;
+}
+
+.detail-table tr:last-child th,
+.detail-table tr:last-child td {
+  border-bottom: none;
+}
+
+.detail-table tbody tr:nth-child(odd) {
+  background: var(--bg-secondary);
+}
+
+.quote-ingredients-table,
+.quote-cost-table {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.quote-ingredients-table th:first-child,
+.quote-ingredients-table td:first-child {
+  text-align: center;
+}
+
+.quote-cost-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quote-cost-notes {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.detail-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.detail-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 6px 0;
+}
+
+.quote-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px 16px;
+}
+
+.quote-summary-card .quote-section-header {
+  margin-bottom: 0;
+}
+
+.quote-summary-card .quote-section-title {
+  font-size: 24px;
+}
+
+.quote-override-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-strong);
+  border-radius: 10px;
+}
+
+.quote-override-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.quote-override-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-end;
+}
+
+.quote-override-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.quote-override-field span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.quote-override-field input,
+.quote-override-field select {
+  padding: 8px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  min-height: 34px;
+}
+
+.quote-override-field input:focus,
+.quote-override-field select:focus {
+  outline: none;
+  border-color: rgba(0, 122, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+.quote-override-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quote-override-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.quote-export-mode {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 18px 18px 24px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  display: block !important;
+  box-shadow: none;
+}
+
+.quote-export-mode > h3 {
+  text-align: left;
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.quote-export-mode .detail-content {
+  gap: 18px;
+}
+
+.quote-export-mode .quote-summary-card,
+.quote-export-mode .quote-block {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.quote-export-mode .quote-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+
+.quote-export-mode .quote-summary-value,
+.quote-export-mode .detail-grid-value {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.quote-export-mode .detail-grid {
+  --detail-grid-columns: 2 !important;
+  gap: 10px 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.quote-export-mode .detail-section-title {
+  font-size: 15px;
+  margin: 6px 0;
+}
+
+.quote-export-mode .detail-table,
+.quote-export-mode .quote-cost-table {
+  font-size: 12px;
+}
+
+.quote-export-mode .detail-table th,
+.quote-export-mode .detail-table td,
+.quote-export-mode .quote-cost-table th,
+.quote-export-mode .quote-cost-table td {
+  padding: 8px;
+}
+
+.quote-export-mode .quote-cost-total {
+  font-size: 14px;
+}
+
+.quote-export-mode .quote-cost-wrapper {
+  gap: 10px;
+}
+
+.quote-export-mode .quote-cost-notes {
+  font-size: 11px;
+}
+
+.quote-export-mode .quote-override-card,
+.quote-export-mode .actions {
+  display: none !important;
+}
+
+.quote-export-mode .detail-table,
+.quote-export-mode .quote-cost-table {
+  overflow: hidden;
+}
+
+.quote-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 24px;
+}
+
+.quote-summary-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quote-summary-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.quote-summary-value {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.quote-summary-value br {
+  line-height: 1.6;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--detail-grid-columns, 2), minmax(0, 1fr));
+  gap: 10px 20px;
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.detail-grid.compact {
+  gap: 8px 18px;
+  padding: 12px 14px;
+}
+
+.detail-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-grid-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.detail-grid-value {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.detail-grid-value strong {
+  font-weight: 600;
+}
+
+.quote-section-header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.quote-section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.quote-energy-highlight {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 122, 255, 0.08);
+  border: 1px solid rgba(0, 122, 255, 0.25);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.quote-energy-label {
+  font-size: 12px;
+  color: #007aff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.quote-energy-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #007aff;
+}
+
+.quote-recipe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 370px;
+  overflow-y: auto;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--bg-secondary);
+}
+
+.quote-recipe-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 0.5px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.quote-recipe-item:hover {
+  border-color: var(--border);
+  background: var(--bg-tertiary);
+}
+
+.quote-recipe-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.quote-recipe-meta strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.quote-recipe-meta .muted {
+  font-size: 12px;
+}
+
+.quote-cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.quote-cost-table th,
+.quote-cost-table td {
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--border);
+  border-right: 0.5px solid var(--border);
+  text-align: center;
+}
+
+.quote-cost-total {
+  font-weight: 700;
+  color: #d63384;
+  font-size: 16px;
+}
+
+.quote-cost-table th:last-child,
+.quote-cost-table td:last-child {
+  border-right: none;
+}
+
+.quote-cost-table tr:last-child th,
+.quote-cost-table tr:last-child td {
+  border-bottom: none;
+}
+
+.quote-cost-table thead th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.quote-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.quote-export-mode.quote-export-mobile {
+  font-size: 17px;
+  line-height: 1.6;
+  padding: 20px 16px 24px;
+  border-radius: 20px;
+}
+
+.quote-export-mode.quote-export-mobile > h3 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr !important;
+  gap: 10px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-grid-item {
+  display: block;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-grid-item[data-field="activity"],
+.quote-export-mode.quote-export-mobile .quote-summary-grid-item[data-field="avoid"],
+.quote-export-mode.quote-export-mobile .quote-summary-grid-item[data-field="allergies"] {
+  display: block;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-value {
+  font-size: 16px;
+  line-height: 1.6;
+  word-break: keep-all;
+  white-space: normal;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-grid-item[data-field="fav"] {
+  display: none;
+}
+
+.quote-export-mode.quote-export-mobile .detail-grid {
+  --detail-grid-columns: 1 !important;
+  gap: 12px;
+  padding: 16px 18px;
+  font-size: 16px;
+}
+
+.quote-export-mode.quote-export-mobile .detail-grid-label {
+  font-size: 15px;
+}
+
+.quote-export-mode.quote-export-mobile .detail-grid-value {
+  font-size: 17px;
+}
+
+.quote-export-mode.quote-export-mobile .detail-section-title {
+  font-size: 18px;
+  margin: 12px 0 8px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-ingredients-table,
+.quote-export-mode.quote-export-mobile .quote-cost-table {
+  font-size: 15px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-ingredients-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.quote-export-mode.quote-export-mobile .quote-ingredients-table .col-category,
+.quote-export-mode.quote-export-mobile .quote-ingredients-table .col-nutrition {
+  display: none;
+}
+
+.quote-export-mode.quote-export-mobile .quote-ingredients-table .col-ingredient,
+.quote-export-mode.quote-export-mobile .quote-ingredients-table .col-brand,
+.quote-export-mode.quote-export-mobile .quote-ingredients-table .col-usage {
+  word-break: break-word;
+  white-space: normal;
+}
+
+.quote-export-mode.quote-export-mobile .quote-ingredients-table th,
+.quote-export-mode.quote-export-mobile .quote-ingredients-table td,
+.quote-export-mode.quote-export-mobile .quote-cost-table th,
+.quote-export-mode.quote-export-mobile .quote-cost-table td {
+  padding: 10px 12px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-cost-total {
+  font-size: 18px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-cost-notes {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.quote-export-mode.quote-export-mobile .quote-block {
+  padding: 18px;
+  border-radius: 18px;
+}
+
+.quote-export-mode.quote-export-mobile .detail-table {
+  border-radius: 14px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-card {
+  padding: 18px;
+  border-radius: 18px;
+}
+
+.quote-export-mode.quote-export-mobile .detail-content {
+  gap: 22px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-cost-wrapper {
+  gap: 16px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-cost-notes div {
+  margin-bottom: 6px;
+}
+
+.quote-export-mode.quote-export-mobile .quote-override-card,
+.quote-export-mode.quote-export-mobile .actions {
+  display: none !important;
+}
+
+.quote-export-mode.quote-export-mobile .quote-summary-value strong {
+  font-size: 17px;
+  color: var(--primary);
+}
+
+/* 全局预览模式 */
+body.mode-mobile {
+  font-size: 16px;
+  background: #f7f7f8;
+}
+
+body.mode-mobile .container {
+  max-width: 480px;
+  padding: 16px;
+}
+
+body.mode-mobile .card {
+  border-radius: 18px;
+  padding: 20px;
+}
+
+body.mode-mobile .card h2,
+body.mode-mobile .card h3 {
+  font-size: 20px;
+}
+
+body.mode-mobile .list-head,
+body.mode-mobile .list-item-row {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+body.mode-mobile .quote-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+body.mode-mobile .quote-summary-grid-item[data-field="fav"] {
+  display: none;
+}
+
+body.mode-mobile .quote-summary-label {
+  font-size: 13px;
+}
+
+body.mode-mobile .quote-summary-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: keep-all;
+  white-space: normal;
+}
+body.mode-mobile .quote-summary-value br {
+  display: inline;
+  content: ' ';
+}
+body.mode-mobile .quote-summary-value br::after {
+  content: '';
+}
+
+body.mode-mobile .quote-summary-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+body.mode-mobile .quote-summary-grid-item[data-field="activity"],
+body.mode-mobile .quote-summary-grid-item[data-field="avoid"],
+body.mode-mobile .quote-summary-grid-item[data-field="allergies"] {
+  grid-column: 1 / -1;
+  display: block;
+}
+
+body.mode-mobile .quote-summary-grid-item[data-field="weight"] {
+  grid-column: 1 / span 2;
+}
+
+body.mode-mobile .quote-summary-grid-item[data-field="meals"] {
+  grid-column: 3 / span 1;
+}
+
+body.mode-mobile .quote-energy-highlight {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+body.mode-mobile .detail-grid {
+  --detail-grid-columns: 1 !important;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+body.mode-mobile .detail-grid-label {
+  font-size: 15px;
+}
+
+body.mode-mobile .detail-grid-value {
+  font-size: 16px;
+}
+
+body.mode-mobile .detail-section-title {
+  font-size: 18px;
+  margin: 12px 0 8px;
+}
+
+body.mode-mobile .quote-ingredients-table,
+body.mode-mobile .quote-cost-table {
+  font-size: 15px;
+}
+
+body.mode-mobile .quote-ingredients-table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  box-sizing: border-box;
+  margin-top: 12px;
+}
+
+body.mode-mobile .quote-cost-per {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+body.mode-mobile .quote-ingredients-table th {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+body.mode-mobile .quote-ingredients-table .ingredient-description {
+  display: none;
+}
+body.mode-mobile .quote-cost-table th,
+body.mode-mobile .quote-cost-table td {
+  padding: 10px 12px;
+}
+
+body.mode-mobile .quote-cost-total {
+  font-size: 18px;
+}
+
+body.mode-mobile .quote-cost-wrapper {
+  gap: 16px;
+}
+
+body.mode-mobile .quote-cost-notes {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+body.mode-mobile .quote-cost-notes div {
+  margin-bottom: 6px;
+}
+
+body.mode-mobile #customers-head {
+  display: none;
+}
+
+body.mode-mobile #customers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+body.mode-mobile .list-item {
+  padding: 18px;
+}
+
+body.mode-mobile .list-item-row {
+  display: none;
+}
+
+body.mode-mobile .customer-card-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body.mode-mobile .customer-mobile-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+body.mode-mobile .customer-mobile-row {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+body.mode-mobile .quote-block {
+  overflow-x: hidden;
+}
+
+body.mode-mobile .quote-ingredients-table,
+body.mode-mobile .quote-cost-table {
+  font-size: 15px;
+}
+
+body.mode-mobile .quote-ingredients-table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  box-sizing: border-box;
+}
+
+body.mode-mobile .quote-block {
+  background: var(--surface-elevated);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+body.mode-mobile .quote-block:nth-of-type(odd) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+body.mode-mobile .quote-block:nth-of-type(even) {
+  background: rgba(248, 248, 252, 0.92);
+}
+
+body.mode-mobile .quote-block + .quote-block {
+  margin-top: 12px;
+}
+
+body.mode-mobile .detail-section-title {
+  font-size: 16px;
+  margin: 16px 0 8px;
+}
+
+body.mode-mobile .quote-block .detail-section-title {
+  text-align: left;
+}
+
+body.mode-mobile .quote-block .detail-section-title:last-of-type {
+  margin-bottom: 8px;
+}
+
+body.mode-mobile .quote-block .detail-section-title.detail-section-title-cost {
+  text-align: center;
+}
+
+.quote-summary-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quote-summary-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quote-summary-line-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.quote-summary-line-value {
+  font-size: 16px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+#orders-utility-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+#orders-utility-panels .card {
+  border: 0.5px solid var(--border);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.panel-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel-header h3 {
+  margin: 0;
+}
+
+.procurement-date-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.procurement-date-control input[type="date"] {
+  padding: 4px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  font-size: 13px;
+  min-width: 150px;
+}
+
+#procurement-panel .table-wrapper {
+  max-height: none;
+  overflow: visible;
+  border-radius: var(--radius-sm);
+}
+
+#procurement-panel table {
+  width: 100%;
+}
+
+#procurement-panel tbody td {
+  vertical-align: top;
+}
+
+#procurement-panel .panel-note textarea {
+  width: 100%;
+  margin-top: 4px;
+  resize: vertical;
+}
+
+.order-select-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.order-select-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.order-select-checkbox input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.order-select-checkbox input[type="checkbox"]:checked::after {
+  content: '\2713';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  color: #fff;
+  font-size: 14px;
+}
+
+.order-select-checkbox span {
+  margin-left: 4px;
+}
+
+#production-preview-panel {
+  position: relative;
+}
+
+.production-preview-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.production-preview-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.production-preview-meta-item {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.production-preview-meta-item span:first-child {
+  color: var(--text-secondary);
+}
+
+.production-preview-ingredients table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.production-preview-ingredients th,
+.production-preview-ingredients td {
+  border: 0.5px solid var(--border);
+  padding: 8px;
+  font-size: 13px;
+}
+
+.production-preview-footer {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  font-size: 13px;
+}
+
+.production-preview-footer span {
+  color: var(--text-secondary);
+}
+
+.print-preview-active {
+  outline: 2px dashed var(--primary);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+  animation: modalFadeIn 0.2s ease;
+  z-index: 1101;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.modal-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.modal-body input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+@keyframes modalFadeIn {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #production-preview-panel,
+  #production-preview-panel * {
+    visibility: visible;
+  }
+  #production-preview-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  #production-preview-panel .actions,
+  #procurement-panel,
+  .app-header,
+  .pagination {
+    display: none !important;
+  }
+}
+
+.order-total-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-total-cell .order-select-checkbox {
+  margin-left: auto;
+}
+
+.order-select-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
 }

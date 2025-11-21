@@ -1,0 +1,29 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <view wx:if="{{error}}" class="error">
+    <text>{{error}}</text>
+  </view>
+
+  <view wx:if="{{!loading && !error}}" class="recipes-list">
+    <view class="recipe-card" wx:for="{{recipes}}" wx:key="id" data-id="{{item.id}}" bindtap="goToRecipeDetail">
+      <view class="recipe-header">
+        <text class="recipe-name">{{item.name}}</text>
+        <text class="recipe-price">¥{{item.basePrice || '-'}}</text>
+      </view>
+      <view class="recipe-desc">{{item.description || '暂无描述'}}</view>
+      <view class="recipe-meta">
+        <text>生命阶段：{{item.lifeStage || '-'}}</text>
+        <text>默认份数：{{item.defaultServings || '-'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{!recipes.length}}" class="empty">
+      <text>暂无食谱</text>
+    </view>
+  </view>
+</view>
+
+

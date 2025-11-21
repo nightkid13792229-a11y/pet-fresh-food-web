@@ -1,0 +1,119 @@
+<view class="page">
+  <view class="card form">
+    <view class="form-item">
+      <view class="label">爱犬昵称</view>
+      <input placeholder="请输入爱犬昵称" value="{{form.name}}" data-field="name" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">品种</view>
+      <picker range="{{breedOptions}}" value="{{breedIndex}}" bindchange="handleBreedChange">
+        <view class="picker-value">
+          {{breedIndex >= 0 ? breedOptions[breedIndex] : '请选择品种'}}
+        </view>
+      </picker>
+      <input wx:if="{{showOtherBreedInput}}" class="other-breed-input" placeholder="请输入品种名称" value="{{form.breed}}" data-field="breed" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">常驻城市</view>
+      <picker mode="region" bindchange="handleRegionChange" value="{{region}}">
+        <view class="picker-value">{{form.city || '请选择城市'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">生日</view>
+      <picker mode="date" value="{{form.birthdate}}" bindchange="handleDateChange">
+        <view class="picker-value">{{form.birthdate || '请选择生日'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">体重 (kg)</view>
+      <input type="digit" placeholder="例如 8.5" value="{{form.weightKg}}" data-field="weightKg" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">性别</view>
+      <picker range="{{sexOptions}}" range-key="label" value="{{sexIndex}}" bindchange="handleSexChange">
+        <view class="picker-value">
+          {{sexIndex >= 0 ? sexOptions[sexIndex].label : '选择性别'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item inline">
+      <view class="label">是否绝育</view>
+      <switch checked="{{form.neutered}}" data-field="neutered" bindchange="handleSwitch" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">生命阶段</view>
+      <picker range="{{lifeStageOptions}}" range-key="label" value="{{lifeStageIndex}}" bindchange="handleLifeStageChange">
+        <view class="picker-value">
+          {{lifeStageIndex >= 0 ? lifeStageOptions[lifeStageIndex].label : '请选择'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">活动水平</view>
+      <picker range="{{activityOptions}}" range-key="label" value="{{activityIndex}}" bindchange="handleActivityChange">
+        <view class="picker-value">
+          {{activityIndex >= 0 ? activityOptions[activityIndex].label : '请选择'}}
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item">
+      <view class="label">运动-能量系数</view>
+      <input type="digit" placeholder="例如 1.8" value="{{form.energyMultiplier}}" data-field="energyMultiplier" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">每日能量估算 (kcal)</view>
+      <input type="number" placeholder="自动计算，可手动调整" value="{{form.dailyEnergyKcal}}" data-field="dailyEnergyKcal" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">体况评分 (1-9)</view>
+      <input type="number" placeholder="如：5" value="{{form.bodyConditionScore}}" data-field="bodyConditionScore" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">每日进餐数</view>
+      <input type="number" placeholder="如：2" value="{{form.mealsPerDay}}" data-field="mealsPerDay" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">每日零食量</view>
+      <input placeholder="如：一小把冻干" value="{{form.snackAmount}}" data-field="snackAmount" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">过敏食物</view>
+      <textarea placeholder="如：鸡肉、乳制品" value="{{form.allergyNote}}" data-field="allergyNote" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">挑食食物</view>
+      <textarea placeholder="如：不喜欢吃胡萝卜" value="{{form.dietaryNote}}" data-field="dietaryNote" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">症状/疾病史</view>
+      <textarea placeholder="如：轻微食物过敏" value="{{form.symptomNote}}" data-field="symptomNote" bindinput="handleInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">备注</view>
+      <textarea placeholder="其他备注内容" value="{{form.notes}}" data-field="notes" bindinput="handleInput" />
+    </view>
+
+    <button class="button-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitForm">
+      保存
+    </button>
+  </view>
+</view>
+

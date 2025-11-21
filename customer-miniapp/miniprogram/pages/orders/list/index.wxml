@@ -1,0 +1,41 @@
+<view wx:if="{{!profileCompleted}}" class="profile-banner" bindtap="goToProfile">
+  <text>完善您和爱犬的信息，才能计算专属饭量和价格</text>
+  <view class="banner-action">去完善</view>
+</view>
+
+<view class="card" wx:if="{{orders.length}}">
+  <view class="order-item" wx:for="{{orders}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+    <view class="header">
+      <text class="order-number">{{item.orderNumber || '订单' + item.id}}</text>
+      <text class="status">{{item.statusLabel}}</text>
+    </view>
+    <view class="meta">
+      <text>制作日期：{{item.productionDate || '-'}}</text>
+      <block wx:if="{{item.showMetrics}}">
+        <text>总份数：{{item.totalServings || '-'}}</text>
+        <text>总金额：¥{{item.totalPrice || '-'}}</text>
+      </block>
+      <block wx:else>
+        <text class="muted">完善资料后可查看饭量与价格</text>
+      </block>
+      <text>支付状态：{{item.paymentStatusLabel}}</text>
+    </view>
+    <view class="sub">
+      <text>宠物：{{item.petName || '-'}}</text>
+      <text>食谱：{{item.recipeName || '-'}}</text>
+    </view>
+  </view>
+</view>
+
+<view wx:if="{{!orders.length && !loading}}" class="empty">
+  <text>暂无订单</text>
+</view>
+
+<view wx:if="{{loading}}" class="loading">
+  <text>加载中...</text>
+</view>
+
+<view wx:if="{{error}}" class="error">
+  <text>{{error}}</text>
+</view>
+

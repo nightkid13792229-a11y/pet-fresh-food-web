@@ -1,0 +1,35 @@
+<view class="page">
+  <view wx:if="{{!profileCompleted}}" class="profile-banner" bindtap="goToProfile">
+    <text>完善您和爱犬的信息，才能计算专属饭量和价格</text>
+    <view class="banner-action">去完善</view>
+  </view>
+
+  <view class="home-content">
+    <view class="welcome-section">
+      <text class="welcome-title">欢迎使用宠物鲜食</text>
+      <text class="welcome-desc">为您的爱宠提供新鲜、健康的定制美食</text>
+    </view>
+
+    <view class="quick-actions">
+      <view class="action-card" bindtap="goToRecipes">
+        <view class="action-icon">📖</view>
+        <text class="action-title">所有食谱</text>
+        <text class="action-desc">查看所有可用食谱</text>
+      </view>
+
+      <view class="action-card" bindtap="goToOrders">
+        <view class="action-icon">📦</view>
+        <text class="action-title">我的订单</text>
+        <text class="action-desc">查看订单状态</text>
+      </view>
+
+      <view class="action-card" bindtap="goToProfile">
+        <view class="action-icon">🐕</view>
+        <text class="action-title">我的爱犬</text>
+        <text class="action-desc">管理宠物信息</text>
+      </view>
+    </view>
+  </view>
+</view>
+
+
