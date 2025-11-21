@@ -1,6 +1,6 @@
-const createError = require('http-errors');
-const { verifyToken } = require('../utils/token');
-const { getProfile } = require('../modules/users/users.service');
+import createError from 'http-errors';
+import { verifyToken } from '../utils/token.js';
+import { getProfile } from '../modules/users/users.service.js';
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -36,7 +36,7 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = {
+export {
   authenticate,
   authorize
 };

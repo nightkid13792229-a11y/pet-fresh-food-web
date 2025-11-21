@@ -50,7 +50,7 @@ const validateWeChatLogin = (data) => {
   return errors;
 };
 
-module.exports = {
+export {
   validateRegister,
   validateLogin,
   validateWeChatLogin

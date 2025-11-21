@@ -1,15 +1,15 @@
-const express = require('express');
-const { authenticate, authorize } = require('../../middleware/auth');
-const {
+import { Router } from 'express';
+import { authenticate, authorize } from '../../middleware/auth.js';
+import {
   listUsersController,
   getUserController,
   createUserController,
   updateUserController,
   resetPasswordController,
   deleteUserController
-} = require('./users.controller');
+} from './users.controller.js';
 
-const router = express.Router();
+const router = Router();
 
 // 所有用户管理路由都需要管理员权限
 router.use(authenticate);
@@ -22,6 +22,6 @@ router.put('/:id', updateUserController);
 router.post('/:id/reset-password', resetPasswordController);
 router.delete('/:id', deleteUserController);
 
-module.exports = router;
+export default router;
 
 

@@ -1,0 +1,98 @@
+[
+  {
+    "elements": [
+      {
+        "json": {
+          "codeType": 31,
+          "height": 16,
+          "rotate": 0,
+          "value": "12345678",
+          "width": 16,
+          "x": 2,
+          "y": 2
+        },
+        "type": "qrCode"
+      },
+      {
+        "json": {
+          "fontFamily": "宋体",
+          "fontSize": 3.2,
+          "fontStyle": [
+            true,
+            false,
+            false,
+            false
+          ],
+          "height": 16,
+          "letterSpacing": 0,
+          "lineMode": 6,
+          "lineSpacing": 1,
+          "rotate": 0,
+          "textAlignHorizontal": 0,
+          "textAlignVertical": 1,
+          "value": "姓名：武汉精臣\n年龄：11\n类型：血液检测",
+          "width": 28,
+          "x": 20,
+          "y": 2
+        },
+        "type": "text"
+      }
+    ],
+    "initDrawingBoardParam": {
+      "height": 20,
+      "HorizontalShift": 0,
+      "path": "ZT001.ttf",
+      "rotate": 0,
+      "verticalShift": 0,
+      "width": 50
+    }
+  },
+  {
+    "elements": [
+      {
+        "json": {
+          "codeType": 31,
+          "height": 16,
+          "rotate": 0,
+          "value": "12345678",
+          "width": 16,
+          "x": 2,
+          "y": 2
+        },
+        "type": "qrCode"
+      },
+      {
+        "json": {
+          "fontFamily": "宋体",
+          "fontSize": 3.2,
+          "fontStyle": [
+            true,
+            false,
+            false,
+            false
+          ],
+          "height": 16,
+          "letterSpacing": 0,
+          "lineMode": 6,
+          "lineSpacing": 1,
+          "rotate": 0,
+          "textAlignHorizontal": 0,
+          "textAlignVertical": 1,
+          "value": "姓名：武汉精臣\n年龄：12\n类型：血液检测",
+          "width": 28,
+          "x": 20,
+          "y": 2
+        },
+        "type": "text"
+      }
+    ],
+    "initDrawingBoardParam": {
+      "height": 20,
+      "HorizontalShift": 0,
+      "path": "ZT001.ttf",
+      "rotate": 0,
+      "verticalShift": 0,
+      "width": 50
+    }
+  }
+]

@@ -1,8 +1,8 @@
-const express = require('express');
-const { authenticate, authorize } = require('../../middleware/auth');
-const { listAuditLogsController } = require('./audit.controller');
+import { Router } from 'express';
+import { authenticate, authorize } from '../../middleware/auth.js';
+import { listAuditLogsController } from './audit.controller.js';
 
-const router = express.Router();
+const router = Router();
 
 // 只有管理员可以查看操作日志
 router.use(authenticate);
@@ -10,6 +10,6 @@ router.use(authorize('admin'));
 
 router.get('/', listAuditLogsController);
 
-module.exports = router;
+export default router;
 
 

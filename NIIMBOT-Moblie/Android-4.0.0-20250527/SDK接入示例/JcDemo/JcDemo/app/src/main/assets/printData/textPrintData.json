@@ -1,0 +1,180 @@
+{
+  "elements": [
+    {
+      "json": {
+        "fontFamily": "宋体",
+        "fontSize": 5.6,
+        "fontStyle": [
+          true,
+          false,
+          false,
+          false
+        ],
+        "height": 7.4,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 1,
+        "textAlignVertical": 1,
+        "value": "合格证",
+        "width": 36,
+        "x": 2,
+        "y": 2
+      },
+      "type": "text"
+    },
+    {
+      "json": {
+        "fontFamily": "",
+        "fontSize": 3.2,
+        "fontStyle": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "height": 4.3,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 0,
+        "textAlignVertical": 1,
+        "value": "品名：连衣裙",
+        "width": 34,
+        "x": 3,
+        "y": 11
+      },
+      "type": "text"
+    },
+    {
+      "json": {
+        "fontFamily": "宋体",
+        "fontSize": 3.2,
+        "fontStyle": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "height": 4.3,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 0,
+        "textAlignVertical": 1,
+        "value": "货号：L0565",
+        "width": 34,
+        "x": 3,
+        "y": 17
+      },
+      "type": "text"
+    },
+    {
+      "json": {
+        "fontFamily": "宋体",
+        "fontSize": 3.2,
+        "fontStyle": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "height": 4.3,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 0,
+        "textAlignVertical": 1,
+        "value": "尺码：S（155）",
+        "width": 34,
+        "x": 3,
+        "y": 23
+      },
+      "type": "text"
+    },
+    {
+      "json": {
+        "fontFamily": "宋体",
+        "fontSize": 3.2,
+        "fontStyle": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "height": 4.3,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 0,
+        "textAlignVertical": 1,
+        "value": "颜色：蓝色",
+        "width": 34,
+        "x": 3,
+        "y": 29
+      },
+      "type": "text"
+    },
+    {
+      "json": {
+        "fontFamily": "宋体",
+        "fontSize": 3.2,
+        "fontStyle": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "height": 4.3,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 0,
+        "textAlignVertical": 1,
+        "value": "面料：100%聚酯纤维",
+        "width": 34,
+        "x": 3,
+        "y": 35
+      },
+      "type": "text"
+    },
+    {
+      "json": {
+        "fontFamily": "宋体",
+        "fontSize": 5.6,
+        "fontStyle": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "height": 14.8,
+        "letterSpacing": 0,
+        "lineMode": 6,
+        "lineSpacing": 1,
+        "rotate": 0,
+        "textAlignHorizontal": 1,
+        "textAlignVertical": 1,
+        "value": "全国统一价\n¥188",
+        "width": 34,
+        "x": 3,
+        "y": 41
+      },
+      "type": "text"
+    }
+  ],
+  "initDrawingBoardParam": {
+    "height": 60,
+    "HorizontalShift": 0,
+    "path": "ZT001.ttf",
+    "rotate": 0,
+    "verticalShift": 0,
+    "width": 40
+  }
+}

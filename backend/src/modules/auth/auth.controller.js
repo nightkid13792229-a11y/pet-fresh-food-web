@@ -1,7 +1,7 @@
-const { success } = require('../../utils/response');
-const { registerUser, loginUser, getProfile, wechatLogin } = require('../users/users.service');
-const { createAuditLog } = require('../../utils/audit-helper');
-const { validateRegister, validateLogin, validateWeChatLogin } = require('./auth.schemas');
+import { success } from '../../utils/response.js';
+import { registerUser, loginUser, getProfile, wechatLogin } from '../users/users.service.js';
+import { createAuditLog } from '../../utils/audit-helper.js';
+import { validateRegister, validateLogin, validateWeChatLogin } from './auth.schemas.js';
 
 const register = async (req, res) => {
   try {
@@ -80,7 +80,7 @@ const loginWithWeChat = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   register,
   login,
   profile,

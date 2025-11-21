@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>宠物鲜食助手</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#10b981" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>宠物鲜食助手</h1>
+    <nav class="top-nav" id="top-nav">
+      <button data-view="customers" class="nav-btn active">顾客</button>
+      <button data-view="recipes" class="nav-btn">食谱</button>
+      <button data-view="inventory" class="nav-btn">食材</button>
+      <button data-view="orders" class="nav-btn">订单</button>
+      <button data-view="labels" class="nav-btn">标签</button>
+      <button data-view="settings" class="nav-btn">设置</button>
+    </nav>
+    <button id="btn-print" class="btn primary">导出/打印</button>
+  </header>
+
+  <main class="container">
+    <!-- Customers Module -->
+    <section class="view" id="view-customers" style="display:none">
+      <div class="card">
+        <h2>顾客与宠物信息（犬）</h2>
+        <div class="actions">
+          <input id="customer-search" type="text" placeholder="搜索：微信/宠物/收货信息..." style="flex:1" />
+          <button id="btn-new-customer" class="btn" onclick="window.__openCustomer ? window.__openCustomer() : (function(){var c=document.getElementById('customer-form-card'); if(c) c.style.display='block';})();">新增</button>
+        </div>
+        <div id="customers-head" class="list-head">
+          <div>编号</div>
+          <div>宠物昵称</div>
+          <div>品种</div>
+          <div>微信号</div>
+          <div>收货信息</div>
+        </div>
+        <div id="customers-list" class="list"></div>
+        <div id="customers-pagination" class="pagination">
+          <div id="customers-total" class="total">共 0 条</div>
+          <div class="spacer"></div>
+          <button id="customers-prev" class="btn small">上一页</button>
+          <span id="customers-pageinfo" class="muted"></span>
+          <button id="customers-next" class="btn small">下一页</button>
+        </div>
+      </div>
+
+      <div class="card" id="customer-form-card" style="display:none">
+        <h3 id="customer-form-title">新增顾客</h3>
+        <form id="customer-form">
+          <input type="hidden" id="customer-id" />
+
+          <div class="section-title">顾客信息</div>
+          <div class="grid">
+            <label>微信号<input id="c-wechat" type="text" /></label>
+            <label>收货信息<input id="c-address" type="text" /></label>
+          </div>
+
+          <div class="section-title">宠物信息</div>
+          <div class="grid">
+            <label>宠物昵称<input id="c-petName" type="text" required /></label>
+            <label>品种
+              <select id="c-breed">
+                <option value="">请选择品种</option>
+              </select>
+            </label>
+            <label>生日<input id="c-birthday" type="date" /></label>
+
+            <label>体重 (kg)<input id="c-weightKg" type="number" min="0" step="0.1" required /></label>
+            <label>性别
+              <select id="c-sex">
+                <option value="male">公</option>
+                <option value="female">母</option>
+                <option value="unknown">未知</option>
+              </select>
+            </label>
+            <label>是否绝育
+              <select id="c-neutered">
+                <option value="yes">是</option>
+                <option value="no">否</option>
+                <option value="unknown">未知</option>
+              </select>
+            </label>
+
+            <label>生命阶段（可自动/可手动）
+              <select id="c-lifeStage">
+                <option value="puppy">幼犬</option>
+                <option value="adult" selected>成犬</option>
+                <option value="senior">老年犬</option>
+                <option value="pregnancy">妊娠期</option>
+                <option value="lactation">哺乳期</option>
+              </select>
+            </label>
+            <label id="wrap-monthAge" style="display:none">月龄
+              <input id="c-monthAge" type="number" min="0" step="1" readonly />
+            </label>
+            <label id="wrap-monthFactor" style="display:none">月龄系数
+              <input id="c-monthFactor" type="number" min="0" step="0.1" readonly />
+            </label>
+            <label id="wrap-lactStage" style="display:none">哺乳阶段
+              <select id="c-lactStage">
+                <option value="week1">第一周</option>
+                <option value="week2">第二周</option>
+                <option value="week3">第三周</option>
+                <option value="week4">第四周</option>
+              </select>
+            </label>
+            <label id="wrap-lactFactor" style="display:none">哺乳期阶段因子
+              <input id="c-lactFactor" type="number" step="0.01" readonly />
+            </label>
+            <label id="wrap-litterCount" style="display:none">产仔数
+              <input id="c-litterCount" type="number" min="0" step="1" />
+            </label>
+            <label>日均活动水平
+              <select id="c-activity">
+                <option value="sedentary">基本不出门，家里也基本不活动</option>
+                <option value="light_walk">每天出门半小时内，散步为主</option>
+                <option value="mixed_1_3">每天出门1-3小时，跑动散步各一半</option>
+                <option value="high_1_3">每天出门1-3小时，高强度运动</option>
+                <option value="high_3_plus">每天出门3小时以上，高强度运动</option>
+                <option value="working_dog">特种工作犬，极强的运动量</option>
+              </select>
+            </label>
+            <label>热量系数
+              <input id="c-kcalFactor" type="number" min="0" step="1" placeholder="随活动自动填入，可手动调整" />
+            </label>
+            <label>每日能量估算 (kcal/天)
+              <input id="c-estKcal" type="number" min="0" step="1" placeholder="自动计算" readonly />
+            </label>
+            <div id="estKcalHint" class="muted" style="font-size:12px"></div>
+
+            <label>体况评分(1-9)<input id="c-bcs" type="number" min="1" max="9" step="1" /></label>
+            <label>每日吃几顿饭<input id="c-mealsPerDay" type="number" min="1" max="10" step="1" /></label>
+            <label>过敏/不耐受<textarea id="c-allergies" rows="2" placeholder="如：鸡肉、乳制品"></textarea></label>
+            <label>挑食/尽量不吃<textarea id="c-avoid" rows="2" placeholder="不爱吃/尽量避免的食物"></textarea></label>
+            <label>非常喜欢吃<textarea id="c-fav" rows="2" placeholder="最喜欢的食物"></textarea></label>
+            <label>症状史/疾病史<textarea id="c-med" rows="2" placeholder="既往病史、症状记录..."></textarea></label>
+            <label>备注<textarea id="c-notes" rows="2" placeholder="其他备注..."></textarea></label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn primary">保存</button>
+            <button type="button" id="btn-cancel-customer" class="btn ghost">取消</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Recipes Module -->
+    <section class="view" id="view-recipes" style="display:none">
+      <div class="card">
+        <h2>食谱库（后续完善）</h2>
+        <p>在此管理既有食谱（字段已在原配方录入实现的一部分，我们稍后迁移到此模块）。</p>
+      </div>
+    </section>
+
+    <!-- Inventory Module -->
+    <section class="view" id="view-inventory" style="display:none">
+      <div class="card">
+        <h2>食材管理</h2>
+        <div class="actions">
+          <input id="ingredient-search" type="text" placeholder="搜索：名称/品牌..." style="flex:1" />
+          <select id="ingredient-category-filter" style="width:120px">
+            <option value="">全部类别</option>
+          </select>
+          <select id="ingredient-name-filter" style="width:150px">
+            <option value="">全部项目</option>
+          </select>
+          <button id="btn-import-excel" class="btn">从Excel导入</button>
+          <button id="btn-new-ingredient" class="btn">新增</button>
+        </div>
+        <div id="ingredients-head" class="list-head" style="grid-template-columns: 1fr 1.2fr 1fr 0.8fr 1fr 1.2fr;">
+          <div>类别</div>
+          <div>项目</div>
+          <div>品牌/来源</div>
+          <div>单位</div>
+          <div>单价/500单位</div>
+          <div>主要作用</div>
+        </div>
+        <div id="ingredients-list" class="list"></div>
+        <div id="ingredients-pagination" class="pagination">
+          <div id="ingredients-total" class="total">共 0 条</div>
+          <div class="spacer"></div>
+          <button id="ingredients-prev" class="btn small">上一页</button>
+          <span id="ingredients-pageinfo" class="muted"></span>
+          <button id="ingredients-next" class="btn small">下一页</button>
+        </div>
+      </div>
+
+      <div class="card" id="ingredient-form-card" style="display:none">
+        <h3 id="ingredient-form-title">新增食材</h3>
+        <form id="ingredient-form">
+          <input type="hidden" id="ingredient-id" />
+          <div class="grid">
+            <label>编号<input id="i-code" type="text" placeholder="如：SCYMZ01" /></label>
+            <label>类别
+              <select id="i-category" required>
+                <option value="">请选择类别</option>
+              </select>
+            </label>
+            <label>项目（名称）<input id="i-name" type="text" required /></label>
+            <label>品牌/来源<input id="i-brand" type="text" /></label>
+            <label>费用（采购价格）<input id="i-cost" type="number" min="0" step="0.01" /></label>
+            <label>单量（采购数量）<input id="i-quantity" type="number" min="0" step="0.1" /></label>
+            <label>单位
+              <select id="i-unit">
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="L">L</option>
+                <option value="个">个</option>
+                <option value="包">包</option>
+                <option value="盒">盒</option>
+                <option value="瓶">瓶</option>
+                <option value="袋">袋</option>
+              </select>
+            </label>
+            <label>单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+            <label>可食部（0-1）<input id="i-ediblePortion" type="number" min="0" max="1" step="0.01" value="1" /></label>
+            <label>可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+            <label>每单位重量(g)<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
+            <label>说明<textarea id="i-description" rows="2" placeholder="食材描述、备注"></textarea></label>
+            <label>主要作用<textarea id="i-mainFunction" rows="2" placeholder="主要作用描述"></textarea></label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn primary">保存</button>
+            <button type="button" id="btn-cancel-ingredient" class="btn ghost">取消</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="display:none" id="import-excel-card">
+        <h3>从Excel导入食材</h3>
+        <p class="muted" style="margin-bottom:12px">请选择"原材料信息.xlsx"文件进行导入。导入会添加新数据，不会覆盖已有数据。</p>
+        <input id="excel-file-input" type="file" accept=".xlsx,.xls" />
+        <div class="actions" style="margin-top:12px">
+          <button id="btn-confirm-import" class="btn primary">确认导入</button>
+          <button id="btn-cancel-import" class="btn ghost">取消</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Orders Module -->
+    <section class="view" id="view-orders" style="display:none">
+      <div class="card">
+        <h2>订单与采购清单（后续完善）</h2>
+        <p>基于顾客+食谱+要求自动计算用量、饭量、价格，生成订单与采购清单。</p>
+      </div>
+    </section>
+
+    <!-- Labels Module -->
+    <section class="view" id="view-labels" style="display:none">
+      <div class="card">
+        <h2>标签打印（后续完善）</h2>
+        <p>标签模板、预览与打印机对接。</p>
+      </div>
+    </section>
+
+    <!-- Settings Module -->
+    <section class="view" id="view-settings" style="display:none">
+      <div class="card">
+        <h2>设置</h2>
+        
+        <div class="section-title">数据管理</div>
+        <div class="grid">
+          <label>数据导入（JSON）<input id="import-json" type="file" accept="application/json" /></label>
+          <button id="btn-export-json" class="btn">导出全部数据</button>
+        </div>
+
+        <div class="section-title">自动备份管理</div>
+        <div style="margin-bottom:16px;">
+          <p class="muted" style="font-size:13px; margin-bottom:12px;">
+            💡 每次保存数据时，系统会自动创建备份。最多保留最近10个备份版本。
+          </p>
+          <div id="backups-list" style="display:grid; gap:8px; margin-top:12px;">
+            <!-- 备份列表将在这里动态生成 -->
+          </div>
+        </div>
+
+        <div class="section-title">系统工具</div>
+        <div class="grid">
+          <button id="btn-clear-cache" class="btn">清除缓存</button>
+          <button id="btn-unregister-sw" class="btn">取消注册Service Worker</button>
+        </div>
+        
+        <div style="margin-top:20px; padding:12px; background:var(--bg-tertiary); border-radius:8px;">
+          <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">调试信息：</div>
+          <div id="debug-info" style="font-size:12px; font-family:monospace; color:var(--text-secondary);"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>© 宠物鲜食助手</span>
+    <button id="btn-install" class="btn small">安装到手机/桌面</button>
+  </footer>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          console.log('Service Worker注册成功:', reg.scope);
+          // 检查是否有更新
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'activated') {
+                console.log('Service Worker已更新，建议刷新页面');
+              }
+            });
+          });
+        }).catch(err => {
+          console.error('Service Worker注册失败:', err);
+        });
+        
+        // 取消注册有问题的Service Worker
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => {
+            if (reg.active && reg.active.scriptURL && !reg.active.scriptURL.includes('sw.js')) {
+              reg.unregister();
+            }
+          });
+        });
+      });
+    }
+  </script>
+</body>
+</html>

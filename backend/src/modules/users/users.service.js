@@ -1,6 +1,6 @@
-const createError = require('http-errors');
-const crypto = require('crypto');
-const {
+import createError from 'http-errors';
+import crypto from 'crypto';
+import {
   createUser,
   createWeChatUser,
   findUserByEmail,
@@ -10,14 +10,15 @@ const {
   countUsers,
   updateUser,
   deleteUser
-} = require('./users.repository');
-const { hashPassword, comparePassword } = require('../../utils/password');
-const { signToken } = require('../../utils/token');
+} from './users.repository.js';
+import { hashPassword, comparePassword } from '../../utils/password.js';
+import { signToken } from '../../utils/token.js';
+import { query } from '../../db/pool.js';
 
 // 检查用户资料是否完整（简化版，只检查是否有宠物）
+
 const isProfileCompleted = async (userId) => {
-  const pool = require('../../../db/pool');
-  const [rows] = await pool.query('SELECT COUNT(*) AS count FROM pet_profiles WHERE user_id = ?', [userId]);
+  const rows = await query('SELECT COUNT(*) AS count FROM pet_profiles WHERE user_id = ?', [userId]);
   return rows[0].count > 0;
 };
 
@@ -229,7 +230,7 @@ const removeUser = async (id) => {
   return true;
 };
 
-module.exports = {
+export {
   registerUser,
   loginUser,
   getProfile,

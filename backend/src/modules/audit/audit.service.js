@@ -1,10 +1,10 @@
-const { createAuditLog, findAuditLogs, countAuditLogs } = require('./audit.repository');
+import { createAuditLog, findAuditLogs, countAuditLogs } from './audit.repository.js';
 
-const logAction = async (payload) => {
+export const logAction = async (payload) => {
   return createAuditLog(payload);
 };
 
-const listAuditLogs = async (options = {}) => {
+export const listAuditLogs = async (options = {}) => {
   const logs = await findAuditLogs(options);
   const total = await countAuditLogs(options);
   return {
@@ -13,11 +13,6 @@ const listAuditLogs = async (options = {}) => {
     page: options.page || 1,
     pageSize: options.pageSize || 50
   };
-};
-
-module.exports = {
-  logAction,
-  listAuditLogs
 };
 
 

@@ -17,6 +17,7 @@ const baseSelect = `
 export const findAllBreeds = async (options = {}) => {
   const { category, sizeCategory, search, page = 1, pageSize = 100 } = options;
   let sql = baseSelect;
+  const countSql = 'SELECT COUNT(*) as total FROM dog_breeds';
   const params = [];
   const conditions = [];
 
@@ -36,10 +37,14 @@ export const findAllBreeds = async (options = {}) => {
     params.push(searchPattern, searchPattern);
   }
 
-  if (conditions.length > 0) {
-    sql += ' WHERE ' + conditions.join(' AND ');
-  }
+  const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
+  // 获取总数
+  const countResult = await query(countSql + whereClause, params);
+  const total = countResult[0]?.total || 0;
+
+  // 获取分页数据
+  sql += whereClause;
   sql += ' ORDER BY category, name';
 
   if (pageSize > 0) {
@@ -47,7 +52,15 @@ export const findAllBreeds = async (options = {}) => {
     sql += ` LIMIT ${pageSize} OFFSET ${offset}`;
   }
 
-  return query(sql, params);
+  const items = await query(sql, params);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize)
+  };
 };
 
 export const findBreedById = async (id) => {

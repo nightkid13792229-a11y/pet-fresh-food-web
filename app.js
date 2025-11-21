@@ -7281,7 +7281,7 @@ let breedsState = {
   breeds: [],
   categories: [],
   page: 1,
-  pageSize: 1000,  // 一次加载所有数据
+  pageSize: 10,  // 每页显示10条
   total: 0
 };
 
@@ -7310,21 +7310,33 @@ async function loadBreeds() {
     
     const response = await backendRequest(`/api/v1/breeds?${params.toString()}`);
     
-    // 后端返回格式：{ success: true, data: [...] }
+    // 后端返回格式：{ success: true, data: { items: [...], total: 100, page: 1, pageSize: 10, totalPages: 10 } }
     // backendRequest 返回整个响应对象
     let breedsArray = [];
-    if (response && response.data && Array.isArray(response.data)) {
-      breedsArray = response.data;
+    let total = 0;
+    
+    if (response && response.data) {
+      if (response.data.items && Array.isArray(response.data.items)) {
+        // 新格式：包含分页信息
+        breedsArray = response.data.items;
+        total = response.data.total || 0;
+      } else if (Array.isArray(response.data)) {
+        // 旧格式：直接是数组（兼容处理）
+        breedsArray = response.data;
+        total = breedsArray.length;
+      }
     } else if (Array.isArray(response)) {
       // 如果直接是数组（兼容处理）
       breedsArray = response;
+      total = breedsArray.length;
     } else {
       console.warn('无法解析品种数据格式:', response);
       breedsArray = [];
+      total = 0;
     }
     
     breedsState.breeds = breedsArray;
-    breedsState.total = breedsArray.length;
+    breedsState.total = total;
   } catch (error) {
     console.error('Load breeds failed:', error);
     breedsState.breeds = [];

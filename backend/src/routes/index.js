@@ -8,6 +8,8 @@ import customerAddressesRouter from '../modules/addresses/addresses.routes.js';
 import customerProfileRouter from '../modules/profile/profile.routes.js';
 import recipesRouter from '../modules/recipes/recipes.routes.js';
 import breedsRouter from '../modules/breeds/breeds.routes.js';
+import usersRouter from '../modules/users/users.routes.js';
+import auditRouter from '../modules/audit/audit.routes.js';
 import healthRouter from '../modules/health/health.routes.js';
 
 const router = Router();
@@ -20,6 +22,8 @@ router.use('/customer/addresses', customerAddressesRouter);
 router.use('/customer/profile', customerProfileRouter);
 router.use('/recipes', recipesRouter);
 router.use('/breeds', breedsRouter);
+router.use('/users', usersRouter);
+router.use('/audit', auditRouter);
 router.use('/health', healthRouter);
 
 export default router;

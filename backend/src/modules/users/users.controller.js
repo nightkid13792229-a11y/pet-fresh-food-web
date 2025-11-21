@@ -1,13 +1,13 @@
-const { success } = require('../../utils/response');
-const {
+import { success } from '../../utils/response.js';
+import {
   listUsers,
   getUser,
   createUserRecord,
   updateUserRecord,
   resetUserPassword,
   removeUser
-} = require('./users.service');
-const { createAuditLog } = require('../../utils/audit-helper');
+} from './users.service.js';
+import { createAuditLog } from '../../utils/audit-helper.js';
 
 const listUsersController = async (req, res) => {
   try {
@@ -117,7 +117,7 @@ const deleteUserController = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   listUsersController,
   getUserController,
   createUserController,

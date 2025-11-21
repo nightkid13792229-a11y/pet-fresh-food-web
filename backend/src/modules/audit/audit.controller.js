@@ -1,7 +1,7 @@
-const { success } = require('../../utils/response');
-const { listAuditLogs } = require('./audit.service');
+import { success } from '../../utils/response.js';
+import { listAuditLogs } from './audit.service.js';
 
-const listAuditLogsController = async (req, res) => {
+export const listAuditLogsController = async (req, res) => {
   try {
     const options = {
       userId: req.query.userId ? parseInt(req.query.userId, 10) : undefined,
@@ -17,10 +17,6 @@ const listAuditLogsController = async (req, res) => {
     console.error('listAuditLogsController error:', error);
     res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error' });
   }
-};
-
-module.exports = {
-  listAuditLogsController
 };
 
 

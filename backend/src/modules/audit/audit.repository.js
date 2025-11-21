@@ -1,4 +1,4 @@
-const pool = require('../../../db/pool');
+import { query } from '../../../db/pool.js';
 
 const createAuditLog = async (payload) => {
   const sql = `
@@ -23,7 +23,7 @@ const createAuditLog = async (payload) => {
     payload.userAgent || null,
     payload.metadata ? JSON.stringify(payload.metadata) : null
   ];
-  const [result] = await pool.query(sql, params);
+  const result = await query(sql, params);
   return result.insertId;
 };
 
@@ -76,7 +76,7 @@ const findAuditLogs = async (options = {}) => {
     sql += ` LIMIT ${pageSize} OFFSET ${offset}`;
   }
 
-  const [rows] = await pool.query(sql, params);
+  const rows = await query(sql, params);
   return rows;
 };
 
@@ -105,11 +105,11 @@ const countAuditLogs = async (options = {}) => {
     params.push(resourceId);
   }
 
-  const [rows] = await pool.query(sql, params);
+  const rows = await query(sql, params);
   return rows[0].total;
 };
 
-module.exports = {
+export {
   createAuditLog,
   findAuditLogs,
   countAuditLogs

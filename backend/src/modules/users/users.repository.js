@@ -1,11 +1,11 @@
-const pool = require('../../../db/pool');
+import { query } from '../../../db/pool.js';
 
 const createUser = async ({ email, passwordHash, name, role }) => {
   const sql = `
     INSERT INTO users (email, password_hash, name, role)
     VALUES (?, ?, ?, ?)
   `;
-  const [result] = await pool.query(sql, [email, passwordHash, name, role]);
+  const result = await query(sql, [email, passwordHash, name, role]);
   return { id: result.insertId, email, name, role };
 };
 
@@ -16,7 +16,7 @@ const findUserByEmail = async (email) => {
     WHERE email = ?
     LIMIT 1
   `;
-  const [rows] = await pool.query(sql, [email]);
+  const rows = await query(sql, [email]);
   return rows[0] || null;
 };
 
@@ -27,7 +27,7 @@ const findUserById = async (id) => {
     WHERE id = ?
     LIMIT 1
   `;
-  const [rows] = await pool.query(sql, [id]);
+  const rows = await query(sql, [id]);
   return rows[0] || null;
 };
 
@@ -46,7 +46,7 @@ const findUserByWeChatOpenId = async (openId) => {
     WHERE wechat_openid = ?
     LIMIT 1
   `;
-  const [rows] = await pool.query(sql, [openId]);
+  const rows = await query(sql, [openId]);
   return rows[0] || null;
 };
 
@@ -55,7 +55,7 @@ const createWeChatUser = async ({ email, passwordHash, name, openId, unionId }) 
     INSERT INTO users (email, password_hash, name, role, wechat_openid, wechat_unionid)
     VALUES (?, ?, ?, 'customer', ?, ?)
   `;
-  const [result] = await pool.query(sql, [email, passwordHash, name, openId, unionId || null]);
+  const result = await query(sql, [email, passwordHash, name, openId, unionId || null]);
   return {
     id: result.insertId,
     email,
@@ -107,7 +107,7 @@ const findAllUsers = async (options = {}) => {
     sql += ` LIMIT ${pageSize} OFFSET ${offset}`;
   }
 
-  const [rows] = await pool.query(sql, params);
+  const rows = await query(sql, params);
   return rows;
 };
 
@@ -132,7 +132,7 @@ const countUsers = async (options = {}) => {
     params.push(searchPattern, searchPattern);
   }
 
-  const [rows] = await pool.query(sql, params);
+  const rows = await query(sql, params);
   return rows[0].total;
 };
 
@@ -168,17 +168,17 @@ const updateUser = async (id, payload) => {
   params.push(id);
 
   const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
-  await pool.query(sql, params);
+  await query(sql, params);
   return findUserById(id);
 };
 
 const deleteUser = async (id) => {
   const sql = 'DELETE FROM users WHERE id = ?';
-  const [result] = await pool.query(sql, [id]);
+  const result = await query(sql, [id]);
   return result.affectedRows > 0;
 };
 
-module.exports = {
+export {
   createUser,
   findUserByEmail,
   findUserById,

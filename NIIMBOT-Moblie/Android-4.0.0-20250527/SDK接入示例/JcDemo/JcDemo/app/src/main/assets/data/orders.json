@@ -1,0 +1,39 @@
+[
+  {
+    "id": "ORDER-20251109-001",
+    "orderDate": "2025-11-09",
+    "recipeName": "蔡麦南瓜鸡腿牛肉",
+    "petName": "布丁",
+    "perServingWeight": "80g",
+    "totalServings": "14份",
+    "ingredients": [
+      { "name": "鸡腿肉", "ratio": "40%", "totalAmount": "80g" },
+      { "name": "麸皮", "ratio": "12%", "totalAmount": "24g" },
+      { "name": "南瓜", "ratio": "20%", "totalAmount": "40g" },
+      { "name": "胡萝卜", "ratio": "10%", "totalAmount": "20g" },
+      { "name": "西兰花", "ratio": "8%", "totalAmount": "16g" },
+      { "name": "三文鱼油", "ratio": "5%", "totalAmount": "10g" },
+      { "name": "益生菌粉", "ratio": "3%", "totalAmount": "6g" },
+      { "name": "复合维生素", "ratio": "2%", "totalAmount": "4g" }
+    ]
+  },
+  {
+    "id": "ORDER-20251111-002",
+    "orderDate": "2025-11-11",
+    "recipeName": "低脂牛肉紫薯粮",
+    "petName": "球球",
+    "perServingWeight": "100g",
+    "totalServings": "10份",
+    "ingredients": [
+      { "name": "牛后腿肉", "ratio": "45%", "totalAmount": "100g" },
+      { "name": "紫薯", "ratio": "18%", "totalAmount": "40g" },
+      { "name": "西葫芦", "ratio": "15%", "totalAmount": "33g" },
+      { "name": "鸡蛋", "ratio": "12%", "totalAmount": "27g" },
+      { "name": "亚麻籽油", "ratio": "5%", "totalAmount": "11g" },
+      { "name": "钙粉", "ratio": "5%", "totalAmount": "11g" }
+    ]
+  }
+]
+
+
+
