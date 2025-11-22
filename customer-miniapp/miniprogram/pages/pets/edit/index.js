@@ -473,6 +473,7 @@ Page({
       selectedBreedData
     }, () => {
       console.log('[populateForm] setData 后 this.data.form.energyMultiplier:', this.data.form.energyMultiplier, 'type:', typeof this.data.form.energyMultiplier);
+      console.log('[populateForm] setData 后 this.data.form.activityLevel:', this.data.form.activityLevel);
       // 自动匹配生命阶段（如果品种数据已加载）
       if (selectedBreedData && form.birthdate) {
         this.updateLifeStage();
@@ -481,7 +482,15 @@ Page({
       this.updateLifeStageDescription();
       // 确保能量系数已设置（如果活动水平已选择）
       const currentForm = this.data.form;
-      if (currentForm.activityLevel && (!currentForm.energyMultiplier || currentForm.energyMultiplier === '' || currentForm.energyMultiplier === 0)) {
+      const needsEnergyMultiplier = currentForm.activityLevel && 
+                                    (!currentForm.energyMultiplier || 
+                                     currentForm.energyMultiplier === '' || 
+                                     currentForm.energyMultiplier === 0 ||
+                                     currentForm.energyMultiplier === null ||
+                                     currentForm.energyMultiplier === undefined);
+      
+      if (needsEnergyMultiplier) {
+        console.log('[populateForm callback] 需要设置能量系数，当前值:', currentForm.energyMultiplier);
         // 尝试多种匹配方式
         let activityOption = ACTIVITY_OPTIONS.find(opt => opt.value === currentForm.activityLevel);
         if (!activityOption && typeof currentForm.activityLevel === 'string') {
@@ -493,16 +502,17 @@ Page({
           );
         }
         if (activityOption) {
-          console.log('[populateForm callback] 设置能量系数为:', activityOption.energyMultiplier);
+          console.log('[populateForm callback] 找到匹配，设置能量系数为:', activityOption.energyMultiplier);
           this.setData({
-            form: {
-              ...currentForm,
-              energyMultiplier: activityOption.energyMultiplier
-            }
+            'form.energyMultiplier': activityOption.energyMultiplier
+          }, () => {
+            console.log('[populateForm callback] 设置后 this.data.form.energyMultiplier:', this.data.form.energyMultiplier);
           });
         } else {
           console.warn('[populateForm callback] 未找到匹配的活动水平:', currentForm.activityLevel);
         }
+      } else {
+        console.log('[populateForm callback] 能量系数已存在，无需设置:', currentForm.energyMultiplier);
       }
     });
     wx.setNavigationBarTitle({
