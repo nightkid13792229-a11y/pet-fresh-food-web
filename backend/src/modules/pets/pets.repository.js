@@ -30,12 +30,15 @@ const baseSelect = `
 export const findPetById = async (id) => {
   const sql = `${baseSelect} WHERE id = ? LIMIT 1`;
   const rows = await query(sql, [id]);
-  return rows[0] || null;
+  // query 对于非 INSERT 操作返回数组
+  return Array.isArray(rows) ? (rows[0] || null) : rows;
 };
 
 export const findPetsByUserId = async (userId) => {
   const sql = `${baseSelect} WHERE user_id = ? ORDER BY created_at DESC`;
-  return query(sql, [userId]);
+  const rows = await query(sql, [userId]);
+  // query 对于非 INSERT 操作返回数组
+  return Array.isArray(rows) ? rows : [rows];
 };
 
 export const createPetProfile = async (payload) => {
@@ -64,28 +67,44 @@ export const createPetProfile = async (payload) => {
       updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
   `;
-  const result = await query(sql, [
-    payload.userId,
-    payload.name,
-    payload.breed,
-    payload.city,
-    payload.birthdate,
-    payload.weightKg,
-    payload.sex || 'unknown',
-    payload.neutered ? 1 : 0,
-    payload.lifeStage,
-    payload.activityLevel,
-    payload.energyMultiplier,
-    payload.dailyEnergyKcal,
-    payload.bodyConditionScore,
-    payload.mealsPerDay,
-    payload.snackAmount,
-    payload.dietaryNote,
-    payload.allergyNote,
-    payload.symptomNote,
-    payload.notes
-  ]);
-  return result.insertId;
+  try {
+    // 确保所有参数都是 null 而不是 undefined（MySQL2 不允许 undefined）
+    const params = [
+      payload.userId,
+      payload.name,
+      payload.breed !== undefined ? payload.breed : null,
+      payload.city !== undefined ? payload.city : null,
+      payload.birthdate !== undefined ? payload.birthdate : null,
+      payload.weightKg !== undefined ? payload.weightKg : null,
+      payload.sex !== undefined ? payload.sex : 'unknown',
+      payload.neutered ? 1 : 0,
+      payload.lifeStage !== undefined ? payload.lifeStage : null,
+      payload.activityLevel !== undefined ? payload.activityLevel : null,
+      payload.energyMultiplier !== undefined ? payload.energyMultiplier : null,
+      payload.dailyEnergyKcal !== undefined ? payload.dailyEnergyKcal : null,
+      payload.bodyConditionScore !== undefined ? payload.bodyConditionScore : null,
+      payload.mealsPerDay !== undefined ? payload.mealsPerDay : null,
+      payload.snackAmount !== undefined ? payload.snackAmount : null,
+      payload.dietaryNote !== undefined ? payload.dietaryNote : null,
+      payload.allergyNote !== undefined ? payload.allergyNote : null,
+      payload.symptomNote !== undefined ? payload.symptomNote : null,
+      payload.notes !== undefined ? payload.notes : null
+    ];
+    
+    const result = await query(sql, params);
+    
+    // MySQL2 对于 INSERT 返回 ResultSetHeader，insertId 在 result 对象上
+    const insertId = result.insertId;
+    if (!insertId) {
+      throw new Error(`Failed to get insertId from query result. Result: ${JSON.stringify(result)}`);
+    }
+    return insertId;
+  } catch (error) {
+    console.error('createPetProfile error:', error);
+    console.error('SQL:', sql);
+    console.error('Payload:', JSON.stringify(payload, null, 2));
+    throw error;
+  }
 };
 
 export const updatePetProfile = async (id, fields) => {
