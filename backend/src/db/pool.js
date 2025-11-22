@@ -30,7 +30,12 @@ export const getPool = async () => {
 
 export const query = async (sql, params = []) => {
   const connection = await getPool();
-  const [rows] = await connection.execute(sql, params);
+  const [rows, fields] = await connection.execute(sql, params);
+  // MySQL2 的 execute 返回：
+  // - 对于 SELECT: rows 是数组
+  // - 对于 INSERT/UPDATE/DELETE: rows 是 ResultSetHeader 对象（包含 insertId, affectedRows 等）
+  // 对于 INSERT，rows 本身就是 ResultSetHeader，有 insertId 属性
+  // 对于 SELECT，rows 是数组
   return rows;
 };
 

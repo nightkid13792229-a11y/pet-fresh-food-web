@@ -7,8 +7,13 @@ export const listCustomerPets = async (req, res) => {
 };
 
 export const createCustomerPet = async (req, res) => {
-  const result = await createPet(req.user.id, req.body);
-  return success(res, result, 201);
+  try {
+    const result = await createPet(req.user.id, req.body);
+    return success(res, result, 201);
+  } catch (error) {
+    console.error('createCustomerPet error:', error);
+    throw error;
+  }
 };
 
 export const updateCustomerPet = async (req, res) => {

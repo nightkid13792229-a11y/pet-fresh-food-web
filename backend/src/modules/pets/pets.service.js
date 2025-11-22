@@ -13,10 +13,25 @@ export const listPetsByUser = async (userId) => {
 };
 
 export const createPet = async (userId, payload) => {
-  const insertId = await createPetProfile({ userId, ...payload });
-  const pet = await findPetById(insertId);
-  const profileCompleted = await isProfileCompleted(userId);
-  return { pet, profileCompleted };
+  try {
+    const insertId = await createPetProfile({ userId, ...payload });
+    if (!insertId) {
+      throw createError(500, 'Failed to create pet profile: no insertId returned');
+    }
+    const pet = await findPetById(insertId);
+    if (!pet) {
+      throw createError(500, 'Failed to retrieve created pet profile');
+    }
+    const profileCompleted = await isProfileCompleted(userId);
+    return { pet, profileCompleted };
+  } catch (error) {
+    // 记录详细错误信息
+    if (error instanceof createError.HttpError) {
+      throw error;
+    }
+    console.error('createPet error:', error);
+    throw createError(500, `Failed to create pet: ${error.message}`);
+  }
 };
 
 export const updatePet = async (userId, petId, payload) => {
