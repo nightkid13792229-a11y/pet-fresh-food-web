@@ -416,18 +416,32 @@ Page({
       return option;
     };
     
-    if (form.energyMultiplier && form.energyMultiplier !== '' && form.energyMultiplier !== 0) {
+    // 格式化能量系数：确保是数字类型
+    // 如果能量系数为空或无效，但活动水平已选择，使用活动水平对应的能量系数
+    const currentEnergyMultiplier = form.energyMultiplier;
+    console.log('[populateForm] 格式化前 energyMultiplier:', currentEnergyMultiplier, 'type:', typeof currentEnergyMultiplier);
+    
+    // 检查能量系数是否有效（不为 null、undefined、空字符串、0）
+    const isValidEnergyMultiplier = currentEnergyMultiplier !== null && 
+                                    currentEnergyMultiplier !== undefined && 
+                                    currentEnergyMultiplier !== '' && 
+                                    currentEnergyMultiplier !== 0;
+    
+    if (isValidEnergyMultiplier) {
       // 能量系数有值，转换为数字类型
-      const multiplier = Number(form.energyMultiplier);
+      const multiplier = Number(currentEnergyMultiplier);
       if (!isNaN(multiplier) && multiplier > 0) {
         form.energyMultiplier = multiplier; // 保持数字类型
+        console.log('[populateForm] 格式化后 energyMultiplier (有效值):', form.energyMultiplier);
       } else {
         // 如果转换失败或为0，但活动水平已选择，使用活动水平对应的能量系数
         if (form.activityLevel) {
           const activityOption = findActivityOption(form.activityLevel);
           form.energyMultiplier = activityOption ? activityOption.energyMultiplier : '';
+          console.log('[populateForm] 转换失败，根据活动水平设置 energyMultiplier:', form.energyMultiplier);
         } else {
           form.energyMultiplier = '';
+          console.log('[populateForm] 转换失败且无活动水平，设置为空');
         }
       }
     } else {
@@ -435,10 +449,14 @@ Page({
       if (form.activityLevel) {
         const activityOption = findActivityOption(form.activityLevel);
         form.energyMultiplier = activityOption ? activityOption.energyMultiplier : '';
+        console.log('[populateForm] 能量系数无效，根据活动水平设置 energyMultiplier:', form.energyMultiplier);
       } else {
         form.energyMultiplier = '';
+        console.log('[populateForm] 能量系数无效且无活动水平，设置为空');
       }
     }
+    
+    console.log('[populateForm] setData 前 form.energyMultiplier:', form.energyMultiplier, 'type:', typeof form.energyMultiplier);
     
     this.setData({
       form,
@@ -454,6 +472,7 @@ Page({
       showOtherBreedInput,
       selectedBreedData
     }, () => {
+      console.log('[populateForm] setData 后 this.data.form.energyMultiplier:', this.data.form.energyMultiplier, 'type:', typeof this.data.form.energyMultiplier);
       // 自动匹配生命阶段（如果品种数据已加载）
       if (selectedBreedData && form.birthdate) {
         this.updateLifeStage();

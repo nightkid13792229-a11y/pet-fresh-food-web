@@ -1,36 +1,33 @@
 <view class="page">
+  <view class="page-header">
+    <text class="page-description">爱犬信息用于计算食谱对应的饭量和价格</text>
+  </view>
   <view class="card form">
     <view class="form-item">
-      <view class="label">爱犬昵称</view>
+      <view class="label">爱犬昵称<text class="required-mark">*</text></view>
       <input placeholder="请输入爱犬昵称" value="{{form.name}}" data-field="name" bindinput="handleInput" />
     </view>
 
     <view class="form-item">
-      <view class="label">品种</view>
-      <picker range="{{breedOptions}}" value="{{breedIndex}}" bindchange="handleBreedChange">
+      <view class="label">品种<text class="required-mark">*</text></view>
+      <picker wx:if="{{!showOtherBreedInput}}" range="{{breedOptions}}" value="{{breedIndex}}" bindchange="handleBreedChange">
         <view class="picker-value">
           {{breedIndex >= 0 ? breedOptions[breedIndex] : '请选择品种'}}
         </view>
       </picker>
       <input wx:if="{{showOtherBreedInput}}" class="other-breed-input" placeholder="请输入品种名称" value="{{form.breed}}" data-field="breed" bindinput="handleInput" />
+      <view wx:if="{{showOtherBreedInput}}" class="form-hint">当前品种：{{form.breed || '未填写'}}</view>
     </view>
 
     <view class="form-item">
-      <view class="label">常驻城市</view>
-      <picker mode="region" bindchange="handleRegionChange" value="{{region}}">
-        <view class="picker-value">{{form.city || '请选择城市'}}</view>
-      </picker>
-    </view>
-
-    <view class="form-item">
-      <view class="label">生日</view>
+      <view class="label">生日<text class="required-mark">*</text><text class="label-hint">（年月必选，日可选）</text></view>
       <picker mode="date" value="{{form.birthdate}}" bindchange="handleDateChange">
         <view class="picker-value">{{form.birthdate || '请选择生日'}}</view>
       </picker>
     </view>
 
     <view class="form-item">
-      <view class="label">体重 (kg)</view>
+      <view class="label">体重 (kg)<text class="required-mark">*</text></view>
       <input type="digit" placeholder="例如 8.5" value="{{form.weightKg}}" data-field="weightKg" bindinput="handleInput" />
     </view>
 
@@ -43,32 +40,59 @@
       </picker>
     </view>
 
-    <view class="form-item inline">
+    <view class="form-item">
       <view class="label">是否绝育</view>
-      <switch checked="{{form.neutered}}" data-field="neutered" bindchange="handleSwitch" />
+      <view class="neutered-options">
+        <view 
+          class="neutered-option {{form.neutered === true ? 'selected' : ''}}" 
+          bindtap="handleNeuteredSelect"
+          data-value="true"
+        >
+          <text class="check-icon">{{form.neutered === true ? '✓' : ''}}</text>
+          <text>是</text>
+        </view>
+        <view 
+          class="neutered-option {{form.neutered === false ? 'selected' : ''}}" 
+          bindtap="handleNeuteredSelect"
+          data-value="false"
+        >
+          <text class="check-icon">{{form.neutered === false ? '✓' : ''}}</text>
+          <text>否</text>
+        </view>
+      </view>
     </view>
 
     <view class="form-item">
       <view class="label">生命阶段</view>
-      <picker range="{{lifeStageOptions}}" range-key="label" value="{{lifeStageIndex}}" bindchange="handleLifeStageChange">
-        <view class="picker-value">
-          {{lifeStageIndex >= 0 ? lifeStageOptions[lifeStageIndex].label : '请选择'}}
-        </view>
-      </picker>
+      <view wx:if="{{lifeStageDescription}}" class="life-stage-description">
+        {{lifeStageDescription}}
+      </view>
+      <view wx:else class="life-stage-description muted">
+        请填写爱犬昵称、品种和生日以自动匹配生命阶段
+      </view>
     </view>
 
     <view class="form-item">
-      <view class="label">活动水平</view>
-      <picker range="{{activityOptions}}" range-key="label" value="{{activityIndex}}" bindchange="handleActivityChange">
-        <view class="picker-value">
-          {{activityIndex >= 0 ? activityOptions[activityIndex].label : '请选择'}}
+      <view class="label">活动水平<text class="required-mark">*</text></view>
+      <view class="activity-cards">
+        <view 
+          wx:for="{{activityOptions}}" 
+          wx:key="value"
+          class="activity-card {{activityIndex === index ? 'selected' : ''}}"
+          bindtap="handleActivitySelect"
+          data-index="{{index}}"
+        >
+          <view class="activity-card-title">{{item.label}}</view>
+          <view class="activity-card-desc">{{item.description}}</view>
         </view>
-      </picker>
+      </view>
     </view>
 
     <view class="form-item">
       <view class="label">运动-能量系数</view>
-      <input type="digit" placeholder="例如 1.8" value="{{form.energyMultiplier}}" data-field="energyMultiplier" bindinput="handleInput" />
+      <view class="energy-multiplier-display">
+        {{form.energyMultiplier !== null && form.energyMultiplier !== undefined && form.energyMultiplier !== '' && form.energyMultiplier !== 0 ? Math.round(Number(form.energyMultiplier)) : '-'}}
+      </view>
     </view>
 
     <view class="form-item">
@@ -77,18 +101,39 @@
     </view>
 
     <view class="form-item">
-      <view class="label">体况评分 (1-9)</view>
-      <input type="number" placeholder="如：5" value="{{form.bodyConditionScore}}" data-field="bodyConditionScore" bindinput="handleInput" />
+      <view class="label">平均每日零食量</view>
+      <picker range="{{snackCalorieOptions}}" range-key="label" value="{{snackCalorieIndex}}" bindchange="handleSnackCalorieChange">
+        <view class="picker-value">
+          {{snackCalorieIndex >= 0 ? snackCalorieOptions[snackCalorieIndex].label : '请选择'}}
+        </view>
+      </picker>
+      <view class="form-hint">选填，用于制作鲜食时预留出零食热量</view>
     </view>
 
     <view class="form-item">
-      <view class="label">每日进餐数</view>
-      <input type="number" placeholder="如：2" value="{{form.mealsPerDay}}" data-field="mealsPerDay" bindinput="handleInput" />
+      <view class="label">体况评分 (1-9)<text class="required-mark">*</text></view>
+      <picker range="{{bodyConditionScoreOptions}}" value="{{bodyConditionScoreIndex}}" bindchange="handleBodyConditionScoreChange">
+        <view class="picker-value">
+          {{bodyConditionScoreIndex >= 0 ? bodyConditionScoreOptions[bodyConditionScoreIndex] : '请选择'}}
+        </view>
+      </picker>
+      <button class="bcs-view-button" bindtap="showBCSChart">查看体况评分表</button>
+      <image 
+        class="bcs-preview-image" 
+        src="/images/bcs-chart.png" 
+        mode="aspectFit"
+        bindtap="previewBCSImage"
+        style="display:none;"
+      />
     </view>
 
     <view class="form-item">
-      <view class="label">每日零食量</view>
-      <input placeholder="如：一小把冻干" value="{{form.snackAmount}}" data-field="snackAmount" bindinput="handleInput" />
+      <view class="label">每日进餐数<text class="required-mark">*</text></view>
+      <picker range="{{mealsPerDayOptions}}" value="{{mealsPerDayIndex}}" bindchange="handleMealsPerDayChange">
+        <view class="picker-value">
+          {{mealsPerDayIndex >= 0 ? mealsPerDayOptions[mealsPerDayIndex] : '请选择'}}
+        </view>
+      </picker>
     </view>
 
     <view class="form-item">
