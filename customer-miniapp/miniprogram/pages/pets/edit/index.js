@@ -223,7 +223,7 @@ Page({
                 this.setData({
                   form: {
                     ...this.data.form,
-                    energyMultiplier: activityOption.energyMultiplier
+                    energyMultiplier: Math.round(activityOption.energyMultiplier)
                   }
                 });
               }
@@ -253,7 +253,7 @@ Page({
                 this.setData({
                   form: {
                     ...this.data.form,
-                    energyMultiplier: activityOption.energyMultiplier
+                    energyMultiplier: Math.round(activityOption.energyMultiplier)
                   }
                 });
               }
@@ -331,7 +331,7 @@ Page({
       }
       
       if (activityOption) {
-        energyMultiplier = activityOption.energyMultiplier;
+        energyMultiplier = Math.round(activityOption.energyMultiplier);
         console.log('[populateForm] 匹配成功，设置能量系数为:', energyMultiplier);
       } else {
         console.warn('[populateForm] 未找到匹配的活动水平:', pet.activityLevel);
@@ -431,13 +431,13 @@ Page({
       // 能量系数有值，转换为数字类型
       const multiplier = Number(currentEnergyMultiplier);
       if (!isNaN(multiplier) && multiplier > 0) {
-        form.energyMultiplier = multiplier; // 保持数字类型
+        form.energyMultiplier = Math.round(multiplier); // 四舍五入为整数
         console.log('[populateForm] 格式化后 energyMultiplier (有效值):', form.energyMultiplier);
       } else {
         // 如果转换失败或为0，但活动水平已选择，使用活动水平对应的能量系数
         if (form.activityLevel) {
           const activityOption = findActivityOption(form.activityLevel);
-          form.energyMultiplier = activityOption ? activityOption.energyMultiplier : '';
+          form.energyMultiplier = activityOption ? Math.round(activityOption.energyMultiplier) : '';
           console.log('[populateForm] 转换失败，根据活动水平设置 energyMultiplier:', form.energyMultiplier);
         } else {
           form.energyMultiplier = '';
@@ -448,7 +448,7 @@ Page({
       // 能量系数为空或0，如果活动水平已选择，使用活动水平对应的能量系数
       if (form.activityLevel) {
         const activityOption = findActivityOption(form.activityLevel);
-        form.energyMultiplier = activityOption ? activityOption.energyMultiplier : '';
+        form.energyMultiplier = activityOption ? Math.round(activityOption.energyMultiplier) : '';
         console.log('[populateForm] 能量系数无效，根据活动水平设置 energyMultiplier:', form.energyMultiplier);
       } else {
         form.energyMultiplier = '';
@@ -502,9 +502,10 @@ Page({
           );
         }
         if (activityOption) {
-          console.log('[populateForm callback] 找到匹配，设置能量系数为:', activityOption.energyMultiplier);
+          const roundedMultiplier = Math.round(activityOption.energyMultiplier);
+          console.log('[populateForm callback] 找到匹配，设置能量系数为:', roundedMultiplier);
           this.setData({
-            'form.energyMultiplier': activityOption.energyMultiplier
+            'form.energyMultiplier': roundedMultiplier
           }, () => {
             console.log('[populateForm callback] 设置后 this.data.form.energyMultiplier:', this.data.form.energyMultiplier);
           });
@@ -601,7 +602,7 @@ Page({
       form: {
         ...this.data.form,
         activityLevel: option.value,
-        energyMultiplier: option.energyMultiplier
+        energyMultiplier: Math.round(option.energyMultiplier)
       },
       activityIndex: index
     }, () => {

@@ -91,7 +91,7 @@
     <view class="form-item">
       <view class="label">运动-能量系数</view>
       <view class="energy-multiplier-display">
-        <text wx:if="{{form.energyMultiplier && form.energyMultiplier !== '' && form.energyMultiplier !== 0}}">{{Math.round(Number(form.energyMultiplier))}}</text>
+        <text wx:if="{{form.energyMultiplier && form.energyMultiplier !== '' && form.energyMultiplier !== 0 && form.energyMultiplier !== null && form.energyMultiplier !== undefined}}">{{form.energyMultiplier}}</text>
         <text wx:else>-</text>
       </view>
     </view>
