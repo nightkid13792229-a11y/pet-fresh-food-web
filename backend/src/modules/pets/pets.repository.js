@@ -239,11 +239,28 @@ export const findAllPetsWithUsers = async (options = {}) => {
   }
   
   sql += ` ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`;
-  // 确保参数是整数（不是 NaN），使用 Math.floor 确保是整数
-  params.push(Math.floor(pageSize), Math.floor(offset));
+  // 确保参数是有效的整数（不是 NaN）
+  const limitValue = Number.isInteger(pageSize) ? pageSize : 50;
+  const offsetValue = Number.isInteger(offset) ? offset : 0;
+  
+  // 最终验证：确保不是 NaN 或 Infinity
+  if (!Number.isFinite(limitValue) || !Number.isFinite(offsetValue)) {
+    throw new Error(`Invalid SQL parameters: limitValue=${limitValue}, offsetValue=${offsetValue}, page=${page}, pageSize=${pageSize}, offset=${offset}`);
+  }
+  
+  params.push(limitValue, offsetValue);
   
   try {
-    console.log('[findAllPetsWithUsers] SQL params:', { page, pageSize, offset, search, paramsLength: params.length });
+    console.log('[findAllPetsWithUsers] SQL params:', { 
+      page, 
+      pageSize, 
+      offset, 
+      limitValue, 
+      offsetValue, 
+      search, 
+      paramsLength: params.length,
+      params: params.map((p, i) => `${i}: ${typeof p} = ${p}`)
+    });
     const rows = await query(sql, params);
     const pets = Array.isArray(rows) ? rows : (rows ? [rows] : []);
   
@@ -283,6 +300,13 @@ export const findAllPetsWithUsers = async (options = {}) => {
     console.error('Params:', params);
     console.error('Params types:', params.map(p => typeof p));
     console.error('Params values:', params);
+    console.error('Params details:', params.map((p, i) => ({
+      index: i,
+      type: typeof p,
+      value: p,
+      isNaN: Number.isNaN(p),
+      isFinite: Number.isFinite(p)
+    })));
     throw error;
   }
 };
