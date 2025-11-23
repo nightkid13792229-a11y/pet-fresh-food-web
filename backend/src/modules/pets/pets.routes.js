@@ -5,7 +5,8 @@ import {
   createCustomerPet,
   deleteCustomerPet,
   listCustomerPets,
-  updateCustomerPet
+  updateCustomerPet,
+  listAllPetsController
 } from './pets.controller.js';
 import { createPetSchema, updatePetSchema } from './pets.schemas.js';
 
@@ -19,5 +20,10 @@ router.put('/:id', validate(updatePetSchema), updateCustomerPet);
 router.delete('/:id', deleteCustomerPet);
 
 export default router;
+
+// 管理员端路由（单独导出）
+export const adminPetsRouter = Router();
+adminPetsRouter.use(authenticate, authorize('admin', 'employee'));
+adminPetsRouter.get('/', listAllPetsController);
 
 

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import authRouter from '../modules/auth/auth.routes.js';
 import ordersRouter from '../modules/orders/orders.routes.js';
 import customerOrdersRouter from '../modules/orders/orders.customer.routes.js';
-import customerPetsRouter from '../modules/pets/pets.routes.js';
+import customerPetsRouter, { adminPetsRouter } from '../modules/pets/pets.routes.js';
 import customerAddressesRouter from '../modules/addresses/addresses.routes.js';
 import customerProfileRouter from '../modules/profile/profile.routes.js';
 import recipesRouter from '../modules/recipes/recipes.routes.js';
@@ -25,6 +25,8 @@ router.use('/breeds', breedsRouter);
 router.use('/users', usersRouter);
 router.use('/audit', auditRouter);
 router.use('/health', healthRouter);
+// 管理员端：获取所有宠物信息
+router.use('/pets', adminPetsRouter);
 
 export default router;
 

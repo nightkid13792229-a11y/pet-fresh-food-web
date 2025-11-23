@@ -4,7 +4,8 @@ import {
   deletePetProfile,
   findPetById,
   findPetsByUserId,
-  updatePetProfile
+  updatePetProfile,
+  findAllPetsWithUsers
 } from './pets.repository.js';
 import { isProfileCompleted } from '../profile/profile.service.js';
 
@@ -59,4 +60,9 @@ export const removePet = async (userId, petId) => {
   }
   const profileCompleted = await isProfileCompleted(userId);
   return profileCompleted;
+};
+
+// 管理员端：获取所有宠物信息
+export const listAllPets = async (options) => {
+  return findAllPetsWithUsers(options);
 };

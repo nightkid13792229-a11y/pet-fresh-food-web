@@ -138,7 +138,9 @@ export const updatePetProfile = async (id, fields) => {
       if (key === 'neutered') {
         params.push(fields[key] ? 1 : 0);
       } else {
-        params.push(fields[key]);
+        // 确保所有参数都是 null 而不是 undefined（MySQL2 不允许 undefined）
+        const value = fields[key] !== undefined ? fields[key] : null;
+        params.push(value);
       }
     }
   });
@@ -147,18 +149,116 @@ export const updatePetProfile = async (id, fields) => {
     return false;
   }
 
-  const sql = `
-    UPDATE pet_profiles
-    SET ${updates.join(', ')}, updated_at = NOW()
-    WHERE id = ?
-  `;
-  params.push(id);
-  const result = await query(sql, params);
-  return result.affectedRows > 0;
+  try {
+    const sql = `
+      UPDATE pet_profiles
+      SET ${updates.join(', ')}, updated_at = NOW()
+      WHERE id = ?
+    `;
+    params.push(id);
+    const result = await query(sql, params);
+    // 对于 UPDATE，result 可能是 ResultSetHeader 或数组，需要检查 affectedRows
+    const affectedRows = result.affectedRows || (Array.isArray(result) ? 0 : result.affectedRows);
+    return affectedRows > 0;
+  } catch (error) {
+    console.error('updatePetProfile error:', error);
+    console.error('Updates:', updates.join(', '));
+    console.error('Fields:', JSON.stringify(fields, null, 2));
+    throw error;
+  }
 };
 
 export const deletePetProfile = async (id) => {
   const sql = 'DELETE FROM pet_profiles WHERE id = ? LIMIT 1';
   const result = await query(sql, [id]);
   return result.affectedRows > 0;
+};
+
+// 管理员端：获取所有宠物信息（带用户信息）
+export const findAllPetsWithUsers = async (options = {}) => {
+  const { page = 1, pageSize = 50, search } = options;
+  const offset = (page - 1) * pageSize;
+  
+  let sql = `
+    SELECT
+      pp.id,
+      pp.user_id AS userId,
+      pp.name,
+      pp.breed,
+      pp.city,
+      pp.birthdate,
+      pp.weight_kg AS weightKg,
+      pp.sex,
+      pp.neutered,
+      pp.life_stage AS lifeStage,
+      pp.activity_level AS activityLevel,
+      pp.energy_multiplier AS energyMultiplier,
+      pp.daily_energy_kcal AS dailyEnergyKcal,
+      pp.body_condition_score AS bodyConditionScore,
+      pp.meals_per_day AS mealsPerDay,
+      pp.snack_amount AS snackAmount,
+      pp.dietary_note AS dietaryNote,
+      pp.allergy_note AS allergyNote,
+      pp.symptom_note AS symptomNote,
+      pp.notes,
+      pp.created_at AS createdAt,
+      pp.updated_at AS updatedAt,
+      u.name AS userName,
+      u.email AS userEmail,
+      u.contact_info AS userContactInfo,
+      u.wechat_openid AS userWeChatOpenId
+    FROM pet_profiles pp
+    LEFT JOIN users u ON pp.user_id = u.id
+  `;
+  
+  const params = [];
+  
+  if (search) {
+    sql += ` WHERE (
+      pp.name LIKE ? OR 
+      pp.breed LIKE ? OR 
+      u.name LIKE ? OR 
+      u.email LIKE ? OR 
+      u.contact_info LIKE ?
+    )`;
+    const searchPattern = `%${search}%`;
+    params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+  }
+  
+  sql += ` ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`;
+  params.push(pageSize, offset);
+  
+  const rows = await query(sql, params);
+  const pets = Array.isArray(rows) ? rows : [rows];
+  
+  // 获取总数
+  let countSql = `
+    SELECT COUNT(*) as total
+    FROM pet_profiles pp
+    LEFT JOIN users u ON pp.user_id = u.id
+  `;
+  const countParams = [];
+  
+  if (search) {
+    countSql += ` WHERE (
+      pp.name LIKE ? OR 
+      pp.breed LIKE ? OR 
+      u.name LIKE ? OR 
+      u.email LIKE ? OR 
+      u.contact_info LIKE ?
+    )`;
+    const searchPattern = `%${search}%`;
+    countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+  }
+  
+  const countRows = await query(countSql, countParams);
+  const total = Array.isArray(countRows) ? (countRows[0]?.total || 0) : (countRows?.total || 0);
+  
+  return {
+    items: pets,
+    total: Number(total),
+    page: Number(page),
+    pageSize: Number(pageSize),
+    totalPages: Math.ceil(Number(total) / Number(pageSize))
+  };
 };

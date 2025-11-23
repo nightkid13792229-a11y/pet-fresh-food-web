@@ -12,6 +12,8 @@ const store = {
   orders: [],
   page: 1,
   pageSize: 10,
+  totalCustomers: 0, // 后端返回的总数
+  totalPages: 1, // 后端返回的总页数
   ingredientPage: 1,
   ingredientPageSize: 20,
   recipePage: 1,
@@ -602,6 +604,12 @@ function switchView(view) {
       setTimeout(() => {
         updateNameFilterSelect();
         renderIngredientsList();
+      }, 100);
+    }
+    // 如果切换到顾客视图，从后端加载数据
+    if (view === 'customers' && backendState.token) {
+      setTimeout(async () => {
+        await loadCustomersFromBackend();
       }, 100);
     }
     // 如果切换到品种管理视图，加载数据
@@ -1635,6 +1643,16 @@ function formatDetails(c) {
 }
 
 function paginatedCustomers() {
+  // 如果使用后端数据，直接返回当前页数据（后端已处理分页和搜索）
+  if (backendState.token && store.totalCustomers !== undefined) {
+    return {
+      pageItems: store.customers,
+      total: store.totalCustomers || store.customers.length,
+      totalPages: store.totalPages || 1
+    };
+  }
+  
+  // 本地数据：客户端分页和搜索
   const q = ($('customer-search').value || '').trim().toLowerCase();
   const filtered = store.customers.filter(c => {
     const text = `${c.wechat || ''} ${c.petName || ''} ${c.address || ''}`.toLowerCase();
@@ -1693,13 +1711,33 @@ function renderCustomersList() {
 
   const totalEl = $('customers-total'); if (totalEl) totalEl.textContent = `共 ${total} 条`;
   const infoEl = $('customers-pageinfo'); if (infoEl) infoEl.textContent = `第 ${store.page}/${totalPages} 页`;
-  const prevBtn = $('customers-prev'); if (prevBtn) {
+  const prevBtn = $('customers-prev'); 
+  if (prevBtn) {
     prevBtn.disabled = store.page <= 1;
-    prevBtn.onclick = () => { if (store.page > 1) { store.page -= 1; renderCustomersList(); } };
+    prevBtn.onclick = () => { 
+      if (store.page > 1) { 
+        store.page -= 1;
+        if (backendState.token) {
+          loadCustomersFromBackend();
+        } else {
+          renderCustomersList();
+        }
+      } 
+    };
   }
-  const nextBtn = $('customers-next'); if (nextBtn) {
+  const nextBtn = $('customers-next'); 
+  if (nextBtn) {
     nextBtn.disabled = store.page >= totalPages;
-    nextBtn.onclick = () => { if (store.page < totalPages) { store.page += 1; renderCustomersList(); } };
+    nextBtn.onclick = () => { 
+      if (store.page < totalPages) { 
+        store.page += 1;
+        if (backendState.token) {
+          loadCustomersFromBackend();
+        } else {
+          renderCustomersList();
+        }
+      } 
+    };
   }
 }
 function openCustomerForm(id) {
@@ -1744,8 +1782,11 @@ function openCustomerForm(id) {
     $('c-sex').value = 'unknown';
     $('c-neutered').value = 'unknown';
     $('c-lifeStage').value = 'adult';
-    $('c-activity').value = 'sedentary';
-    $('c-kcalFactor').value = activityKcalFactor('sedentary');
+    $('c-activity').value = '';
+    $('c-kcalFactor').value = '';
+    // 清空生命阶段描述
+    const descEl = $('life-stage-description');
+    if (descEl) descEl.textContent = '';
     $('c-lactStage').value = 'week1';
     $('c-lactFactor').value = lactFactorFromStage('week1');
     updatePuppyMonthFields();
@@ -1763,14 +1804,103 @@ function deleteCustomer(id) {
   renderCustomersList();
 }
 
+// 从后端加载顾客和宠物数据
+async function loadCustomersFromBackend() {
+  if (!backendState.token) {
+    console.log('未登录，跳过从后端加载数据');
+    return;
+  }
+  
+  try {
+    console.log('从后端加载顾客和宠物数据...');
+    const searchQuery = ($('customer-search')?.value || '').trim();
+    const params = new URLSearchParams({
+      page: String(store.page || 1),
+      pageSize: String(store.pageSize || 10)
+    });
+    if (searchQuery) {
+      params.append('search', searchQuery);
+    }
+    
+    const response = await backendRequest(`/api/v1/pets?${params.toString()}`, {
+      method: 'GET'
+    });
+    
+    if (response && response.items) {
+      // 将后端数据格式转换为Web端格式
+      const customers = response.items.map(pet => ({
+        id: `pet_${pet.id}`, // 使用pet_前缀避免ID冲突
+        petName: pet.name || '',
+        breed: pet.breed || '',
+        wechat: pet.userContactInfo || pet.userEmail || '',
+        address: '', // 地址信息需要从addresses API获取
+        birthday: pet.birthdate || '',
+        weightKg: pet.weightKg || 0,
+        sex: pet.sex || 'unknown',
+        neutered: pet.neutered ? 'yes' : 'no',
+        lifeStage: pet.lifeStage || 'adult',
+        activity: pet.activityLevel || '',
+        kcalFactor: pet.energyMultiplier || 0,
+        estKcal: pet.dailyEnergyKcal || 0,
+        bcs: pet.bodyConditionScore || null,
+        mealsPerDay: pet.mealsPerDay || null,
+        allergies: pet.allergyNote || '',
+        avoid: pet.dietaryNote || '',
+        fav: '',
+        med: pet.symptomNote || '',
+        notes: pet.notes || '',
+        userId: pet.userId,
+        userName: pet.userName || '',
+        userEmail: pet.userEmail || '',
+        createdAt: pet.createdAt ? new Date(pet.createdAt).getTime() : Date.now()
+      }));
+      
+      // 更新store
+      store.customers = customers;
+      store.totalCustomers = response.total || 0;
+      store.totalPages = response.totalPages || 1;
+      
+      console.log(`✓ 从后端加载了 ${customers.length} 条宠物记录（共 ${response.total} 条）`);
+      
+      // 重新渲染列表
+      renderCustomersList();
+    } else {
+      console.warn('后端返回数据格式异常:', response);
+    }
+  } catch (error) {
+    console.error('从后端加载数据失败:', error);
+    // 如果后端加载失败，继续使用本地数据
+  }
+}
+
 function setupCustomersModule() {
   populateBreedSelect();
+  
+  // 如果已登录，从后端加载数据
+  if (backendState.token) {
+    loadCustomersFromBackend();
+  }
+  
   const newBtn = $('btn-new-customer');
   if (newBtn) newBtn.addEventListener('click', () => openCustomerForm());
   const cancelBtn = $('btn-cancel-customer');
   if (cancelBtn) cancelBtn.addEventListener('click', () => { const card = $('customer-form-card'); if (card) card.style.display = 'none'; });
   const searchEl = $('customer-search');
-  if (searchEl) searchEl.addEventListener('input', () => { store.page = 1; renderCustomersList(); });
+  if (searchEl) {
+    // 防抖搜索
+    let searchTimeout;
+    searchEl.addEventListener('input', () => { 
+      store.page = 1;
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        if (backendState.token) {
+          loadCustomersFromBackend();
+        } else {
+          renderCustomersList();
+        }
+      }, 500);
+    });
+  }
 
   const bd = $('c-birthday'); 
   if (bd) {
