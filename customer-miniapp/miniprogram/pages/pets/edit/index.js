@@ -1,146 +1,20 @@
 import { request } from '../../../utils/request';
-
-const SEX_OPTIONS = [
-  { label: '公', value: 'male' },
-  { label: '母', value: 'female' },
-  { label: '未知', value: 'unknown' }
-];
-
-const LIFE_STAGE_OPTIONS = [
-  { label: '幼年期', value: 'puppy', multiplier: 3 },
-  { label: '成年期', value: 'adult', multiplier: 1.8 }
-];
-
-const ACTIVITY_OPTIONS = [
-  { 
-    label: '低运动量', 
-    value: 'low', 
-    description: '＜1小时/天，例如牵绳散步',
-    energyMultiplier: 95
-  },
-  { 
-    label: '中等运动量', 
-    value: 'medium', 
-    description: '1-3小时/天，例如散步+室内玩耍',
-    energyMultiplier: 110
-  },
-  { 
-    label: '较高运动量', 
-    value: 'high', 
-    description: '1-3小时/天，例如跑跳、追逐等',
-    energyMultiplier: 125
-  },
-  { 
-    label: '高运动量', 
-    value: 'very_high', 
-    description: '3-6小时/天，例如牧羊等工作',
-    energyMultiplier: 150
-  }
-];
-
-const SNACK_CALORIE_OPTIONS = [
-  { label: '几乎不吃', value: 'none' },
-  { label: '少量（比如：2块鸡肉干）', value: 'low' },
-  { label: '中等（2块鸡肉干+1根奶酪棒）', value: 'medium' },
-  { label: '大量（鸡肉干+奶酪棒+半颗苹果）', value: 'high' }
-];
-
-const DEFAULT_FORM = {
-  name: '',
-  breed: '',
-  birthdate: '',
-  weightKg: '',
-  sex: 'unknown',
-  neutered: false,
-  lifeStage: '',
-  activityLevel: '',
-  energyMultiplier: '',
-  dailyEnergyKcal: '',
-  bodyConditionScore: '',
-  mealsPerDay: '2', // 默认值为2
-  snackCalorie: '',
-  dietaryNote: '',
-  allergyNote: '',
-  symptomNote: '',
-  notes: ''
-};
-
-// 根据月龄计算K值（幼年期使用）
-const calculateKValue = (ageMonths) => {
-  if (ageMonths === null || ageMonths === undefined) {
-    return 1;
-  }
-  if (ageMonths < 2) {
-    return 2;
-  } else if (ageMonths === 2) {
-    return 1.8;
-  } else if (ageMonths === 3) {
-    return 1.6;
-  } else if (ageMonths === 4) {
-    return 1.5;
-  } else if (ageMonths === 5) {
-    return 1.4;
-  } else if (ageMonths === 6) {
-    return 1.3;
-  } else if (ageMonths === 7) {
-    return 1.2;
-  } else if (ageMonths === 8) {
-    return 1.1;
-  } else {
-    // 月龄 > 8
-    return 1;
-  }
-};
-
-// 计算每日能量估算
-const calculateEnergy = (weight, multiplier, lifeStage, ageMonths) => {
-  const w = Number(weight);
-  const m = Number(multiplier);
-  if (!(w > 0) || !(m > 0)) {
-    return '';
-  }
-  
-  // 基础公式：体重的0.75次方 * 运动-能量系数
-  const baseEnergy = Math.pow(w, 0.75) * m;
-  
-  // 如果是幼年期，需要乘以K值
-  if (lifeStage === 'puppy' && ageMonths !== null) {
-    const k = calculateKValue(ageMonths);
-    return Math.round(baseEnergy * k);
-  } else {
-    // 成年期直接使用基础公式
-    return Math.round(baseEnergy);
-  }
-};
-
-// 计算月龄
-const calculateAgeMonths = (birthdate) => {
-  if (!birthdate) return null;
-  const birth = new Date(birthdate);
-  if (isNaN(birth.getTime())) return null;
-  const now = new Date();
-  const years = now.getFullYear() - birth.getFullYear();
-  const months = now.getMonth() - birth.getMonth();
-  return years * 12 + months;
-};
-
-// 计算年龄（岁，整数，不四舍五入）
-const calculateAgeYears = (birthdate) => {
-  if (!birthdate) return null;
-  const birth = new Date(birthdate);
-  if (isNaN(birth.getTime())) return null;
-  const now = new Date();
-  let years = now.getFullYear() - birth.getFullYear();
-  const monthDiff = now.getMonth() - birth.getMonth();
-  const dayDiff = now.getDate() - birth.getDate();
-  
-  // 如果还没到今年的生日，年龄减1
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    years--;
-  }
-  
-  return Math.floor(years); // 确保是整数，不四舍五入
-};
+import {
+  SEX_OPTIONS,
+  LIFE_STAGE_OPTIONS,
+  ACTIVITY_OPTIONS,
+  SNACK_CALORIE_OPTIONS,
+  MEALS_PER_DAY_OPTIONS,
+  BODY_CONDITION_SCORE_OPTIONS,
+  DEFAULT_PET_FORM as DEFAULT_FORM,
+  calculateKValue,
+  calculateEnergy,
+  calculateAgeMonths,
+  calculateAgeYears,
+  getEnergyMultiplierByActivity,
+  determineLifeStage,
+  generateLifeStageDescription
+} from '../../../utils/pet-utils';
 
 Page({
   data: {
@@ -155,9 +29,9 @@ Page({
     lifeStageIndex: -1,
     activityIndex: -1,
     snackCalorieIndex: -1,
-    bodyConditionScoreOptions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    bodyConditionScoreOptions: BODY_CONDITION_SCORE_OPTIONS,
     bodyConditionScoreIndex: -1,
-    mealsPerDayOptions: [1, 2, 3, 4, 5],
+    mealsPerDayOptions: MEALS_PER_DAY_OPTIONS,
     mealsPerDayIndex: 1, // 默认选择2（索引1）
     submitting: false,
     breedOptions: ['其它品种'],
@@ -723,14 +597,9 @@ Page({
       return;
     }
     
-    const ageMonths = calculateAgeMonths(birthdate);
-    if (ageMonths === null) {
-      return;
-    }
-    
+    // 使用共享工具库判断生命阶段
     const maturityMonths = selectedBreedData.maturityMonths;
-    // 如果月龄小于成熟月龄，选择幼年期；否则选择成年期
-    const newLifeStage = ageMonths < maturityMonths ? 'puppy' : 'adult';
+    const newLifeStage = determineLifeStage(birthdate, maturityMonths);
     const lifeStageIndex = LIFE_STAGE_OPTIONS.findIndex(opt => opt.value === newLifeStage);
     
     if (lifeStageIndex >= 0) {
@@ -766,31 +635,40 @@ Page({
     
     // 需要昵称、品种和生日才能计算
     if (form.name && form.breed && form.birthdate) {
-      const ageMonths = calculateAgeMonths(form.birthdate);
-      
-      if (ageMonths !== null && selectedBreedData && selectedBreedData.maturityMonths) {
-        // 计算生命阶段
-        const lifeStage = ageMonths < selectedBreedData.maturityMonths ? 'puppy' : 'adult';
-        const lifeStageLabel = lifeStage === 'puppy' ? '幼年期' : '成年期';
-        
-        if (lifeStage === 'adult') {
-          // 成年期：显示年龄（岁）
-          const ageYears = calculateAgeYears(form.birthdate);
-          if (ageYears !== null && ageYears >= 0) {
-            description = `${form.name}现在${ageYears}岁了，属于${lifeStageLabel}`;
+      if (selectedBreedData && selectedBreedData.maturityMonths) {
+        // 使用共享工具库计算生命阶段
+        const lifeStage = determineLifeStage(form.birthdate, selectedBreedData.maturityMonths);
+        // 使用共享工具库生成描述
+        description = generateLifeStageDescription(
+          form.name, 
+          form.breed, 
+          selectedBreedData.maturityMonths, 
+          form.birthdate, 
+          lifeStage
+        );
+      } else {
+        // 如果没有品种数据，使用简化版本
+        const ageMonths = calculateAgeMonths(form.birthdate);
+        if (ageMonths !== null) {
+          const lifeStage = ageMonths < 12 ? 'puppy' : 'adult';
+          const lifeStageLabel = lifeStage === 'puppy' ? '幼年期' : '成年期';
+          
+          if (lifeStage === 'adult') {
+            // 成年期：显示年龄（岁）
+            const ageYears = calculateAgeYears(form.birthdate);
+            if (ageYears !== null && ageYears >= 0) {
+              description = `${form.name}现在${ageYears}岁了，属于${lifeStageLabel}`;
+            } else {
+              description = `${form.name}现在${ageMonths}个月大，属于${lifeStageLabel}`;
+            }
           } else {
+            // 幼年期：显示月龄
             description = `${form.name}现在${ageMonths}个月大，属于${lifeStageLabel}`;
           }
         } else {
-          // 幼年期：显示月龄
-          description = `${form.name}现在${ageMonths}个月大，属于${lifeStageLabel}`;
+          // 生日格式错误
+          description = '';
         }
-      } else if (ageMonths !== null) {
-        // 有月龄但没有成熟月龄数据（其它品种）
-        description = `${form.name}现在${ageMonths}个月大`;
-      } else {
-        // 生日格式错误
-        description = '';
       }
     }
     
