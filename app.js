@@ -1868,7 +1868,43 @@ async function loadCustomersFromBackend() {
       // 重新渲染列表
       renderCustomersList();
     } else {
-      console.warn('后端返回数据格式异常:', response);
+      // 如果返回格式不符合预期，尝试直接使用response（可能是直接返回数据而不是包装在data中）
+      if (response && Array.isArray(response)) {
+        // 如果response本身就是数组，直接使用
+        const customers = response.map(pet => ({
+          id: `pet_${pet.id}`,
+          petName: pet.name || '',
+          breed: pet.breed || '',
+          wechat: pet.userContactInfo || pet.userEmail || '',
+          address: '',
+          birthday: pet.birthdate || '',
+          weightKg: pet.weightKg || 0,
+          sex: pet.sex || 'unknown',
+          neutered: pet.neutered ? 'yes' : 'no',
+          lifeStage: pet.lifeStage || 'adult',
+          activity: pet.activityLevel || '',
+          kcalFactor: pet.energyMultiplier || 0,
+          estKcal: pet.dailyEnergyKcal || 0,
+          bcs: pet.bodyConditionScore || null,
+          mealsPerDay: pet.mealsPerDay || null,
+          allergies: pet.allergyNote || '',
+          avoid: pet.dietaryNote || '',
+          fav: '',
+          med: pet.symptomNote || '',
+          notes: pet.notes || '',
+          userId: pet.userId,
+          userName: pet.userName || '',
+          userEmail: pet.userEmail || '',
+          createdAt: pet.createdAt ? new Date(pet.createdAt).getTime() : Date.now()
+        }));
+        store.customers = customers;
+        store.totalCustomers = customers.length;
+        store.totalPages = 1;
+        console.log(`✓ 从后端加载了 ${customers.length} 条宠物记录（直接数组格式）`);
+        renderCustomersList();
+      } else {
+        console.warn('后端返回数据格式异常，无法解析:', response);
+      }
     }
   } catch (error) {
     console.error('从后端加载数据失败:', error);
