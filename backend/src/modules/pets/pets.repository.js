@@ -176,11 +176,21 @@ export const deletePetProfile = async (id) => {
 
 // 管理员端：获取所有宠物信息（带用户信息）
 export const findAllPetsWithUsers = async (options = {}) => {
-  // 确保参数是有效的数字
-  const page = Math.max(1, parseInt(options.page, 10) || 1);
-  const pageSize = Math.max(1, Math.min(100, parseInt(options.pageSize, 10) || 50)); // 限制最大100
+  // 确保参数是有效的数字，防止 NaN
+  let page = parseInt(options.page, 10);
+  if (isNaN(page) || page < 1) page = 1;
+  
+  let pageSize = parseInt(options.pageSize, 10);
+  if (isNaN(pageSize) || pageSize < 1) pageSize = 50;
+  if (pageSize > 100) pageSize = 100; // 限制最大100
+  
   const search = options.search ? String(options.search).trim() : undefined;
   const offset = (page - 1) * pageSize;
+  
+  // 确保 offset 也是有效数字
+  if (isNaN(offset) || offset < 0) {
+    throw new Error(`Invalid offset calculated: page=${page}, pageSize=${pageSize}, offset=${offset}`);
+  }
   
   let sql = `
     SELECT
@@ -229,10 +239,11 @@ export const findAllPetsWithUsers = async (options = {}) => {
   }
   
   sql += ` ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`;
-  // 确保pageSize和offset是整数
-  params.push(parseInt(pageSize, 10), parseInt(offset, 10));
+  // 确保参数是整数（不是 NaN），使用 Math.floor 确保是整数
+  params.push(Math.floor(pageSize), Math.floor(offset));
   
   try {
+    console.log('[findAllPetsWithUsers] SQL params:', { page, pageSize, offset, search, paramsLength: params.length });
     const rows = await query(sql, params);
     const pets = Array.isArray(rows) ? rows : (rows ? [rows] : []);
   
@@ -270,6 +281,8 @@ export const findAllPetsWithUsers = async (options = {}) => {
     console.error('findAllPetsWithUsers error:', error);
     console.error('SQL:', sql);
     console.error('Params:', params);
+    console.error('Params types:', params.map(p => typeof p));
+    console.error('Params values:', params);
     throw error;
   }
 };
