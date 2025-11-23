@@ -226,7 +226,8 @@ export const findAllPetsWithUsers = async (options = {}) => {
   }
   
   sql += ` ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`;
-  params.push(pageSize, offset);
+  // 确保pageSize和offset是数字类型
+  params.push(Number(pageSize), Number(offset));
   
   const rows = await query(sql, params);
   const pets = Array.isArray(rows) ? rows : [rows];
@@ -255,10 +256,10 @@ export const findAllPetsWithUsers = async (options = {}) => {
   const total = Array.isArray(countRows) ? (countRows[0]?.total || 0) : (countRows?.total || 0);
   
   return {
-    items: pets,
-    total: Number(total),
-    page: Number(page),
-    pageSize: Number(pageSize),
-    totalPages: Math.ceil(Number(total) / Number(pageSize))
+    items: Array.isArray(pets) ? pets : [],
+    total: Number(total) || 0,
+    page: Number(page) || 1,
+    pageSize: Number(pageSize) || 50,
+    totalPages: Math.ceil((Number(total) || 0) / (Number(pageSize) || 50))
   };
 };
