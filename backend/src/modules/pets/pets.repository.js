@@ -176,7 +176,10 @@ export const deletePetProfile = async (id) => {
 
 // 管理员端：获取所有宠物信息（带用户信息）
 export const findAllPetsWithUsers = async (options = {}) => {
-  const { page = 1, pageSize = 50, search } = options;
+  // 确保参数是有效的数字
+  const page = Math.max(1, parseInt(options.page, 10) || 1);
+  const pageSize = Math.max(1, Math.min(100, parseInt(options.pageSize, 10) || 50)); // 限制最大100
+  const search = options.search ? String(options.search).trim() : undefined;
   const offset = (page - 1) * pageSize;
   
   let sql = `
@@ -226,11 +229,12 @@ export const findAllPetsWithUsers = async (options = {}) => {
   }
   
   sql += ` ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`;
-  // 确保pageSize和offset是数字类型
-  params.push(Number(pageSize), Number(offset));
+  // 确保pageSize和offset是整数
+  params.push(parseInt(pageSize, 10), parseInt(offset, 10));
   
-  const rows = await query(sql, params);
-  const pets = Array.isArray(rows) ? rows : [rows];
+  try {
+    const rows = await query(sql, params);
+    const pets = Array.isArray(rows) ? rows : (rows ? [rows] : []);
   
   // 获取总数
   let countSql = `
@@ -252,14 +256,20 @@ export const findAllPetsWithUsers = async (options = {}) => {
     countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
   }
   
-  const countRows = await query(countSql, countParams);
-  const total = Array.isArray(countRows) ? (countRows[0]?.total || 0) : (countRows?.total || 0);
-  
-  return {
-    items: Array.isArray(pets) ? pets : [],
-    total: Number(total) || 0,
-    page: Number(page) || 1,
-    pageSize: Number(pageSize) || 50,
-    totalPages: Math.ceil((Number(total) || 0) / (Number(pageSize) || 50))
-  };
+    const countRows = await query(countSql, countParams);
+    const total = Array.isArray(countRows) ? (countRows[0]?.total || 0) : (countRows?.total || 0);
+    
+    return {
+      items: pets,
+      total: parseInt(total, 10) || 0,
+      page: page,
+      pageSize: pageSize,
+      totalPages: Math.ceil((parseInt(total, 10) || 0) / pageSize) || 1
+    };
+  } catch (error) {
+    console.error('findAllPetsWithUsers error:', error);
+    console.error('SQL:', sql);
+    console.error('Params:', params);
+    throw error;
+  }
 };
