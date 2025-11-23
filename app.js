@@ -1826,9 +1826,12 @@ async function loadCustomersFromBackend() {
       method: 'GET'
     });
     
-    if (response && response.items) {
+    // 后端返回格式: {success: true, data: {items: [], total: 0, ...}}
+    const data = response?.data || response;
+    
+    if (data && data.items) {
       // 将后端数据格式转换为Web端格式
-      const customers = response.items.map(pet => ({
+      const customers = data.items.map(pet => ({
         id: `pet_${pet.id}`, // 使用pet_前缀避免ID冲突
         petName: pet.name || '',
         breed: pet.breed || '',
@@ -1857,10 +1860,10 @@ async function loadCustomersFromBackend() {
       
       // 更新store
       store.customers = customers;
-      store.totalCustomers = response.total || 0;
-      store.totalPages = response.totalPages || 1;
+      store.totalCustomers = data.total || 0;
+      store.totalPages = data.totalPages || 1;
       
-      console.log(`✓ 从后端加载了 ${customers.length} 条宠物记录（共 ${response.total} 条）`);
+      console.log(`✓ 从后端加载了 ${customers.length} 条宠物记录（共 ${data.total} 条）`);
       
       // 重新渲染列表
       renderCustomersList();
