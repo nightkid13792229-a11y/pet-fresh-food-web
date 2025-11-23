@@ -6,7 +6,10 @@ import {
   deleteCustomerPet,
   listCustomerPets,
   updateCustomerPet,
-  listAllPetsController
+  listAllPetsController,
+  createPetAsAdminController,
+  updatePetAsAdminController,
+  deletePetAsAdminController
 } from './pets.controller.js';
 import { createPetSchema, updatePetSchema } from './pets.schemas.js';
 
@@ -25,5 +28,8 @@ export default router;
 export const adminPetsRouter = Router();
 adminPetsRouter.use(authenticate, authorize('admin', 'employee'));
 adminPetsRouter.get('/', listAllPetsController);
+adminPetsRouter.post('/', validate(createPetSchema), createPetAsAdminController);
+adminPetsRouter.put('/:id', validate(updatePetSchema), updatePetAsAdminController);
+adminPetsRouter.delete('/:id', deletePetAsAdminController);
 
 

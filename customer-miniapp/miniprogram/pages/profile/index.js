@@ -6,6 +6,48 @@ const formatAddressLabel = (addr) => {
   return `${addr.contactName} ${addr.contactPhone} · ${region}${addr.detail}`;
 };
 
+// 计算月龄
+const calculateAgeMonths = (birthdate) => {
+  if (!birthdate) return null;
+  const birth = new Date(birthdate);
+  if (isNaN(birth.getTime())) return null;
+  const now = new Date();
+  const years = now.getFullYear() - birth.getFullYear();
+  const months = now.getMonth() - birth.getMonth();
+  return years * 12 + months;
+};
+
+// 计算年龄（岁）
+const calculateAgeYears = (birthdate) => {
+  if (!birthdate) return null;
+  const birth = new Date(birthdate);
+  if (isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let years = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    years--;
+  }
+  return years;
+};
+
+// 格式化年龄显示
+const formatAge = (birthdate) => {
+  if (!birthdate) return '-';
+  const ageMonths = calculateAgeMonths(birthdate);
+  if (ageMonths === null) return '-';
+  
+  if (ageMonths < 12) {
+    return `${ageMonths}个月`;
+  } else {
+    const ageYears = calculateAgeYears(birthdate);
+    if (ageYears !== null && ageYears >= 0) {
+      return `${ageYears}岁`;
+    }
+    return `${ageMonths}个月`;
+  }
+};
+
 Page({
   data: {
     user: null,
@@ -16,8 +58,8 @@ Page({
     error: '',
     profileCompleted: false,
     editingUser: {},
-    editingName: false,
-    editingContactInfo: false
+    originalUser: {}, // 保存原始用户数据，用于比较是否有改动
+    hasChanges: false // 是否有改动
   },
 
   onShow() {
@@ -33,12 +75,18 @@ Page({
   async loadUserProfile() {
     try {
       const profile = await request({ url: '/customer/profile', method: 'GET' });
+      const originalData = {
+        name: profile.name || '',
+        contactInfo: profile.contactInfo || ''
+      };
       this.setData({
         user: profile,
         editingUser: {
           name: profile.name || '',
           contactInfo: profile.contactInfo || ''
-        }
+        },
+        originalUser: originalData,
+        hasChanges: false
       });
       const app = getApp();
       if (app && app.globalData) {
@@ -52,65 +100,55 @@ Page({
   handleInput(event) {
     const { field } = event.currentTarget.dataset;
     const value = event.detail.value;
-    this.setData({
-      editingUser: {
-        ...this.data.editingUser,
-        [field]: value
-      }
-    });
-  },
-
-  handleStartEdit(event) {
-    const { field } = event.currentTarget.dataset;
-    const editingKey = `editing${field.charAt(0).toUpperCase() + field.slice(1)}`;
-    this.setData({
-      [editingKey]: true,
-      editingUser: {
-        ...this.data.editingUser,
-        [field]: this.data.user[field] || ''
-      }
-    });
-  },
-
-  handleCancelEdit(event) {
-    const { field } = event.currentTarget.dataset;
-    const editingKey = `editing${field.charAt(0).toUpperCase() + field.slice(1)}`;
-    this.setData({
-      [editingKey]: false,
-      editingUser: {
-        ...this.data.editingUser,
-        [field]: this.data.user[field] || ''
-      }
-    });
-  },
-
-  async handleSaveField(event) {
-    const { field } = event.currentTarget.dataset;
-    const value = this.data.editingUser[field];
+    const newEditingUser = {
+      ...this.data.editingUser,
+      [field]: value
+    };
     
-    if (field === 'name' && (!value || value.trim() === '')) {
+    // 检查是否有改动
+    const hasChanges = 
+      newEditingUser.name !== this.data.originalUser.name ||
+      newEditingUser.contactInfo !== this.data.originalUser.contactInfo;
+    
+    this.setData({
+      editingUser: newEditingUser,
+      hasChanges
+    });
+  },
+
+  async handleSaveChanges() {
+    const { editingUser } = this.data;
+    
+    if (!editingUser.name || editingUser.name.trim() === '') {
       wx.showToast({ title: '请输入主人昵称', icon: 'none' });
       return;
     }
 
     try {
       const updateData = {
-        [field]: value ? value.trim() : ''
+        name: editingUser.name ? editingUser.name.trim() : '',
+        contactInfo: editingUser.contactInfo ? editingUser.contactInfo.trim() : ''
       };
+      
       const profile = await request({
         url: '/customer/profile',
         method: 'PUT',
         data: updateData
       });
       
-      const editingKey = `editing${field.charAt(0).toUpperCase() + field.slice(1)}`;
+      const originalData = {
+        name: profile.name || '',
+        contactInfo: profile.contactInfo || ''
+      };
+      
       this.setData({
         user: profile,
-        [editingKey]: false,
         editingUser: {
-          ...this.data.editingUser,
-          [field]: profile[field] || ''
-        }
+          name: profile.name || '',
+          contactInfo: profile.contactInfo || ''
+        },
+        originalUser: originalData,
+        hasChanges: false
       });
       
       const app = getApp();
@@ -119,7 +157,7 @@ Page({
       }
       wx.showToast({ title: '保存成功', icon: 'success' });
     } catch (error) {
-      console.error('save field failed', error);
+      console.error('save changes failed', error);
       wx.showToast({ title: error.message || '保存失败', icon: 'none' });
     }
   },
@@ -136,9 +174,14 @@ Page({
         isDefault: !!item.isDefault,
         label: formatAddressLabel(item)
       }));
+      // 为每个宠物添加格式化后的年龄
+      const petsWithAge = (pets || []).map((pet) => ({
+        ...pet,
+        ageDisplay: formatAge(pet.birthdate)
+      }));
       // 只显示默认地址
       const defaultAddr = mappedAddresses.find(addr => addr.isDefault) || null;
-      this.setData({ pets, addresses: mappedAddresses, defaultAddress: defaultAddr, loading: false });
+      this.setData({ pets: petsWithAge, addresses: mappedAddresses, defaultAddress: defaultAddr, loading: false });
       const app = getApp();
       if (app && typeof app.fetchProfile === 'function') {
         await app.fetchProfile();

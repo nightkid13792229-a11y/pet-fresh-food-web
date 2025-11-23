@@ -1,5 +1,5 @@
 import { success } from '../../utils/response.js';
-import { createPet, listPetsByUser, removePet, updatePet, listAllPets } from './pets.service.js';
+import { createPet, listPetsByUser, removePet, updatePet, listAllPets, createPetAsAdmin, updatePetAsAdmin, removePetAsAdmin } from './pets.service.js';
 
 export const listCustomerPets = async (req, res) => {
   const pets = await listPetsByUser(req.user.id);
@@ -38,6 +38,39 @@ export const listAllPetsController = async (req, res) => {
     return success(res, result);
   } catch (error) {
     console.error('listAllPetsController error:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error' });
+  }
+};
+
+// 管理员端：创建宠物信息
+export const createPetAsAdminController = async (req, res) => {
+  try {
+    const result = await createPetAsAdmin(req.body);
+    return success(res, result, 201);
+  } catch (error) {
+    console.error('createPetAsAdminController error:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error' });
+  }
+};
+
+// 管理员端：更新宠物信息
+export const updatePetAsAdminController = async (req, res) => {
+  try {
+    const result = await updatePetAsAdmin(Number(req.params.id), req.body);
+    return success(res, result);
+  } catch (error) {
+    console.error('updatePetAsAdminController error:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error' });
+  }
+};
+
+// 管理员端：删除宠物信息
+export const deletePetAsAdminController = async (req, res) => {
+  try {
+    const result = await removePetAsAdmin(Number(req.params.id));
+    return success(res, result);
+  } catch (error) {
+    console.error('deletePetAsAdminController error:', error);
     res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error' });
   }
 };

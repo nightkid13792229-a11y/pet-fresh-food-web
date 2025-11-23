@@ -12,6 +12,30 @@
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
 }
 
+.section-title-wrapper {
+  margin-bottom: 32rpx;
+}
+
+.section-title-text {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.section-hint {
+  font-size: 24rpx;
+  color: #9ca3af;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.section-title-line {
+  height: 2rpx;
+  background-color: #e5e7eb;
+}
+
 .section-title {
   font-size: 36rpx;
   font-weight: 600;
@@ -29,7 +53,7 @@
 }
 
 .pet {
-  padding: 20rpx 0;
+  padding: 24rpx 0;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -37,10 +61,11 @@
   border-bottom: none;
 }
 
-.pet-header {
+.pet-info {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
 }
 
 .strong {
@@ -50,6 +75,8 @@
 .pet-actions {
   display: flex;
   gap: 12rpx;
+  justify-content: flex-end;
+  margin-top: 16rpx;
 }
 
 .btn-small {
@@ -132,39 +159,23 @@
   border: 1px solid #d1d5db;
   border-radius: 8rpx;
   margin-top: 8rpx;
+  background-color: #fff;
 }
 
-.info-action {
-  margin-left: 20rpx;
-  display: flex;
-  align-items: center;
-}
-
-.edit-btn {
-  font-size: 26rpx;
-  color: #10b981;
-  padding: 8rpx 16rpx;
-  border: 1px solid #10b981;
-  border-radius: 6rpx;
-}
-
-.action-btns {
-  display: flex;
-  gap: 12rpx;
-}
-
-.cancel-btn {
-  font-size: 26rpx;
-  color: #6b7280;
-  padding: 8rpx 16rpx;
-}
-
-.save-btn {
-  font-size: 26rpx;
-  color: #fff;
+.save-button {
+  margin-top: 20rpx;
+  width: 100%;
   background-color: #10b981;
-  padding: 8rpx 16rpx;
-  border-radius: 6rpx;
+  color: #fff;
+  border: none;
+  border-radius: 8rpx;
+  padding: 20rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.save-button::after {
+  border: none;
 }
 
 .address-section {
@@ -207,5 +218,23 @@
   padding: 4rpx 12rpx;
   border-radius: 4rpx;
   margin-left: 12rpx;
+}
+
+.edit-btn {
+  font-size: 26rpx;
+  color: #10b981;
+  padding: 8rpx 16rpx;
+  border: 1px solid #10b981;
+  border-radius: 6rpx;
+}
+
+.empty-pets {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 26rpx;
 }
 

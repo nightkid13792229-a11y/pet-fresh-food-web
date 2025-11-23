@@ -1,5 +1,11 @@
 {
-  "rules": []
+  "desc": "关于本小程序的索引规则",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
 }
 
 

@@ -1797,11 +1797,38 @@ function openCustomerForm(id) {
 
 window.__openCustomer = () => openCustomerForm();
 
-function deleteCustomer(id) {
+async function deleteCustomer(id) {
   if (!confirm('确认删除该顾客及其宠物信息？')) return;
-  store.customers = store.customers.filter(c => c.id !== id);
-  saveApp();
-  renderCustomersList();
+  
+  // 如果是pet_开头的ID，说明是从后端加载的数据
+  if (id && id.startsWith('pet_')) {
+    const petId = id.replace('pet_', '');
+    try {
+      // 调用后端API删除
+      await backendRequest(`/api/v1/pets/${petId}`, {
+        method: 'DELETE'
+      });
+      console.log('✓ 后端删除成功');
+      
+      // 成功后重新加载数据
+      if (backendState.token) {
+        await loadCustomersFromBackend();
+      } else {
+        // 如果未登录，回退到本地删除
+        store.customers = store.customers.filter(c => c.id !== id);
+        saveApp();
+        renderCustomersList();
+      }
+    } catch (error) {
+      console.error('删除失败:', error);
+      alert('删除失败: ' + (error.message || '未知错误'));
+    }
+  } else {
+    // 本地数据，直接删除
+    store.customers = store.customers.filter(c => c.id !== id);
+    saveApp();
+    renderCustomersList();
+  }
 }
 
 // 从后端加载顾客和宠物数据
@@ -1981,60 +2008,172 @@ function setupCustomersModule() {
         computeAndFillEstKcal();
       }
     });
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const id = $('customer-id').value || genId();
+      const id = $('customer-id').value || '';
       const weight = Number($('c-weightKg').value) || 0;
       if (!weight) { alert('请填写体重'); return; }
       computeAndFillEstKcal();
       const estKcal = Number($('c-estKcal').value) || 0;
 
-      const record = {
-        id,
-        wechat: $('c-wechat').value.trim(),
-        address: $('c-address').value.trim(),
-        petName: $('c-petName').value.trim(),
-        breed: $('c-breed').value.trim(),
-        birthday: $('c-birthday').value,
-        weightKg: weight,
-        sex: $('c-sex').value,
-        neutered: $('c-neutered').value,
-        lifeStage: $('c-lifeStage').value,
-        activity: $('c-activity').value,
-        kcalFactor: Number($('c-kcalFactor').value) || activityKcalFactor($('c-activity').value),
-        monthAge: Number($('c-monthAge').value) || null,
-        monthFactor: Number($('c-monthFactor').value) || null,
-        lactStage: $('c-lactStage').value,
-        lactFactor: Number($('c-lactFactor').value) || lactFactorFromStage($('c-lactStage').value),
-        litterCount: Number($('c-litterCount').value) || 0,
-        estKcal,
-        bcs: $('c-bcs').value ? Number($('c-bcs').value) : null,
-        mealsPerDay: $('c-mealsPerDay').value ? Number($('c-mealsPerDay').value) : null,
-        allergies: $('c-allergies').value.trim(),
-        avoid: $('c-avoid').value.trim(),
-        fav: $('c-fav').value.trim(),
-        med: $('c-med').value.trim(),
-        notes: $('c-notes').value.trim(),
-        species: 'dog',
-        createdAt: Date.now()
-      };
-      if (!record.petName) { alert('请填写必填项：宠物昵称'); return; }
-      const existsIdx = store.customers.findIndex(x => x.id === id);
-      if (existsIdx >= 0) {
-        store.customers.splice(existsIdx, 1, record);
-        console.log('更新顾客记录:', record.petName);
-      } else {
-        store.customers.unshift(record);
-        console.log('新增顾客记录:', record.petName);
+      // 验证必填项
+      const petName = $('c-petName').value.trim();
+      if (!petName) { alert('请填写必填项：宠物昵称'); return; }
+      
+      const breed = $('c-breed').value.trim();
+      if (!breed) { alert('请填写必填项：品种'); return; }
+      
+      const birthday = $('c-birthday').value;
+      if (!birthday) { alert('请填写必填项：生日（至少选择年月）'); return; }
+      
+      const activity = $('c-activity').value;
+      if (!activity) { alert('请填写必填项：活动水平'); return; }
+      
+      const bcs = $('c-bcs').value ? Number($('c-bcs').value) : null;
+      if (!bcs) { alert('请填写必填项：体况评分'); return; }
+      
+      const mealsPerDay = $('c-mealsPerDay').value ? Number($('c-mealsPerDay').value) : null;
+      if (!mealsPerDay) { alert('请填写必填项：每日进餐数'); return; }
+
+      // 判断是编辑还是新增
+      const isEditing = id && id.startsWith('pet_');
+      const petId = isEditing ? id.replace('pet_', '') : null;
+      const existingRecord = isEditing ? store.customers.find(x => x.id === id) : null;
+      
+      // 获取userId（编辑时使用现有的，新增时需要查找或创建用户）
+      let userId = existingRecord?.userId;
+      const wechat = $('c-wechat').value.trim();
+      const userEmail = existingRecord?.userEmail || (wechat.includes('@') ? wechat : null);
+      
+      // 如果是新增且没有userId，需要查找用户
+      if (!isEditing && !userId) {
+        const wechat = $('c-wechat').value.trim();
+        const userEmail = wechat.includes('@') ? wechat : null;
+        
+        if (userEmail || wechat) {
+          try {
+            // 尝试通过email或contactInfo查找用户
+            const searchQuery = userEmail || wechat;
+            const usersResponse = await backendRequest(`/api/v1/users?search=${encodeURIComponent(searchQuery)}&role=customer`, {
+              method: 'GET'
+            });
+            const usersData = usersResponse?.data || usersResponse;
+            if (usersData && usersData.items && usersData.items.length > 0) {
+              userId = usersData.items[0].id;
+              console.log('找到用户:', userId);
+            } else {
+              // 如果找不到用户，提示管理员
+              alert('未找到对应的用户。请先在"账号管理"中创建用户，或确保微信号/邮箱正确。');
+              return;
+            }
+          } catch (error) {
+            console.error('查找用户失败:', error);
+            alert('查找用户失败: ' + (error.message || '未知错误') + '\n请先在"账号管理"中创建用户。');
+            return;
+          }
+        } else {
+          alert('请填写微信号或邮箱，以便关联用户');
+          return;
+        }
       }
       
-      if (saveApp()) {
+      if (!userId) {
+        alert('无法确定用户ID。编辑模式下请确保数据已正确加载。');
+        return;
+      }
+
+      // 将Web端格式转换为后端API格式
+      const payload = {
+        name: petName,
+        breed: breed || null,
+        birthdate: birthday || null,
+        weightKg: weight || null,
+        sex: $('c-sex').value || 'unknown',
+        neutered: $('c-neutered').value === 'yes',
+        lifeStage: $('c-lifeStage').value || null,
+        activityLevel: activity || null,
+        energyMultiplier: Number($('c-kcalFactor').value) || null,
+        dailyEnergyKcal: estKcal || null,
+        bodyConditionScore: bcs || null,
+        mealsPerDay: mealsPerDay || null,
+        snackAmount: null, // Web端暂时没有这个字段
+        dietaryNote: $('c-avoid').value.trim() || null,
+        allergyNote: $('c-allergies').value.trim() || null,
+        symptomNote: $('c-med').value.trim() || null,
+        notes: $('c-notes').value.trim() || null,
+        userId: userId // 管理员端API需要userId
+      };
+
+      // 处理空值
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === '' || payload[key] === undefined) {
+          payload[key] = null;
+        }
+      });
+
+      try {
+        // 调用后端API
+        if (isEditing && petId) {
+          // 更新
+          const response = await backendRequest(`/api/v1/pets/${petId}`, {
+            method: 'PUT',
+            body: payload
+          });
+          console.log('✓ 后端更新成功:', response);
+        } else {
+          // 新增
+          const response = await backendRequest('/api/v1/pets', {
+            method: 'POST',
+            body: payload
+          });
+          console.log('✓ 后端创建成功:', response);
+        }
+        
+        // 成功后重新加载数据
+        if (backendState.token) {
+          await loadCustomersFromBackend();
+        } else {
+          // 如果未登录，回退到本地保存
+          const record = {
+            id: isEditing ? id : `pet_${Date.now()}`,
+            wechat: wechat,
+            address: $('c-address').value.trim(),
+            petName: petName,
+            breed: breed,
+            birthday: birthday,
+            weightKg: weight,
+            sex: $('c-sex').value,
+            neutered: $('c-neutered').value,
+            lifeStage: $('c-lifeStage').value,
+            activity: activity,
+            kcalFactor: Number($('c-kcalFactor').value) || 0,
+            estKcal: estKcal,
+            bcs: bcs,
+            mealsPerDay: mealsPerDay,
+            allergies: $('c-allergies').value.trim(),
+            avoid: $('c-avoid').value.trim(),
+            fav: $('c-fav').value.trim(),
+            med: $('c-med').value.trim(),
+            notes: $('c-notes').value.trim(),
+            userId: userId,
+            createdAt: Date.now()
+          };
+          const existsIdx = store.customers.findIndex(x => x.id === id);
+          if (existsIdx >= 0) {
+            store.customers.splice(existsIdx, 1, record);
+          } else {
+            store.customers.unshift(record);
+          }
+          saveApp();
+        }
+        
         const card = $('customer-form-card'); 
         if (card) card.style.display = 'none';
         renderCustomersList();
-        console.log('当前顾客总数:', store.customers.length);
-      } else {
-        alert('保存失败，请重试');
+        alert('保存成功！');
+      } catch (error) {
+        console.error('保存失败:', error);
+        alert('保存失败: ' + (error.message || '未知错误'));
       }
     });
   }
