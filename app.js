@@ -704,6 +704,40 @@ function lactFactorFromStage(stage) {
   }
 }
 
+// 使用共享工具库更新生命阶段
+function updateLifeStageFromBirthday() {
+  if (!PetUtils) {
+    // 回退到旧逻辑
+    autoSetLifeStageFromBirthday();
+    return;
+  }
+  
+  const birthdate = $('c-birthday').value;
+  if (!birthdate) return;
+  
+  // 获取品种数据（如果有）
+  const breedSelect = $('c-breed');
+  const breedName = breedSelect ? breedSelect.value : '';
+  // TODO: 从后端获取品种的成熟月龄，这里暂时使用默认值12
+  const maturityMonths = 12;
+  
+  const lifeStage = PetUtils.determineLifeStage(birthdate, maturityMonths);
+  const lifeSel = $('c-lifeStage');
+  if (lifeSel) {
+    lifeSel.value = lifeStage;
+    
+    // 更新生命阶段描述
+    const petName = $('c-petName') ? $('c-petName').value : '';
+    const description = PetUtils.generateLifeStageDescription(petName, breedName, maturityMonths, birthdate, lifeStage);
+    const descEl = $('life-stage-description');
+    if (descEl) {
+      descEl.textContent = description;
+    }
+  }
+  
+  updatePuppyMonthFields();
+}
+
 function autoSetLifeStageFromBirthday() {
   const lifeSel = $('c-lifeStage');
   const years = calcAgeYears($('c-birthday').value);
@@ -752,6 +786,37 @@ function computeAndFillEstKcal() {
   if (!estEl) return;
   const w = Number($('c-weightKg').value) || 0;
   if (w <= 0) { estEl.value = ''; setEstHint(''); return; }
+  
+  // 优先使用共享工具库
+  if (PetUtils) {
+    const life = $('c-lifeStage').value;
+    const kcalFactor = Number($('c-kcalFactor').value) || 0;
+    if (!kcalFactor) {
+      estEl.value = '';
+      setEstHint('请先选择活动水平');
+      return;
+    }
+    
+    const birthdate = $('c-birthday').value;
+    const ageMonths = birthdate ? PetUtils.calculateAgeMonths(birthdate) : null;
+    
+    const energy = PetUtils.calculateEnergy(w, kcalFactor, life, ageMonths);
+    if (energy !== '') {
+      estEl.value = energy;
+      if (life === 'puppy') {
+        const k = PetUtils.calculateKValue(ageMonths);
+        setEstHint(`幼年期：${w}^0.75 × ${kcalFactor} × K值${k} = ${energy} kcal`);
+      } else {
+        setEstHint(`成年期：${w}^0.75 × ${kcalFactor} = ${energy} kcal`);
+      }
+    } else {
+      estEl.value = '';
+      setEstHint('');
+    }
+    return;
+  }
+  
+  // 回退到旧逻辑
   const life = $('c-lifeStage').value;
   const kcalFactor = Number($('c-kcalFactor').value) || activityKcalFactor($('c-activity').value);
   if (life === 'puppy') {
@@ -1707,13 +1772,28 @@ function setupCustomersModule() {
   const searchEl = $('customer-search');
   if (searchEl) searchEl.addEventListener('input', () => { store.page = 1; renderCustomersList(); });
 
-  const bd = $('c-birthday'); if (bd) bd.addEventListener('change', () => { autoSetLifeStageFromBirthday(); updatePuppyMonthFields(); computeAndFillEstKcal(); });
-  const lifeEl = $('c-lifeStage'); if (lifeEl) lifeEl.addEventListener('change', () => { updatePuppyMonthFields(); updateLactationFields(); computeAndFillEstKcal(); });
+  const bd = $('c-birthday'); 
+  if (bd) {
+    bd.addEventListener('change', () => { 
+      updateLifeStageFromBirthday(); 
+      updatePuppyMonthFields(); 
+      computeAndFillEstKcal(); 
+    });
+  }
+  const lifeEl = $('c-lifeStage'); 
+  if (lifeEl) {
+    lifeEl.addEventListener('change', () => { 
+      updatePuppyMonthFields(); 
+      updateLactationFields(); 
+      computeAndFillEstKcal(); 
+    });
+  }
 
   const onActivityChange = () => {
     const act = $('c-activity').value;
-    const factor = activityKcalFactor(act);
-    const fEl = $('c-kcalFactor'); if (fEl) fEl.value = factor;
+    // 使用共享工具库获取能量系数
+    const factor = PetUtils ? PetUtils.getEnergyMultiplierByActivity(act) : activityKcalFactor(act);
+    const fEl = $('c-kcalFactor'); if (fEl) fEl.value = factor || '';
     computeAndFillEstKcal();
   };
   const wEl = $('c-weightKg'); if (wEl) wEl.addEventListener('change', computeAndFillEstKcal);

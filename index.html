@@ -7,6 +7,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#10b981" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="shared/pet-utils-web.js"></script>
 </head>
 <body>
   <header class="app-header">
@@ -101,14 +102,12 @@
               </select>
             </label>
 
-            <label>生命阶段（可自动/可手动）
+            <label>生命阶段（自动匹配）
               <select id="c-lifeStage">
-                <option value="puppy">幼犬</option>
-                <option value="adult" selected>成犬</option>
-                <option value="senior">老年犬</option>
-                <option value="pregnancy">妊娠期</option>
-                <option value="lactation">哺乳期</option>
+                <option value="puppy">幼年期</option>
+                <option value="adult" selected>成年期</option>
               </select>
+              <div id="life-stage-description" class="muted" style="font-size:12px; margin-top:4px;"></div>
             </label>
             <label id="wrap-monthAge" style="display:none">月龄
               <input id="c-monthAge" type="number" min="0" step="1" readonly />
@@ -132,16 +131,15 @@
             </label>
             <label>日均活动水平
               <select id="c-activity">
-                <option value="sedentary">基本不出门，家里也基本不活动</option>
-                <option value="light_walk">每天出门半小时内，散步为主</option>
-                <option value="mixed_1_3">每天出门1-3小时，跑动散步各一半</option>
-                <option value="high_1_3">每天出门1-3小时，高强度运动</option>
-                <option value="high_3_plus">每天出门3小时以上，高强度运动</option>
-                <option value="working_dog">特种工作犬，极强的运动量</option>
+                <option value="">请选择活动水平</option>
+                <option value="low">低运动量（＜1小时/天，例如牵绳散步）</option>
+                <option value="medium">中等运动量（1-3小时/天，例如散步+室内玩耍）</option>
+                <option value="high">较高运动量（1-3小时/天，例如跑跳、追逐等）</option>
+                <option value="very_high">高运动量（3-6小时/天，例如牧羊等工作）</option>
               </select>
             </label>
-            <label>热量系数
-              <input id="c-kcalFactor" type="number" min="0" step="1" placeholder="随活动自动填入，可手动调整" />
+            <label>运动-能量系数
+              <input id="c-kcalFactor" type="number" min="0" step="1" placeholder="随活动自动填入" readonly style="background-color:#f5f5f5;" />
             </label>
             <label>每日能量估算 (kcal/天)
               <input id="c-estKcal" type="number" min="0" step="1" placeholder="自动计算" readonly />
