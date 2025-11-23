@@ -239,16 +239,18 @@ export const findAllPetsWithUsers = async (options = {}) => {
   }
   
   sql += ` ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`;
-  // 确保参数是有效的整数（不是 NaN）
-  const limitValue = Number.isInteger(pageSize) ? pageSize : 50;
-  const offsetValue = Number.isInteger(offset) ? offset : 0;
+  // 确保参数是有效的整数（不是 NaN 或 Infinity）
+  // 使用 Math.floor 确保是整数，并验证是有限数字
+  const limitValue = Math.floor(pageSize);
+  const offsetValue = Math.floor(offset);
   
-  // 最终验证：确保不是 NaN 或 Infinity
-  if (!Number.isFinite(limitValue) || !Number.isFinite(offsetValue)) {
+  // 最终验证：确保是有限数字
+  if (!Number.isFinite(limitValue) || !Number.isFinite(offsetValue) || limitValue < 0 || offsetValue < 0) {
     throw new Error(`Invalid SQL parameters: limitValue=${limitValue}, offsetValue=${offsetValue}, page=${page}, pageSize=${pageSize}, offset=${offset}`);
   }
   
-  params.push(limitValue, offsetValue);
+  // 确保参数是数字类型（不是字符串）
+  params.push(Number(limitValue), Number(offsetValue));
   
   try {
     console.log('[findAllPetsWithUsers] SQL params:', { 
