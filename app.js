@@ -238,6 +238,9 @@ async function loadChinaRegions() {
     });
     
     // 验证数据：检查每个省份的城市数量
+    // 直辖市列表：这些省份的行政结构特殊，城市数量少是正常的
+    const municipalities = ['北京市', '天津市', '上海市', '重庆市'];
+    
     Object.keys(regions).forEach(province => {
       const cities = Object.keys(regions[province]);
       if (cities.length === 0) {
@@ -247,7 +250,8 @@ async function loadChinaRegions() {
       } else {
         const cityList = cities.filter(c => c !== '其他市');
         console.log(`省份 ${province} 有 ${cities.length} 个城市 (${cityList.length} 个实际城市):`, cityList.slice(0, 10).join(', '), cityList.length > 10 ? '...' : '');
-        if (cityList.length <= 2) {
+        // 直辖市的城市数量少是正常的，不需要警告
+        if (cityList.length <= 2 && !municipalities.includes(province)) {
           console.warn(`⚠️ 省份 ${province} 的城市数量可能不足，只有 ${cityList.length} 个城市`);
         }
       }
@@ -9083,16 +9087,21 @@ async function openAddressManagementDialog(userId) {
     }
     
     // 更新region值（格式：省 市 区，空格分隔，与小程序端兼容）
+    // 直辖市格式：省 区（不包含市）
+    const municipalities = ['北京市', '天津市', '上海市', '重庆市'];
     const updateRegionValue = () => {
       const province = provinceSelect.value;
       const city = citySelect.value;
       const district = districtSelect.value;
       const parts = [];
       if (province) parts.push(province);
-      if (city) parts.push(city);
+      // 直辖市不包含城市部分
+      if (city && !municipalities.includes(province)) {
+        parts.push(city);
+      }
       if (district) parts.push(district);
       regionHidden.value = parts.join(' ');
-      console.log('更新region值:', regionHidden.value, { province, city, district });
+      console.log('更新region值:', regionHidden.value, { province, city, district, isMunicipality: municipalities.includes(province) });
     };
     
     // 加载省市区数据并初始化
