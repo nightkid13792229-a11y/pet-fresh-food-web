@@ -1800,12 +1800,18 @@ async function openCustomerForm(id) {
     const addressEl = $('c-address');
     if (addressEl) {
       addressEl.value = defaultAddress || '（点击"管理地址"查看）';
+      addressEl.placeholder = '默认收货地址';
+    } else {
+      console.warn('地址输入框不存在');
     }
     
     // 确保地址管理按钮可见
     const addressManageBtn = $('c-address-manage');
     if (addressManageBtn) {
       addressManageBtn.style.display = 'inline-block';
+      addressManageBtn.textContent = '管理地址';
+    } else {
+      console.warn('地址管理按钮不存在');
     }
     
     $('c-petName').value = c.petName || '';
@@ -1823,10 +1829,18 @@ async function openCustomerForm(id) {
         } else if (birthday.includes(' ')) {
           formattedDate = birthday.split(' ')[0];
         }
-        birthdayEl.value = formattedDate;
+        // 确保格式为 YYYY-MM-DD
+        if (formattedDate && formattedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          birthdayEl.value = formattedDate;
+        } else {
+          console.warn('生日格式不正确:', birthday, '->', formattedDate);
+          birthdayEl.value = '';
+        }
       } else {
         birthdayEl.value = '';
       }
+    } else {
+      console.warn('生日输入框不存在');
     }
     $('c-weightKg').value = c.weightKg || '';
     $('c-sex').value = c.sex || 'unknown';
@@ -1835,7 +1849,11 @@ async function openCustomerForm(id) {
     $('c-activity').value = c.activity || 'sedentary';
     // 运动-能量系数显示为整数
     const kcalFactor = c.kcalFactor != null ? c.kcalFactor : activityKcalFactor($('c-activity').value);
-    $('c-kcalFactor').value = kcalFactor != null ? Math.round(Number(kcalFactor)) : '';
+    // 运动-能量系数显示为整数
+    const kcalFactorEl = $('c-kcalFactor');
+    if (kcalFactorEl) {
+      kcalFactorEl.value = kcalFactor != null ? Math.round(Number(kcalFactor)) : '';
+    }
     $('c-bcs').value = c.bcs || '';
     $('c-mealsPerDay').value = c.mealsPerDay || '';
     $('c-allergies').value = c.allergies || '';
