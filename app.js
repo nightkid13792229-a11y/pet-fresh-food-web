@@ -878,7 +878,6 @@ async function populateBreedSelect() {
     
     // 后端返回格式可能是 { items: [...], total: X } 或直接是数组
     const breedsArray = Array.isArray(response) ? response : (response.items || []);
-    const breedNames = breedsArray.map(b => b.name);
     
     // 清空并添加选项
     select.innerHTML = '<option value="">请选择品种</option>';
@@ -889,15 +888,30 @@ async function populateBreedSelect() {
     otherOption.textContent = '其它品种';
     select.appendChild(otherOption);
     
-    // 添加所有品种选项
-    breedNames.forEach(breed => {
-      const option = document.createElement('option');
-      option.value = breed;
-      option.textContent = breed;
-      select.appendChild(option);
+    // 按分类组织品种（与小程序端一致）
+    const breedsByCategory = {};
+    breedsArray.forEach(breed => {
+      const category = breed.category || '其他';
+      if (!breedsByCategory[category]) {
+        breedsByCategory[category] = [];
+      }
+      breedsByCategory[category].push(breed.name);
     });
     
-    console.log(`✓ 已加载 ${breedNames.length} 个品种选项`);
+    // 按分类添加选项
+    Object.keys(breedsByCategory).sort().forEach(category => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = category;
+      breedsByCategory[category].sort().forEach(breedName => {
+        const option = document.createElement('option');
+        option.value = breedName;
+        option.textContent = breedName;
+        optgroup.appendChild(option);
+      });
+      select.appendChild(optgroup);
+    });
+    
+    console.log(`✓ 已加载 ${breedsArray.length} 个品种选项（${Object.keys(breedsByCategory).length} 个分类）`);
   } catch (error) {
     console.error('加载品种数据失败，使用本地数据:', error);
     // 如果API失败，回退到本地数据
@@ -1979,13 +1993,24 @@ async function loadCustomersFromBackend() {
               method: 'GET'
             });
             if (addresses && Array.isArray(addresses) && addresses.length > 0) {
-              // 查找默认地址，如果没有默认地址则使用第一个
+              // 优先查找默认地址，如果没有默认地址则使用第一个
               const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
               if (defaultAddr) {
-                defaultAddress = `${defaultAddr.region || ''} ${defaultAddr.detail || ''}`.trim();
+                // 格式化地址显示：联系人 电话 地区 详细地址
+                const parts = [];
                 if (defaultAddr.contactName) {
-                  defaultAddress = `${defaultAddr.contactName} ${defaultAddr.contactPhone || ''} ${defaultAddress}`.trim();
+                  parts.push(defaultAddr.contactName);
                 }
+                if (defaultAddr.contactPhone) {
+                  parts.push(defaultAddr.contactPhone);
+                }
+                if (defaultAddr.region) {
+                  parts.push(defaultAddr.region);
+                }
+                if (defaultAddr.detail) {
+                  parts.push(defaultAddr.detail);
+                }
+                defaultAddress = parts.join(' ');
               }
             }
           } catch (error) {
@@ -2001,7 +2026,7 @@ async function loadCustomersFromBackend() {
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: defaultAddress,
           birthday: pet.birthdate ? (() => {
-            // 处理日期格式，确保不因时区转换而改变日期
+            // 后端已使用 DATE_FORMAT 返回 YYYY-MM-DD 格式的字符串
             if (typeof pet.birthdate === 'string') {
               // 如果是ISO格式（带T），提取日期部分
               if (pet.birthdate.includes('T')) {
@@ -2016,7 +2041,7 @@ async function loadCustomersFromBackend() {
                 return pet.birthdate;
               }
             }
-            // 如果是Date对象，转换为本地日期字符串（不包含时间）
+            // 如果是Date对象（备用处理），转换为UTC日期字符串
             if (pet.birthdate instanceof Date) {
               const year = pet.birthdate.getUTCFullYear();
               const month = String(pet.birthdate.getUTCMonth() + 1).padStart(2, '0');
@@ -2066,7 +2091,7 @@ async function loadCustomersFromBackend() {
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: '',
           birthday: pet.birthdate ? (() => {
-            // 处理日期格式，确保不因时区转换而改变日期
+            // 后端已使用 DATE_FORMAT 返回 YYYY-MM-DD 格式的字符串
             if (typeof pet.birthdate === 'string') {
               // 如果是ISO格式（带T），提取日期部分
               if (pet.birthdate.includes('T')) {
@@ -2081,7 +2106,7 @@ async function loadCustomersFromBackend() {
                 return pet.birthdate;
               }
             }
-            // 如果是Date对象，转换为本地日期字符串（不包含时间）
+            // 如果是Date对象（备用处理），转换为UTC日期字符串
             if (pet.birthdate instanceof Date) {
               const year = pet.birthdate.getUTCFullYear();
               const month = String(pet.birthdate.getUTCMonth() + 1).padStart(2, '0');
@@ -8438,6 +8463,12 @@ async function openAddressManagementDialog(userId) {
   const loadAddresses = async () => {
     const listEl = content.querySelector('#address-list');
     try {
+      // 检查是否已登录
+      if (!backendState.token) {
+        listEl.innerHTML = '<p style="color: red;">请先登录管理员账号</p>';
+        return;
+      }
+      
       // 使用管理员API获取地址列表
       const addresses = await backendRequest(`/api/v1/addresses/customer/${userId}`, {
         method: 'GET'
@@ -8495,7 +8526,12 @@ async function openAddressManagementDialog(userId) {
       });
     } catch (error) {
       console.error('加载地址失败:', error);
-      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${error.message || '未知错误'}</p>`;
+      let errorMsg = error.message || '未知错误';
+      // 如果是权限错误，提供更友好的提示
+      if (errorMsg.includes('403') || errorMsg.includes('permission') || errorMsg.includes('权限')) {
+        errorMsg = '权限不足，请确保已使用管理员账号登录';
+      }
+      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${errorMsg}</p>`;
     }
   };
   
