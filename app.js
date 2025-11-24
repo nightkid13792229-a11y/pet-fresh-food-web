@@ -883,17 +883,29 @@ async function populateBreedSelect() {
     console.log('品种API响应:', response, '类型:', typeof response);
     
     // 后端返回格式可能是 { items: [...], total: X } 或直接是数组
+    // 注意：backendRequest 已经自动解包了 {success: true, data: {...}} 格式
     let breedsArray = [];
     if (Array.isArray(response)) {
       breedsArray = response;
     } else if (response && typeof response === 'object') {
-      breedsArray = response.items || [];
-      if (breedsArray.length === 0 && response.data && Array.isArray(response.data.items)) {
+      // 检查 response.items 是否存在且是数组
+      if (Array.isArray(response.items)) {
+        breedsArray = response.items;
+      } else if (response.data && Array.isArray(response.data.items)) {
         breedsArray = response.data.items;
+      } else if (Array.isArray(response.data)) {
+        breedsArray = response.data;
       }
     }
     
     console.log('解析后的品种数组:', breedsArray, '长度:', breedsArray.length);
+    if (breedsArray.length > 0) {
+      console.log('第一个品种对象示例:', breedsArray[0]);
+      // 检查对象结构
+      if (breedsArray[0] && typeof breedsArray[0] === 'object') {
+        console.log('品种对象属性:', Object.keys(breedsArray[0]));
+      }
+    }
     
     if (breedsArray.length === 0) {
       console.warn('品种数据为空，可能的原因：1. 数据库中没有品种数据；2. API返回格式不正确；3. API调用失败');
@@ -911,11 +923,21 @@ async function populateBreedSelect() {
     // 按分类组织品种（与小程序端一致）
     const breedsByCategory = {};
     breedsArray.forEach(breed => {
+      // 确保breed是对象且有必要的属性
+      if (!breed || typeof breed !== 'object') {
+        console.warn('无效的品种对象:', breed);
+        return;
+      }
       const category = breed.category || '其他';
+      const name = breed.name;
+      if (!name) {
+        console.warn('品种对象缺少name属性:', breed);
+        return;
+      }
       if (!breedsByCategory[category]) {
         breedsByCategory[category] = [];
       }
-      breedsByCategory[category].push(breed.name);
+      breedsByCategory[category].push(name);
     });
     
     // 按分类添加选项
@@ -8512,14 +8534,28 @@ async function openAddressManagementDialog(userId) {
       }
       
       // 使用管理员API获取地址列表
-      console.log(`加载用户 ${userId} 的地址列表...`);
+      console.log(`加载用户 ${userId} 的地址列表，API路径: /api/v1/addresses/customer/${userId}`);
+      console.log(`当前登录状态:`, backendState.token ? '已登录' : '未登录');
+      console.log(`当前用户角色:`, backendState.user?.role || '未知');
+      
       const response = await backendRequest(`/api/v1/addresses/customer/${userId}`, {
         method: 'GET'
       });
-      console.log(`地址API响应:`, response);
+      console.log(`地址API响应:`, response, '类型:', typeof response);
       
       // 处理返回格式：可能是数组或 {items: []}
-      const addresses = Array.isArray(response) ? response : (response.items || []);
+      let addresses = [];
+      if (Array.isArray(response)) {
+        addresses = response;
+      } else if (response && typeof response === 'object') {
+        if (Array.isArray(response.items)) {
+          addresses = response.items;
+        } else if (Array.isArray(response.data)) {
+          addresses = response.data;
+        } else if (response.data && Array.isArray(response.data.items)) {
+          addresses = response.data.items;
+        }
+      }
       
       if (!addresses || addresses.length === 0) {
         listEl.innerHTML = '<p style="color: #999;">该用户暂无收货地址</p>';
