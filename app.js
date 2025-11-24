@@ -1806,13 +1806,29 @@ async function openCustomerForm(id) {
     
     // 确保生日格式正确（YYYY-MM-DD）
     const birthday = c.birthday || '';
-    $('c-birthday').value = birthday.includes('T') ? birthday.split('T')[0] : birthday;
+    const birthdayEl = $('c-birthday');
+    if (birthdayEl) {
+      if (birthday) {
+        // 处理各种可能的日期格式
+        let formattedDate = birthday;
+        if (birthday.includes('T')) {
+          formattedDate = birthday.split('T')[0];
+        } else if (birthday.includes(' ')) {
+          formattedDate = birthday.split(' ')[0];
+        }
+        birthdayEl.value = formattedDate;
+      } else {
+        birthdayEl.value = '';
+      }
+    }
     $('c-weightKg').value = c.weightKg || '';
     $('c-sex').value = c.sex || 'unknown';
     $('c-neutered').value = c.neutered || 'unknown';
     $('c-lifeStage').value = c.lifeStage || 'adult';
     $('c-activity').value = c.activity || 'sedentary';
-    $('c-kcalFactor').value = (c.kcalFactor != null ? c.kcalFactor : activityKcalFactor($('c-activity').value));
+    // 运动-能量系数显示为整数
+    const kcalFactor = c.kcalFactor != null ? c.kcalFactor : activityKcalFactor($('c-activity').value);
+    $('c-kcalFactor').value = kcalFactor != null ? Math.round(Number(kcalFactor)) : '';
     $('c-bcs').value = c.bcs || '';
     $('c-mealsPerDay').value = c.mealsPerDay || '';
     $('c-allergies').value = c.allergies || '';
@@ -1930,7 +1946,7 @@ async function loadCustomersFromBackend() {
           breed: pet.breed || '',
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: defaultAddress,
-          birthday: pet.birthdate ? pet.birthdate.split('T')[0] : '', // 格式化为 YYYY-MM-DD
+          birthday: pet.birthdate ? (pet.birthdate.includes('T') ? pet.birthdate.split('T')[0] : pet.birthdate.split(' ')[0]) : '', // 格式化为 YYYY-MM-DD
         weightKg: pet.weightKg || 0,
         sex: pet.sex || 'unknown',
         neutered: pet.neutered ? 'yes' : 'no',
@@ -8237,6 +8253,60 @@ function init() {
   }
   
   loadApp();
+}
+
+// 地址管理对话框
+async function openAddressManagementDialog(userId) {
+  if (!userId) {
+    alert('用户ID无效');
+    return;
+  }
+  
+  // 创建简单的地址管理对话框
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+  
+  const content = document.createElement('div');
+  content.style.cssText = 'background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;';
+  
+  content.innerHTML = `
+    <h3 style="margin-top: 0;">地址管理</h3>
+    <div id="address-list" style="margin: 10px 0;">
+      <p>加载中...</p>
+    </div>
+    <div style="margin-top: 10px;">
+      <button id="address-add-btn" class="btn">新增地址</button>
+      <button id="address-close-btn" class="btn" style="margin-left: 10px;">关闭</button>
+    </div>
+  `;
+  
+  dialog.appendChild(content);
+  document.body.appendChild(dialog);
+  
+  // 加载地址列表
+  const loadAddresses = async () => {
+    const listEl = content.querySelector('#address-list');
+    try {
+      // 注意：当前地址API需要customer权限，管理员可能需要特殊处理
+      // 这里先显示提示信息
+      listEl.innerHTML = '<p style="color: #999;">地址管理功能需要用户登录后才能使用。当前为管理员视图，无法直接访问用户的地址。</p><p style="color: #999; font-size: 12px; margin-top: 10px;">提示：用户可以在小程序端的"我的"页面管理收货地址。</p>';
+    } catch (error) {
+      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${error.message}</p>`;
+    }
+  };
+  
+  await loadAddresses();
+  
+  // 关闭按钮
+  content.querySelector('#address-close-btn').addEventListener('click', () => {
+    document.body.removeChild(dialog);
+  });
+  
+  // 新增地址按钮
+  content.querySelector('#address-add-btn').addEventListener('click', () => {
+    alert('新增地址功能需要用户在小程序端操作');
+  });
+}
   loadBackendAuth();
   console.log('初始化后 - 顾客数据:', store.customers.length, '条');
   console.log('初始化后 - 原料数据:', store.ingredients.length, '条');
