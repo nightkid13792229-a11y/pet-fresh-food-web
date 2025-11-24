@@ -862,21 +862,58 @@ function computeAndFillEstKcal() {
 }
 
 // 填充品种下拉框
-function populateBreedSelect() {
+// 从后端API加载品种数据（与小程序端一致）
+async function populateBreedSelect() {
   const select = $('c-breed');
   if (!select) return;
-  select.innerHTML = '<option value="">请选择品种</option>';
-  CKU_BREEDS.forEach(group => {
-    const optgroup = document.createElement('optgroup');
-    optgroup.label = group.group;
-    group.breeds.forEach(breed => {
+  
+  // 先显示加载状态
+  select.innerHTML = '<option value="">加载中...</option>';
+  
+  try {
+    // 从后端API加载品种数据
+    const response = await backendRequest('/api/v1/breeds', {
+      method: 'GET'
+    });
+    
+    // 后端返回格式可能是 { items: [...], total: X } 或直接是数组
+    const breedsArray = Array.isArray(response) ? response : (response.items || []);
+    const breedNames = breedsArray.map(b => b.name);
+    
+    // 清空并添加选项
+    select.innerHTML = '<option value="">请选择品种</option>';
+    
+    // 添加"其它品种"选项
+    const otherOption = document.createElement('option');
+    otherOption.value = '其它品种';
+    otherOption.textContent = '其它品种';
+    select.appendChild(otherOption);
+    
+    // 添加所有品种选项
+    breedNames.forEach(breed => {
       const option = document.createElement('option');
       option.value = breed;
       option.textContent = breed;
-      optgroup.appendChild(option);
+      select.appendChild(option);
     });
-    select.appendChild(optgroup);
-  });
+    
+    console.log(`✓ 已加载 ${breedNames.length} 个品种选项`);
+  } catch (error) {
+    console.error('加载品种数据失败，使用本地数据:', error);
+    // 如果API失败，回退到本地数据
+    select.innerHTML = '<option value="">请选择品种</option>';
+    CKU_BREEDS.forEach(group => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = group.group;
+      group.breeds.forEach(breed => {
+        const option = document.createElement('option');
+        option.value = breed;
+        option.textContent = breed;
+        optgroup.appendChild(option);
+      });
+      select.appendChild(optgroup);
+    });
+  }
 }
 function zh(val, map) { return map[val] || val || '-'; }
 const sexMap = { male: '公', female: '母', unknown: '未知' };
@@ -1740,7 +1777,7 @@ function renderCustomersList() {
     };
   }
 }
-function openCustomerForm(id) {
+async function openCustomerForm(id) {
   const card = $('customer-form-card');
   const title = $('customer-form-title');
   if (!card) return;
@@ -1750,11 +1787,26 @@ function openCustomerForm(id) {
     if (!c) return;
     title.textContent = '编辑顾客';
     $('customer-id').value = c.id;
+    
+    // 显示主人昵称
+    if ($('c-userName')) {
+      $('c-userName').value = c.userName || '';
+    }
+    
     $('c-wechat').value = c.wechat || '';
-    $('c-address').value = c.address || '';
+    
+    // 加载默认地址
+    let defaultAddress = c.address || '';
+    // 注意：地址信息需要从地址管理功能中获取
+    // 当前后端API需要customer权限，管理员无法直接访问
+    $('c-address').value = defaultAddress || '（点击"管理地址"查看）';
+    
     $('c-petName').value = c.petName || '';
     $('c-breed').value = c.breed || '';
-    $('c-birthday').value = c.birthday || '';
+    
+    // 确保生日格式正确（YYYY-MM-DD）
+    const birthday = c.birthday || '';
+    $('c-birthday').value = birthday.includes('T') ? birthday.split('T')[0] : birthday;
     $('c-weightKg').value = c.weightKg || '';
     $('c-sex').value = c.sex || 'unknown';
     $('c-neutered').value = c.neutered || 'unknown';
@@ -1778,6 +1830,7 @@ function openCustomerForm(id) {
   } else {
     title.textContent = '新增顾客';
     $('customer-id').value = '';
+    if ($('c-userName')) $('c-userName').value = '';
     ['c-wechat','c-address','c-petName','c-breed','c-birthday','c-weightKg','c-bcs','c-mealsPerDay','c-allergies','c-avoid','c-fav','c-med','c-notes','c-monthAge','c-monthFactor','c-litterCount'].forEach(id => { const el = $(id); if (el) el.value = ''; });
     $('c-sex').value = 'unknown';
     $('c-neutered').value = 'unknown';
@@ -1858,13 +1911,26 @@ async function loadCustomersFromBackend() {
     
     if (data && data.items) {
       // 将后端数据格式转换为Web端格式
-      const customers = data.items.map(pet => ({
-        id: `pet_${pet.id}`, // 使用pet_前缀避免ID冲突
-        petName: pet.name || '',
-        breed: pet.breed || '',
-        wechat: pet.userContactInfo || pet.userEmail || '',
-        address: '', // 地址信息需要从addresses API获取
-        birthday: pet.birthdate || '',
+      const customers = await Promise.all(data.items.map(async (pet) => {
+        // 加载默认地址
+        let defaultAddress = '';
+        if (pet.userId) {
+          try {
+            // 尝试获取用户的默认地址（需要管理员权限或通过userId查询）
+            // 暂时先设为空，后续通过地址管理功能加载
+            defaultAddress = '';
+          } catch (error) {
+            console.warn('加载地址失败:', error);
+          }
+        }
+        
+        return {
+          id: `pet_${pet.id}`, // 使用pet_前缀避免ID冲突
+          petName: pet.name || '',
+          breed: pet.breed || '',
+          wechat: pet.userContactInfo || pet.userEmail || '',
+          address: defaultAddress,
+          birthday: pet.birthdate ? pet.birthdate.split('T')[0] : '', // 格式化为 YYYY-MM-DD
         weightKg: pet.weightKg || 0,
         sex: pet.sex || 'unknown',
         neutered: pet.neutered ? 'yes' : 'no',
@@ -1879,10 +1945,11 @@ async function loadCustomersFromBackend() {
         fav: '',
         med: pet.symptomNote || '',
         notes: pet.notes || '',
-        userId: pet.userId,
-        userName: pet.userName || '',
-        userEmail: pet.userEmail || '',
-        createdAt: pet.createdAt ? new Date(pet.createdAt).getTime() : Date.now()
+          userId: pet.userId,
+          userName: pet.userName || '',
+          userEmail: pet.userEmail || '',
+          createdAt: pet.createdAt ? new Date(pet.createdAt).getTime() : Date.now()
+        };
       }));
       
       // 更新store
@@ -1941,6 +2008,27 @@ async function loadCustomersFromBackend() {
 
 function setupCustomersModule() {
   populateBreedSelect();
+  
+  // 地址管理按钮事件
+  const addressManageBtn = $('c-address-manage');
+  if (addressManageBtn) {
+    addressManageBtn.addEventListener('click', async () => {
+      const customerId = $('customer-id').value;
+      if (!customerId) {
+        alert('请先选择或创建顾客');
+        return;
+      }
+      
+      const customer = store.customers.find(c => c.id === customerId);
+      if (!customer || !customer.userId) {
+        alert('无法获取用户ID，无法管理地址');
+        return;
+      }
+      
+      // 打开地址管理对话框
+      await openAddressManagementDialog(customer.userId);
+    });
+  }
   
   // 如果已登录，从后端加载数据
   if (backendState.token) {
