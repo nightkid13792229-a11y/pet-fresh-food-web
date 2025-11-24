@@ -920,6 +920,22 @@ async function populateBreedSelect() {
     otherOption.textContent = '其它品种';
     select.appendChild(otherOption);
     
+    // 监听品种选择变化，显示/隐藏手动输入框
+    const otherBreedInput = $('c-breed-other');
+    if (otherBreedInput) {
+      select.addEventListener('change', () => {
+        if (select.value === '其它品种') {
+          otherBreedInput.style.display = 'block';
+          otherBreedInput.required = true;
+          otherBreedInput.focus();
+        } else {
+          otherBreedInput.style.display = 'none';
+          otherBreedInput.required = false;
+          otherBreedInput.value = '';
+        }
+      });
+    }
+    
     // 按分类组织品种（与小程序端一致）
     const breedsByCategory = {};
     breedsArray.forEach(breed => {
@@ -1886,7 +1902,23 @@ async function openCustomerForm(id) {
     }
     
     $('c-petName').value = c.petName || '';
-    $('c-breed').value = c.breed || '';
+    // 处理品种选择：如果是"其它品种"，需要检查是否有手动输入的值
+    const breedValue = c.breed || '';
+    if (breedValue === '其它品种' || (!breedValue && c.breedOther)) {
+      $('c-breed').value = '其它品种';
+      const otherInput = $('c-breed-other');
+      if (otherInput) {
+        otherInput.style.display = 'block';
+        otherInput.value = c.breedOther || breedValue || '';
+      }
+    } else {
+      $('c-breed').value = breedValue;
+      const otherInput = $('c-breed-other');
+      if (otherInput) {
+        otherInput.style.display = 'none';
+        otherInput.value = '';
+      }
+    }
     
     // 确保生日格式正确（YYYY-MM-DD）
     const birthday = c.birthday || '';
@@ -1947,6 +1979,13 @@ async function openCustomerForm(id) {
     $('customer-id').value = '';
     if ($('c-userName')) $('c-userName').value = '';
     ['c-wechat','c-address','c-petName','c-breed','c-birthday','c-weightKg','c-bcs','c-mealsPerDay','c-allergies','c-avoid','c-fav','c-med','c-notes','c-monthAge','c-monthFactor','c-litterCount'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+    // 清空其它品种输入框
+    const otherBreedInput = $('c-breed-other');
+    if (otherBreedInput) {
+      otherBreedInput.style.display = 'none';
+      otherBreedInput.value = '';
+      otherBreedInput.required = false;
+    }
     $('c-sex').value = 'unknown';
     $('c-neutered').value = 'unknown';
     $('c-lifeStage').value = 'adult';
@@ -2325,7 +2364,20 @@ function setupCustomersModule() {
       const petName = $('c-petName').value.trim();
       if (!petName) { alert('请填写必填项：宠物昵称'); return; }
       
-      const breed = $('c-breed').value.trim();
+      // 获取品种值：如果是"其它品种"，使用输入框的值
+      const breedSelect = $('c-breed');
+      const breedOtherInput = $('c-breed-other');
+      let breed = breedSelect ? breedSelect.value.trim() : '';
+      
+      if (breed === '其它品种') {
+        breed = breedOtherInput ? breedOtherInput.value.trim() : '';
+        if (!breed) {
+          alert('请填写其它品种名称');
+          if (breedOtherInput) breedOtherInput.focus();
+          return;
+        }
+      }
+      
       if (!breed) { alert('请填写必填项：品种'); return; }
       
       const birthday = $('c-birthday').value;
@@ -8591,13 +8643,41 @@ async function openAddressManagementDialog(userId) {
                 ${addr.region || ''} ${addr.detail || ''}
               </div>
             </div>
-            <div style="display: flex; gap: 5px;">
+            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+              ${!addr.isDefault ? `<button class="btn small" data-set-default-addr="${addr.id}" style="font-size: 12px; padding: 4px 8px; background: #4CAF50; color: white;">设为默认</button>` : ''}
               <button class="btn small" data-edit-addr="${addr.id}" style="font-size: 12px; padding: 4px 8px;">编辑</button>
               <button class="btn small" data-delete-addr="${addr.id}" style="font-size: 12px; padding: 4px 8px; background: #f44336;">删除</button>
             </div>
           </div>
         </div>
       `).join('');
+      
+      // 绑定设为默认地址按钮事件
+      listEl.querySelectorAll('[data-set-default-addr]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const addrId = Number(btn.dataset.setDefaultAddr);
+          try {
+            // 先获取当前地址信息
+            const address = addresses.find(a => a.id === addrId);
+            if (!address) {
+              alert('地址不存在');
+              return;
+            }
+            
+            // 更新为默认地址
+            await backendRequest(`/api/v1/addresses/${addrId}`, {
+              method: 'PUT',
+              body: {
+                ...address,
+                isDefault: true
+              }
+            });
+            await loadAddresses();
+          } catch (error) {
+            alert('设置默认地址失败: ' + (error.message || '未知错误'));
+          }
+        });
+      });
       
       // 绑定编辑和删除按钮事件
       listEl.querySelectorAll('[data-edit-addr]').forEach(btn => {
@@ -8674,16 +8754,57 @@ async function openAddressManagementDialog(userId) {
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: block; margin-bottom: 5px;">地区</label>
-          <input type="text" id="addr-region" value="${address?.region || ''}" placeholder="省/市/区" style="width: 100%; padding: 8px; box-sizing: border-box;" />
+          <select id="addr-region" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            <option value="">请选择地区</option>
+            <option value="北京市">北京市</option>
+            <option value="上海市">上海市</option>
+            <option value="天津市">天津市</option>
+            <option value="重庆市">重庆市</option>
+            <option value="河北省">河北省</option>
+            <option value="山西省">山西省</option>
+            <option value="内蒙古自治区">内蒙古自治区</option>
+            <option value="辽宁省">辽宁省</option>
+            <option value="吉林省">吉林省</option>
+            <option value="黑龙江省">黑龙江省</option>
+            <option value="江苏省">江苏省</option>
+            <option value="浙江省">浙江省</option>
+            <option value="安徽省">安徽省</option>
+            <option value="福建省">福建省</option>
+            <option value="江西省">江西省</option>
+            <option value="山东省">山东省</option>
+            <option value="河南省">河南省</option>
+            <option value="湖北省">湖北省</option>
+            <option value="湖南省">湖南省</option>
+            <option value="广东省">广东省</option>
+            <option value="广西壮族自治区">广西壮族自治区</option>
+            <option value="海南省">海南省</option>
+            <option value="四川省">四川省</option>
+            <option value="贵州省">贵州省</option>
+            <option value="云南省">云南省</option>
+            <option value="西藏自治区">西藏自治区</option>
+            <option value="陕西省">陕西省</option>
+            <option value="甘肃省">甘肃省</option>
+            <option value="青海省">青海省</option>
+            <option value="宁夏回族自治区">宁夏回族自治区</option>
+            <option value="新疆维吾尔自治区">新疆维吾尔自治区</option>
+            <option value="香港特别行政区">香港特别行政区</option>
+            <option value="澳门特别行政区">澳门特别行政区</option>
+            <option value="台湾省">台湾省</option>
+          </select>
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: block; margin-bottom: 5px;">详细地址</label>
           <textarea id="addr-detail" rows="3" required style="width: 100%; padding: 8px; box-sizing: border-box;">${address?.detail || ''}</textarea>
         </div>
         <div style="margin-bottom: 15px;">
-          <label style="display: flex; align-items: center; cursor: pointer;">
-            <input type="checkbox" id="addr-is-default" ${address?.isDefault ? 'checked' : ''} style="margin-right: 5px;" />
+          <label style="display: flex; align-items: center; justify-content: space-between;">
             <span>设为默认地址</span>
+            <label style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0; cursor: pointer;">
+              <input type="checkbox" id="addr-is-default" ${address?.isDefault ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;" />
+              <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 26px; transition: 0.3s;">
+                <span style="position: absolute; content: ''; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+              </span>
+            </label>
           </label>
         </div>
         <div style="display: flex; gap: 10px;">
@@ -8695,6 +8816,67 @@ async function openAddressManagementDialog(userId) {
     
     editDialog.appendChild(editContent);
     document.body.appendChild(editDialog);
+    
+    // 设置地区下拉框的初始值
+    const regionSelect = editContent.querySelector('#addr-region');
+    if (regionSelect && address?.region) {
+      const regionValue = address.region;
+      // 尝试匹配现有值
+      for (let option of regionSelect.options) {
+        if (option.value === regionValue || regionValue.includes(option.value) || option.value.includes(regionValue)) {
+          regionSelect.value = option.value;
+          break;
+        }
+      }
+      // 如果没找到匹配项，添加一个自定义选项
+      if (regionSelect.value === '' && regionValue) {
+        const customOption = document.createElement('option');
+        customOption.value = regionValue;
+        customOption.textContent = regionValue + ' (自定义)';
+        customOption.selected = true;
+        regionSelect.appendChild(customOption);
+      }
+    }
+    
+    // 添加开关按钮的样式和交互
+    const toggleCheckbox = editContent.querySelector('#addr-is-default');
+    const toggleLabel = toggleCheckbox?.parentElement;
+    const toggleSpan = toggleCheckbox?.nextElementSibling;
+    if (toggleCheckbox && toggleSpan) {
+      const toggleSlider = toggleSpan.querySelector('span');
+      
+      // 更新开关状态
+      const updateToggle = () => {
+        if (toggleCheckbox.checked) {
+          toggleSpan.style.backgroundColor = '#4CAF50';
+          if (toggleSlider) {
+            toggleSlider.style.transform = 'translateX(24px)';
+          }
+        } else {
+          toggleSpan.style.backgroundColor = '#ccc';
+          if (toggleSlider) {
+            toggleSlider.style.transform = 'translateX(0)';
+          }
+        }
+      };
+      
+      // 初始化状态
+      updateToggle();
+      
+      // 监听变化
+      toggleCheckbox.addEventListener('change', updateToggle);
+      
+      // 点击整个开关区域都可以切换
+      if (toggleLabel) {
+        toggleLabel.addEventListener('click', (e) => {
+          if (e.target !== toggleCheckbox) {
+            e.preventDefault();
+            toggleCheckbox.checked = !toggleCheckbox.checked;
+            updateToggle();
+          }
+        });
+      }
+    }
     
     editContent.querySelector('#address-form').addEventListener('submit', async (e) => {
       e.preventDefault();

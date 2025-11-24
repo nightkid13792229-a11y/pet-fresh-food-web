@@ -87,9 +87,12 @@
           <div class="grid">
             <label>宠物昵称<input id="c-petName" type="text" required /></label>
             <label>品种
-              <select id="c-breed">
-                <option value="">请选择品种</option>
-              </select>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <select id="c-breed" style="flex: 1;">
+                  <option value="">请选择品种</option>
+                </select>
+                <input type="text" id="c-breed-other" placeholder="其它品种名称" style="flex: 1; display: none; padding: 8px;" />
+              </div>
             </label>
             <label>生日<input id="c-birthday" type="date" /></label>
 
