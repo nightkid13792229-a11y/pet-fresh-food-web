@@ -1151,6 +1151,24 @@ async function populateBreedSelect() {
   // 先显示加载状态
   select.innerHTML = '<option value="">加载中...</option>';
   
+  // 如果没有登录，直接使用本地数据，不调用API
+  if (!backendState.token) {
+    console.log('未登录，使用本地品种数据');
+    select.innerHTML = '<option value="">请选择品种</option>';
+    CKU_BREEDS.forEach(group => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = group.group;
+      group.breeds.forEach(breed => {
+        const option = document.createElement('option');
+        option.value = breed;
+        option.textContent = breed;
+        optgroup.appendChild(option);
+      });
+      select.appendChild(optgroup);
+    });
+    return;
+  }
+  
   try {
     // 从后端API加载品种数据
     const response = await backendRequest('/api/v1/breeds', {
@@ -1248,8 +1266,13 @@ async function populateBreedSelect() {
     
     console.log(`✓ 已加载 ${breedsArray.length} 个品种选项（${Object.keys(breedsByCategory).length} 个分类）`);
   } catch (error) {
-    console.error('加载品种数据失败，使用本地数据:', error);
-    // 如果API失败，回退到本地数据
+    // 如果API失败，回退到本地数据（不显示错误，因为这是预期的回退行为）
+    const errorMsg = error.message || '未知错误';
+    if (errorMsg.includes('404')) {
+      console.log('品种API不存在，使用本地数据');
+    } else {
+      console.warn('加载品种数据失败，使用本地数据:', errorMsg);
+    }
     select.innerHTML = '<option value="">请选择品种</option>';
     CKU_BREEDS.forEach(group => {
       const optgroup = document.createElement('optgroup');
