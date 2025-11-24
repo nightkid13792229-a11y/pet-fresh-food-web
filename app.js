@@ -2025,10 +2025,10 @@ async function loadCustomersFromBackend() {
 function setupCustomersModule() {
   populateBreedSelect();
   
-  // 地址管理按钮事件
-  const addressManageBtn = $('c-address-manage');
-  if (addressManageBtn) {
-    addressManageBtn.addEventListener('click', async () => {
+  // 地址管理按钮事件（使用事件委托，因为按钮是动态显示的）
+  document.addEventListener('click', async (e) => {
+    if (e.target && e.target.id === 'c-address-manage') {
+      e.preventDefault();
       const customerId = $('customer-id').value;
       if (!customerId) {
         alert('请先选择或创建顾客');
