@@ -34,6 +34,127 @@ const QUOTE_SHIPPING_OPTIONS = [
 let quoteOverrides = null;
 let currentQuoteRenderState = null;
 
+// 省市区数据缓存
+let chinaRegionsData = null;
+let regionsDataLoading = false;
+
+// 从GitHub加载省市区数据
+// 使用多个数据源作为备选，确保可用性
+async function loadChinaRegions() {
+  if (chinaRegionsData) {
+    return chinaRegionsData;
+  }
+  
+  if (regionsDataLoading) {
+    // 如果正在加载，等待加载完成
+    while (regionsDataLoading) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return chinaRegionsData;
+  }
+  
+  regionsDataLoading = true;
+  
+  try {
+    // 尝试从GitHub加载数据（使用jsdelivr CDN，更稳定）
+    // 数据源：mumuy/data_location - 中国省市区数据
+    const dataUrl = 'https://cdn.jsdelivr.net/gh/mumuy/data_location@latest/data.json';
+    
+    const response = await fetch(dataUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // 转换数据格式：从 {code: {name, child: {...}}} 转换为 {省: {市: [区]}}
+    const regions = {};
+    
+    // 遍历省份（level=1）
+    Object.keys(data).forEach(provinceCode => {
+      const province = data[provinceCode];
+      if (province.level === 1) {
+        const provinceName = province.name;
+        regions[provinceName] = {};
+        
+        // 遍历市（level=2）
+        if (province.child) {
+          Object.keys(province.child).forEach(cityCode => {
+            const city = province.child[cityCode];
+            if (city.level === 2) {
+              const cityName = city.name;
+              regions[provinceName][cityName] = [];
+              
+              // 遍历区县（level=3）
+              if (city.child) {
+                Object.keys(city.child).forEach(districtCode => {
+                  const district = city.child[districtCode];
+                  if (district.level === 3) {
+                    regions[provinceName][cityName].push(district.name);
+                  }
+                });
+              }
+              
+              // 如果没有区县，至少保留一个空数组
+              if (regions[provinceName][cityName].length === 0) {
+                regions[provinceName][cityName] = ['其他区县'];
+              }
+            }
+          });
+        }
+      }
+    });
+    
+    chinaRegionsData = regions;
+    console.log('✓ 省市区数据加载成功，共', Object.keys(regions).length, '个省份');
+    return regions;
+  } catch (error) {
+    console.warn('从GitHub加载省市区数据失败，使用备用数据:', error);
+    
+    // 备用数据：使用轻量级的基础数据
+    chinaRegionsData = {
+      '北京市': { '北京市': ['东城区', '西城区', '朝阳区', '丰台区', '石景山区', '海淀区', '门头沟区', '房山区', '通州区', '顺义区', '昌平区', '大兴区', '怀柔区', '平谷区', '密云区', '延庆区'] },
+      '上海市': { '上海市': ['黄浦区', '徐汇区', '长宁区', '静安区', '普陀区', '虹口区', '杨浦区', '闵行区', '宝山区', '嘉定区', '浦东新区', '金山区', '松江区', '青浦区', '奉贤区', '崇明区'] },
+      '天津市': { '天津市': ['和平区', '河东区', '河西区', '南开区', '河北区', '红桥区', '东丽区', '西青区', '津南区', '北辰区', '武清区', '宝坻区', '滨海新区', '宁河区', '静海区', '蓟州区'] },
+      '重庆市': { '重庆市': ['万州区', '涪陵区', '渝中区', '大渡口区', '江北区', '沙坪坝区', '九龙坡区', '南岸区', '北碚区', '綦江区', '大足区', '渝北区', '巴南区', '黔江区', '长寿区', '江津区', '合川区', '永川区', '南川区', '璧山区', '铜梁区', '潼南区', '荣昌区', '开州区', '梁平区', '武隆区', '城口县', '丰都县', '垫江县', '忠县', '云阳县', '奉节县', '巫山县', '巫溪县', '石柱土家族自治县', '秀山土家族苗族自治县', '酉阳土家族苗族自治县', '彭水苗族土家族自治县'] },
+      '四川省': { '成都市': ['锦江区', '青羊区', '金牛区', '武侯区', '成华区', '龙泉驿区', '青白江区', '新都区', '温江区', '双流区', '郫都区', '新津区', '金堂县', '大邑县', '蒲江县', '都江堰市', '彭州市', '邛崃市', '崇州市', '简阳市'], '其他市': ['其他区县'] },
+      '广东省': { '广州市': ['荔湾区', '越秀区', '海珠区', '天河区', '白云区', '黄埔区', '番禺区', '花都区', '南沙区', '从化区', '增城区'], '深圳市': ['罗湖区', '福田区', '南山区', '宝安区', '龙岗区', '盐田区', '龙华区', '坪山区', '光明区'], '其他市': ['其他区县'] },
+      '江苏省': { '南京市': ['玄武区', '秦淮区', '建邺区', '鼓楼区', '浦口区', '栖霞区', '雨花台区', '江宁区', '六合区', '溧水区', '高淳区'], '苏州市': ['虎丘区', '吴中区', '相城区', '姑苏区', '吴江区', '常熟市', '张家港市', '昆山市', '太仓市'], '其他市': ['其他区县'] },
+      '浙江省': { '杭州市': ['上城区', '下城区', '江干区', '拱墅区', '西湖区', '滨江区', '萧山区', '余杭区', '富阳区', '临安区', '桐庐县', '淳安县', '建德市'], '宁波市': ['海曙区', '江北区', '北仑区', '镇海区', '鄞州区', '奉化区', '象山县', '宁海县', '余姚市', '慈溪市'], '其他市': ['其他区县'] },
+      '山东省': { '济南市': ['历下区', '市中区', '槐荫区', '天桥区', '历城区', '长清区', '章丘区', '济阳区', '莱芜区', '钢城区', '平阴县', '商河县'], '青岛市': ['市南区', '市北区', '黄岛区', '崂山区', '李沧区', '城阳区', '即墨区', '胶州市', '平度市', '莱西市'], '其他市': ['其他区县'] },
+      '河南省': { '郑州市': ['中原区', '二七区', '管城回族区', '金水区', '上街区', '惠济区', '中牟县', '巩义市', '荥阳市', '新密市', '新郑市', '登封市'], '其他市': ['其他区县'] },
+      '湖北省': { '武汉市': ['江岸区', '江汉区', '硚口区', '汉阳区', '武昌区', '青山区', '洪山区', '东西湖区', '汉南区', '蔡甸区', '江夏区', '黄陂区', '新洲区'], '其他市': ['其他区县'] },
+      '湖南省': { '长沙市': ['芙蓉区', '天心区', '岳麓区', '开福区', '雨花区', '望城区', '长沙县', '宁乡市', '浏阳市'], '其他市': ['其他区县'] },
+      '河北省': { '石家庄市': ['长安区', '桥西区', '新华区', '井陉矿区', '裕华区', '藁城区', '鹿泉区', '栾城区'], '其他市': ['其他区县'] },
+      '山西省': { '太原市': ['小店区', '迎泽区', '杏花岭区', '尖草坪区', '万柏林区', '晋源区'], '其他市': ['其他区县'] },
+      '辽宁省': { '沈阳市': ['和平区', '沈河区', '大东区', '皇姑区', '铁西区', '苏家屯区', '浑南区', '沈北新区', '于洪区', '辽中区'], '大连市': ['中山区', '西岗区', '沙河口区', '甘井子区', '旅顺口区', '金州区', '普兰店区'], '其他市': ['其他区县'] },
+      '吉林省': { '长春市': ['南关区', '宽城区', '朝阳区', '二道区', '绿园区', '双阳区', '九台区'], '其他市': ['其他区县'] },
+      '黑龙江省': { '哈尔滨市': ['道里区', '南岗区', '道外区', '平房区', '松北区', '香坊区', '呼兰区', '阿城区', '双城区'], '其他市': ['其他区县'] },
+      '安徽省': { '合肥市': ['瑶海区', '庐阳区', '蜀山区', '包河区', '长丰县', '肥东县', '肥西县', '庐江县', '巢湖市'], '其他市': ['其他区县'] },
+      '福建省': { '福州市': ['鼓楼区', '台江区', '仓山区', '马尾区', '晋安区', '长乐区'], '厦门市': ['思明区', '海沧区', '湖里区', '集美区', '同安区', '翔安区'], '其他市': ['其他区县'] },
+      '江西省': { '南昌市': ['东湖区', '西湖区', '青云谱区', '青山湖区', '新建区', '红谷滩区'], '其他市': ['其他区县'] },
+      '广西壮族自治区': { '南宁市': ['兴宁区', '青秀区', '江南区', '西乡塘区', '良庆区', '邕宁区', '武鸣区'], '其他市': ['其他区县'] },
+      '海南省': { '海口市': ['秀英区', '龙华区', '琼山区', '美兰区'], '三亚市': ['海棠区', '吉阳区', '天涯区', '崖州区'], '其他市': ['其他区县'] },
+      '贵州省': { '贵阳市': ['南明区', '云岩区', '花溪区', '乌当区', '白云区', '观山湖区'], '其他市': ['其他区县'] },
+      '云南省': { '昆明市': ['五华区', '盘龙区', '官渡区', '西山区', '东川区', '呈贡区', '晋宁区'], '其他市': ['其他区县'] },
+      '西藏自治区': { '拉萨市': ['城关区', '堆龙德庆区', '达孜区'], '其他市': ['其他区县'] },
+      '陕西省': { '西安市': ['新城区', '碑林区', '莲湖区', '灞桥区', '未央区', '雁塔区', '阎良区', '临潼区', '长安区', '高陵区', '鄠邑区'], '其他市': ['其他区县'] },
+      '甘肃省': { '兰州市': ['城关区', '七里河区', '西固区', '安宁区', '红古区'], '其他市': ['其他区县'] },
+      '青海省': { '西宁市': ['城东区', '城中区', '城西区', '城北区', '湟中区'], '其他市': ['其他区县'] },
+      '宁夏回族自治区': { '银川市': ['兴庆区', '西夏区', '金凤区'], '其他市': ['其他区县'] },
+      '新疆维吾尔自治区': { '乌鲁木齐市': ['天山区', '沙依巴克区', '新市区', '水磨沟区', '头屯河区', '达坂城区', '米东区'], '其他市': ['其他区县'] },
+      '香港特别行政区': { '香港特别行政区': ['中西区', '湾仔区', '东区', '南区', '深水埗区', '油尖旺区', '九龙城区', '黄大仙区', '观塘区', '荃湾区', '屯门区', '元朗区', '北区', '大埔区', '沙田区', '西贡区', '葵青区', '离岛区'] },
+      '澳门特别行政区': { '澳门特别行政区': ['花地玛堂区', '花王堂区', '望德堂区', '大堂区', '风顺堂区', '嘉模堂区', '路凼填海区', '圣方济各堂区'] },
+      '台湾省': { '台北市': ['中正区', '大同区', '中山区', '松山区', '大安区', '万华区', '信义区', '士林区', '北投区', '内湖区', '南港区', '文山区'], '其他市': ['其他区县'] }
+    };
+    
+    console.log('使用备用省市区数据，共', Object.keys(chinaRegionsData).length, '个省份');
+    return chinaRegionsData;
+  } finally {
+    regionsDataLoading = false;
+  }
+}
+
 // 后端 API 状态管理
 const API_BASE_STORAGE_KEY = 'pff-api-base-url';
 const API_TOKEN_STORAGE_KEY = 'pff-api-token';
@@ -8754,43 +8875,18 @@ async function openAddressManagementDialog(userId) {
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: block; margin-bottom: 5px;">地区</label>
-          <select id="addr-region" style="width: 100%; padding: 8px; box-sizing: border-box;">
-            <option value="">请选择地区</option>
-            <option value="北京市">北京市</option>
-            <option value="上海市">上海市</option>
-            <option value="天津市">天津市</option>
-            <option value="重庆市">重庆市</option>
-            <option value="河北省">河北省</option>
-            <option value="山西省">山西省</option>
-            <option value="内蒙古自治区">内蒙古自治区</option>
-            <option value="辽宁省">辽宁省</option>
-            <option value="吉林省">吉林省</option>
-            <option value="黑龙江省">黑龙江省</option>
-            <option value="江苏省">江苏省</option>
-            <option value="浙江省">浙江省</option>
-            <option value="安徽省">安徽省</option>
-            <option value="福建省">福建省</option>
-            <option value="江西省">江西省</option>
-            <option value="山东省">山东省</option>
-            <option value="河南省">河南省</option>
-            <option value="湖北省">湖北省</option>
-            <option value="湖南省">湖南省</option>
-            <option value="广东省">广东省</option>
-            <option value="广西壮族自治区">广西壮族自治区</option>
-            <option value="海南省">海南省</option>
-            <option value="四川省">四川省</option>
-            <option value="贵州省">贵州省</option>
-            <option value="云南省">云南省</option>
-            <option value="西藏自治区">西藏自治区</option>
-            <option value="陕西省">陕西省</option>
-            <option value="甘肃省">甘肃省</option>
-            <option value="青海省">青海省</option>
-            <option value="宁夏回族自治区">宁夏回族自治区</option>
-            <option value="新疆维吾尔自治区">新疆维吾尔自治区</option>
-            <option value="香港特别行政区">香港特别行政区</option>
-            <option value="澳门特别行政区">澳门特别行政区</option>
-            <option value="台湾省">台湾省</option>
-          </select>
+          <div style="display: flex; gap: 8px;">
+            <select id="addr-province" style="flex: 1; padding: 8px; box-sizing: border-box;">
+              <option value="">请选择省/市/自治区</option>
+            </select>
+            <select id="addr-city" style="flex: 1; padding: 8px; box-sizing: border-box;" disabled>
+              <option value="">请选择市</option>
+            </select>
+            <select id="addr-district" style="flex: 1; padding: 8px; box-sizing: border-box;" disabled>
+              <option value="">请选择区/县</option>
+            </select>
+          </div>
+          <input type="hidden" id="addr-region" />
         </div>
         <div style="margin-bottom: 10px;">
           <label style="display: block; margin-bottom: 5px;">详细地址</label>
@@ -8817,26 +8913,152 @@ async function openAddressManagementDialog(userId) {
     editDialog.appendChild(editContent);
     document.body.appendChild(editDialog);
     
-    // 设置地区下拉框的初始值
-    const regionSelect = editContent.querySelector('#addr-region');
-    if (regionSelect && address?.region) {
-      const regionValue = address.region;
-      // 尝试匹配现有值
-      for (let option of regionSelect.options) {
-        if (option.value === regionValue || regionValue.includes(option.value) || option.value.includes(regionValue)) {
-          regionSelect.value = option.value;
-          break;
+    // 初始化省市区三级联动
+    const provinceSelect = editContent.querySelector('#addr-province');
+    const citySelect = editContent.querySelector('#addr-city');
+    const districtSelect = editContent.querySelector('#addr-district');
+    const regionHidden = editContent.querySelector('#addr-region');
+    
+    // 加载省市区数据并初始化
+    (async () => {
+      try {
+        const regionsData = await loadChinaRegions();
+        
+        // 初始化省份下拉框
+        provinceSelect.innerHTML = '<option value="">请选择省/市/自治区</option>';
+        Object.keys(regionsData).sort().forEach(province => {
+          const option = document.createElement('option');
+          option.value = province;
+          option.textContent = province;
+          provinceSelect.appendChild(option);
+        });
+        
+        // 省份变化时更新市下拉框
+        provinceSelect.addEventListener('change', () => {
+          const province = provinceSelect.value;
+          citySelect.innerHTML = '<option value="">请选择市</option>';
+          districtSelect.innerHTML = '<option value="">请选择区/县</option>';
+          districtSelect.disabled = true;
+          
+          if (province && regionsData[province]) {
+            citySelect.disabled = false;
+            Object.keys(regionsData[province]).sort().forEach(city => {
+              const option = document.createElement('option');
+              option.value = city;
+              option.textContent = city;
+              citySelect.appendChild(option);
+            });
+          } else {
+            citySelect.disabled = true;
+          }
+          updateRegionValue();
+        });
+        
+        // 市变化时更新区下拉框
+        citySelect.addEventListener('change', () => {
+          const province = provinceSelect.value;
+          const city = citySelect.value;
+          districtSelect.innerHTML = '<option value="">请选择区/县</option>';
+          
+          if (province && city && regionsData[province] && regionsData[province][city]) {
+            districtSelect.disabled = false;
+            regionsData[province][city].sort().forEach(district => {
+              const option = document.createElement('option');
+              option.value = district;
+              option.textContent = district;
+              districtSelect.appendChild(option);
+            });
+          } else {
+            districtSelect.disabled = true;
+          }
+          updateRegionValue();
+        });
+        
+        // 区变化时更新隐藏的region字段
+        districtSelect.addEventListener('change', () => {
+          updateRegionValue();
+        });
+        
+        // 更新region值（格式：省 市 区，空格分隔，与小程序端兼容）
+        function updateRegionValue() {
+          const province = provinceSelect.value;
+          const city = citySelect.value;
+          const district = districtSelect.value;
+          const parts = [];
+          if (province) parts.push(province);
+          if (city) parts.push(city);
+          if (district) parts.push(district);
+          regionHidden.value = parts.join(' ');
+        }
+        
+        // 如果编辑现有地址，解析region并回填
+        if (address?.region) {
+          const regionParts = address.region.split(' ').filter(p => p.trim());
+          if (regionParts.length >= 1) {
+            // 尝试匹配省份
+            const provinceName = regionParts[0];
+            if (regionsData[provinceName]) {
+              provinceSelect.value = provinceName;
+              provinceSelect.dispatchEvent(new Event('change'));
+              
+              if (regionParts.length >= 2) {
+                setTimeout(() => {
+                  const cityName = regionParts[1];
+                  if (regionsData[provinceName][cityName]) {
+                    citySelect.value = cityName;
+                    citySelect.dispatchEvent(new Event('change'));
+                    
+                    if (regionParts.length >= 3) {
+                      setTimeout(() => {
+                        const districtName = regionParts[2];
+                        const districts = regionsData[provinceName][cityName];
+                        if (districts.includes(districtName)) {
+                          districtSelect.value = districtName;
+                        } else {
+                          // 如果区县不匹配，添加自定义选项
+                          const customOption = document.createElement('option');
+                          customOption.value = districtName;
+                          customOption.textContent = districtName + ' (自定义)';
+                          customOption.selected = true;
+                          districtSelect.appendChild(customOption);
+                        }
+                        updateRegionValue();
+                      }, 100);
+                    } else {
+                      updateRegionValue();
+                    }
+                  } else {
+                    // 如果市不匹配，添加自定义选项
+                    const customOption = document.createElement('option');
+                    customOption.value = cityName;
+                    customOption.textContent = cityName + ' (自定义)';
+                    customOption.selected = true;
+                    citySelect.appendChild(customOption);
+                    citySelect.dispatchEvent(new Event('change'));
+                    updateRegionValue();
+                  }
+                }, 100);
+              } else {
+                updateRegionValue();
+              }
+            } else {
+              // 如果省份不匹配，显示原始值
+              console.warn('无法匹配省份:', provinceName);
+              regionHidden.value = address.region;
+            }
+          } else {
+            // 如果region格式不正确，尝试直接设置
+            regionHidden.value = address.region;
+          }
+        }
+      } catch (error) {
+        console.error('初始化省市区选择器失败:', error);
+        // 如果加载失败，至少设置隐藏字段的值
+        if (address?.region) {
+          regionHidden.value = address.region;
         }
       }
-      // 如果没找到匹配项，添加一个自定义选项
-      if (regionSelect.value === '' && regionValue) {
-        const customOption = document.createElement('option');
-        customOption.value = regionValue;
-        customOption.textContent = regionValue + ' (自定义)';
-        customOption.selected = true;
-        regionSelect.appendChild(customOption);
-      }
-    }
+    })();
     
     // 添加开关按钮的样式和交互
     const toggleCheckbox = editContent.querySelector('#addr-is-default');
