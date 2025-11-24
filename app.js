@@ -8919,77 +8919,129 @@ async function openAddressManagementDialog(userId) {
     const districtSelect = editContent.querySelector('#addr-district');
     const regionHidden = editContent.querySelector('#addr-region');
     
+    // 检查元素是否存在
+    if (!provinceSelect || !citySelect || !districtSelect || !regionHidden) {
+      console.error('省市区选择器元素未找到:', { 
+        provinceSelect: !!provinceSelect, 
+        citySelect: !!citySelect, 
+        districtSelect: !!districtSelect, 
+        regionHidden: !!regionHidden 
+      });
+      return;
+    }
+    
+    // 更新region值（格式：省 市 区，空格分隔，与小程序端兼容）
+    const updateRegionValue = () => {
+      const province = provinceSelect.value;
+      const city = citySelect.value;
+      const district = districtSelect.value;
+      const parts = [];
+      if (province) parts.push(province);
+      if (city) parts.push(city);
+      if (district) parts.push(district);
+      regionHidden.value = parts.join(' ');
+      console.log('更新region值:', regionHidden.value, { province, city, district });
+    };
+    
     // 加载省市区数据并初始化
     (async () => {
       try {
+        console.log('开始加载省市区数据...');
         const regionsData = await loadChinaRegions();
+        console.log('省市区数据加载完成，数据:', regionsData);
+        
+        if (!regionsData || Object.keys(regionsData).length === 0) {
+          console.error('省市区数据为空');
+          return;
+        }
         
         // 初始化省份下拉框
         provinceSelect.innerHTML = '<option value="">请选择省/市/自治区</option>';
-        Object.keys(regionsData).sort().forEach(province => {
+        const provinces = Object.keys(regionsData).sort();
+        provinces.forEach(province => {
           const option = document.createElement('option');
           option.value = province;
           option.textContent = province;
           provinceSelect.appendChild(option);
         });
+        console.log('省份下拉框初始化完成，共', provinces.length, '个省份');
+        console.log('示例省份数据:', provinces.slice(0, 3).map(p => ({ 
+          province: p, 
+          cities: Object.keys(regionsData[p] || {}) 
+        })));
         
         // 省份变化时更新市下拉框
-        provinceSelect.addEventListener('change', () => {
+        const handleProvinceChange = () => {
           const province = provinceSelect.value;
+          console.log('省份选择变化:', province);
           citySelect.innerHTML = '<option value="">请选择市</option>';
           districtSelect.innerHTML = '<option value="">请选择区/县</option>';
           districtSelect.disabled = true;
           
           if (province && regionsData[province]) {
             citySelect.disabled = false;
-            Object.keys(regionsData[province]).sort().forEach(city => {
-              const option = document.createElement('option');
-              option.value = city;
-              option.textContent = city;
-              citySelect.appendChild(option);
-            });
+            const cities = Object.keys(regionsData[province]).sort();
+            console.log('加载城市列表:', cities, '共', cities.length, '个城市');
+            if (cities.length > 0) {
+              cities.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                citySelect.appendChild(option);
+              });
+              console.log('城市下拉框已填充，当前状态:', { 
+                disabled: citySelect.disabled, 
+                optionsCount: citySelect.options.length 
+              });
+            } else {
+              console.warn('该省份没有城市数据');
+            }
           } else {
             citySelect.disabled = true;
+            console.warn('未找到省份对应的城市数据:', province, '可用省份:', Object.keys(regionsData));
           }
           updateRegionValue();
-        });
+        };
+        provinceSelect.addEventListener('change', handleProvinceChange);
         
         // 市变化时更新区下拉框
-        citySelect.addEventListener('change', () => {
+        const handleCityChange = () => {
           const province = provinceSelect.value;
           const city = citySelect.value;
+          console.log('城市选择变化:', province, city);
           districtSelect.innerHTML = '<option value="">请选择区/县</option>';
           
           if (province && city && regionsData[province] && regionsData[province][city]) {
             districtSelect.disabled = false;
-            regionsData[province][city].sort().forEach(district => {
-              const option = document.createElement('option');
-              option.value = district;
-              option.textContent = district;
-              districtSelect.appendChild(option);
-            });
+            const districts = regionsData[province][city].sort();
+            console.log('加载区县列表:', districts, '共', districts.length, '个区县');
+            if (districts.length > 0) {
+              districts.forEach(district => {
+                const option = document.createElement('option');
+                option.value = district;
+                option.textContent = district;
+                districtSelect.appendChild(option);
+              });
+              console.log('区县下拉框已填充，当前状态:', { 
+                disabled: districtSelect.disabled, 
+                optionsCount: districtSelect.options.length 
+              });
+            } else {
+              console.warn('该城市没有区县数据');
+            }
           } else {
             districtSelect.disabled = true;
+            console.warn('未找到城市对应的区县数据:', { province, city, hasProvince: !!regionsData[province], hasCity: !!(regionsData[province] && regionsData[province][city]) });
           }
           updateRegionValue();
-        });
+        };
+        citySelect.addEventListener('change', handleCityChange);
         
         // 区变化时更新隐藏的region字段
         districtSelect.addEventListener('change', () => {
+          console.log('区县选择变化:', districtSelect.value);
           updateRegionValue();
         });
-        
-        // 更新region值（格式：省 市 区，空格分隔，与小程序端兼容）
-        function updateRegionValue() {
-          const province = provinceSelect.value;
-          const city = citySelect.value;
-          const district = districtSelect.value;
-          const parts = [];
-          if (province) parts.push(province);
-          if (city) parts.push(city);
-          if (district) parts.push(district);
-          regionHidden.value = parts.join(' ');
-        }
         
         // 如果编辑现有地址，解析region并回填
         if (address?.region) {
