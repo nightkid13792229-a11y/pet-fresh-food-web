@@ -47,3 +47,4 @@ echo "=== 部署完成 ==="
 echo "查看日志: pm2 logs petfresh-api"
 echo "查看状态: pm2 status"
 
+

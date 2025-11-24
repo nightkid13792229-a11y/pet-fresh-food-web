@@ -1971,10 +1971,28 @@ async function loadCustomersFromBackend() {
     if (data && data.items) {
       // 将后端数据格式转换为Web端格式
       const customers = await Promise.all(data.items.map(async (pet) => {
-        // 加载默认地址
-        // 注意：地址信息需要从地址管理功能中获取
-        // 当前后端地址API需要customer权限，管理员无法直接访问
+        // 加载默认地址（使用管理员API）
         let defaultAddress = '';
+        if (pet.userId && backendState.token) {
+          try {
+            const addresses = await backendRequest(`/api/v1/addresses/customer/${pet.userId}`, {
+              method: 'GET'
+            });
+            if (addresses && Array.isArray(addresses) && addresses.length > 0) {
+              // 查找默认地址，如果没有默认地址则使用第一个
+              const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
+              if (defaultAddr) {
+                defaultAddress = `${defaultAddr.region || ''} ${defaultAddr.detail || ''}`.trim();
+                if (defaultAddr.contactName) {
+                  defaultAddress = `${defaultAddr.contactName} ${defaultAddr.contactPhone || ''} ${defaultAddress}`.trim();
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('加载地址失败:', error);
+            // 地址加载失败不影响其他数据加载
+          }
+        }
         
         return {
           id: `pet_${pet.id}`, // 使用pet_前缀避免ID冲突
@@ -1982,7 +2000,31 @@ async function loadCustomersFromBackend() {
           breed: pet.breed || '',
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: defaultAddress,
-          birthday: pet.birthdate ? (typeof pet.birthdate === 'string' ? (pet.birthdate.includes('T') ? pet.birthdate.split('T')[0] : pet.birthdate.split(' ')[0]) : '') : '', // 格式化为 YYYY-MM-DD
+          birthday: pet.birthdate ? (() => {
+            // 处理日期格式，确保不因时区转换而改变日期
+            if (typeof pet.birthdate === 'string') {
+              // 如果是ISO格式（带T），提取日期部分
+              if (pet.birthdate.includes('T')) {
+                return pet.birthdate.split('T')[0];
+              }
+              // 如果是空格分隔的日期时间，提取日期部分
+              if (pet.birthdate.includes(' ')) {
+                return pet.birthdate.split(' ')[0];
+              }
+              // 如果已经是 YYYY-MM-DD 格式，直接返回
+              if (pet.birthdate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                return pet.birthdate;
+              }
+            }
+            // 如果是Date对象，转换为本地日期字符串（不包含时间）
+            if (pet.birthdate instanceof Date) {
+              const year = pet.birthdate.getUTCFullYear();
+              const month = String(pet.birthdate.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(pet.birthdate.getUTCDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+            return '';
+          })() : '', // 格式化为 YYYY-MM-DD
         weightKg: pet.weightKg || 0,
         sex: pet.sex || 'unknown',
         neutered: pet.neutered ? 'yes' : 'no',
@@ -2023,7 +2065,31 @@ async function loadCustomersFromBackend() {
           breed: pet.breed || '',
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: '',
-          birthday: pet.birthdate || '',
+          birthday: pet.birthdate ? (() => {
+            // 处理日期格式，确保不因时区转换而改变日期
+            if (typeof pet.birthdate === 'string') {
+              // 如果是ISO格式（带T），提取日期部分
+              if (pet.birthdate.includes('T')) {
+                return pet.birthdate.split('T')[0];
+              }
+              // 如果是空格分隔的日期时间，提取日期部分
+              if (pet.birthdate.includes(' ')) {
+                return pet.birthdate.split(' ')[0];
+              }
+              // 如果已经是 YYYY-MM-DD 格式，直接返回
+              if (pet.birthdate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                return pet.birthdate;
+              }
+            }
+            // 如果是Date对象，转换为本地日期字符串（不包含时间）
+            if (pet.birthdate instanceof Date) {
+              const year = pet.birthdate.getUTCFullYear();
+              const month = String(pet.birthdate.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(pet.birthdate.getUTCDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+            return '';
+          })() : '',
           weightKg: pet.weightKg || 0,
           sex: pet.sex || 'unknown',
           neutered: pet.neutered ? 'yes' : 'no',
@@ -8372,11 +8438,64 @@ async function openAddressManagementDialog(userId) {
   const loadAddresses = async () => {
     const listEl = content.querySelector('#address-list');
     try {
-      // 注意：当前地址API需要customer权限，管理员可能需要特殊处理
-      // 这里先显示提示信息
-      listEl.innerHTML = '<p style="color: #999;">地址管理功能需要用户登录后才能使用。当前为管理员视图，无法直接访问用户的地址。</p><p style="color: #999; font-size: 12px; margin-top: 10px;">提示：用户可以在小程序端的"我的"页面管理收货地址。</p>';
+      // 使用管理员API获取地址列表
+      const addresses = await backendRequest(`/api/v1/addresses/customer/${userId}`, {
+        method: 'GET'
+      });
+      
+      if (!addresses || addresses.length === 0) {
+        listEl.innerHTML = '<p style="color: #999;">该用户暂无收货地址</p>';
+        return;
+      }
+      
+      // 渲染地址列表
+      listEl.innerHTML = addresses.map((addr, index) => `
+        <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; ${addr.isDefault ? 'border-color: #4CAF50; background: #f0f8f0;' : ''}">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              ${addr.isDefault ? '<span style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-right: 8px;">默认</span>' : ''}
+              <strong>${addr.contactName || '未填写'}</strong> ${addr.contactPhone || ''}
+              <div style="margin-top: 5px; color: #666; font-size: 14px;">
+                ${addr.region || ''} ${addr.detail || ''}
+              </div>
+            </div>
+            <div style="display: flex; gap: 5px;">
+              <button class="btn small" data-edit-addr="${addr.id}" style="font-size: 12px; padding: 4px 8px;">编辑</button>
+              <button class="btn small" data-delete-addr="${addr.id}" style="font-size: 12px; padding: 4px 8px; background: #f44336;">删除</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+      
+      // 绑定编辑和删除按钮事件
+      listEl.querySelectorAll('[data-edit-addr]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const addrId = Number(btn.dataset.editAddr);
+          const address = addresses.find(a => a.id === addrId);
+          if (address) {
+            openEditAddressDialog(address, userId, loadAddresses);
+          }
+        });
+      });
+      
+      listEl.querySelectorAll('[data-delete-addr]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const addrId = Number(btn.dataset.deleteAddr);
+          if (confirm('确定要删除这个地址吗？')) {
+            try {
+              await backendRequest(`/api/v1/addresses/${addrId}`, {
+                method: 'DELETE'
+              });
+              await loadAddresses();
+            } catch (error) {
+              alert('删除失败: ' + (error.message || '未知错误'));
+            }
+          }
+        });
+      });
     } catch (error) {
-      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${error.message}</p>`;
+      console.error('加载地址失败:', error);
+      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${error.message || '未知错误'}</p>`;
     }
   };
   
@@ -8389,8 +8508,86 @@ async function openAddressManagementDialog(userId) {
   
   // 新增地址按钮
   content.querySelector('#address-add-btn').addEventListener('click', () => {
-    alert('新增地址功能需要用户在小程序端操作');
+    openEditAddressDialog(null, userId, loadAddresses);
   });
+  
+  // 编辑/新增地址对话框
+  function openEditAddressDialog(address, customerId, onSuccess) {
+    const editDialog = document.createElement('div');
+    editDialog.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;';
+    
+    const editContent = document.createElement('div');
+    editContent.style.cssText = 'background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%;';
+    
+    const isEdit = !!address;
+    editContent.innerHTML = `
+      <h3 style="margin-top: 0;">${isEdit ? '编辑' : '新增'}地址</h3>
+      <form id="address-form" style="margin-top: 15px;">
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; margin-bottom: 5px;">联系人姓名</label>
+          <input type="text" id="addr-contact-name" value="${address?.contactName || ''}" required style="width: 100%; padding: 8px; box-sizing: border-box;" />
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; margin-bottom: 5px;">联系电话</label>
+          <input type="tel" id="addr-contact-phone" value="${address?.contactPhone || ''}" required style="width: 100%; padding: 8px; box-sizing: border-box;" />
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; margin-bottom: 5px;">地区</label>
+          <input type="text" id="addr-region" value="${address?.region || ''}" placeholder="省/市/区" style="width: 100%; padding: 8px; box-sizing: border-box;" />
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; margin-bottom: 5px;">详细地址</label>
+          <textarea id="addr-detail" rows="3" required style="width: 100%; padding: 8px; box-sizing: border-box;">${address?.detail || ''}</textarea>
+        </div>
+        <div style="margin-bottom: 15px;">
+          <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" id="addr-is-default" ${address?.isDefault ? 'checked' : ''} style="margin-right: 5px;" />
+            <span>设为默认地址</span>
+          </label>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="submit" class="btn" style="flex: 1;">保存</button>
+          <button type="button" class="btn" id="addr-cancel-btn" style="flex: 1; background: #999;">取消</button>
+        </div>
+      </form>
+    `;
+    
+    editDialog.appendChild(editContent);
+    document.body.appendChild(editDialog);
+    
+    editContent.querySelector('#address-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        contactName: editContent.querySelector('#addr-contact-name').value.trim(),
+        contactPhone: editContent.querySelector('#addr-contact-phone').value.trim(),
+        region: editContent.querySelector('#addr-region').value.trim(),
+        detail: editContent.querySelector('#addr-detail').value.trim(),
+        isDefault: editContent.querySelector('#addr-is-default').checked
+      };
+      
+      try {
+        if (isEdit) {
+          await backendRequest(`/api/v1/addresses/${address.id}`, {
+            method: 'PUT',
+            body: payload
+          });
+        } else {
+          await backendRequest(`/api/v1/addresses/customer/${customerId}`, {
+            method: 'POST',
+            body: payload
+          });
+        }
+        document.body.removeChild(editDialog);
+        await onSuccess();
+      } catch (error) {
+        alert('保存失败: ' + (error.message || '未知错误'));
+      }
+    });
+    
+    editContent.querySelector('#addr-cancel-btn').addEventListener('click', () => {
+      document.body.removeChild(editDialog);
+    });
+  }
 }
 
 if (document.readyState === 'loading') {

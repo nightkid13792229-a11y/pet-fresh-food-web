@@ -130,3 +130,4 @@ bash deploy.sh
 2. 监控 PM2 日志：`pm2 logs petfresh-api`
 3. 使用健康检查端点验证应用状态
 
+

@@ -19,3 +19,4 @@
 如果暂时没有图标，可以暂时注释掉 `app.json` 中的 `iconPath` 和 `selectedIconPath`，tabBar 会只显示文字（但可能会有警告）。
 
 
+

@@ -28,3 +28,4 @@ echo "# 5. 查看状态"
 echo "pm2 status"
 echo "pm2 logs petfresh-api --lines 20"
 
+
