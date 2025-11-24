@@ -5,7 +5,8 @@ import {
   findPetById,
   findPetsByUserId,
   updatePetProfile,
-  findAllPetsWithUsers
+  findAllPetsWithUsers,
+  hasOrdersByPetId
 } from './pets.repository.js';
 import { isProfileCompleted } from '../profile/profile.service.js';
 
@@ -54,6 +55,13 @@ export const removePet = async (userId, petId) => {
   if (!existing || existing.userId !== userId) {
     throw createError(404, 'Pet not found');
   }
+  
+  // 检查是否有关联订单
+  const hasOrders = await hasOrdersByPetId(petId);
+  if (hasOrders) {
+    throw createError(400, '无法删除该宠物：该宠物有关联的订单记录。请先删除或处理相关订单后再试。');
+  }
+  
   const deleted = await deletePetProfile(petId);
   if (!deleted) {
     throw createError(500, 'Failed to delete pet profile');
@@ -113,6 +121,13 @@ export const removePetAsAdmin = async (petId) => {
   if (!existing) {
     throw createError(404, 'Pet not found');
   }
+  
+  // 检查是否有关联订单
+  const hasOrders = await hasOrdersByPetId(petId);
+  if (hasOrders) {
+    throw createError(400, '无法删除该宠物：该宠物有关联的订单记录。请先删除或处理相关订单后再试。');
+  }
+  
   const deleted = await deletePetProfile(petId);
   if (!deleted) {
     throw createError(500, 'Failed to delete pet profile');

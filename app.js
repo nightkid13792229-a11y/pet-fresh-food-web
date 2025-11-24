@@ -1989,7 +1989,13 @@ async function deleteCustomer(id) {
       }
     } catch (error) {
       console.error('删除失败:', error);
-      alert('删除失败: ' + (error.message || '未知错误'));
+      // 提供更友好的错误提示
+      const errorMessage = error.message || '未知错误';
+      if (errorMessage.includes('订单') || errorMessage.includes('foreign key') || errorMessage.includes('关联')) {
+        alert('删除失败：该宠物有关联的订单记录，无法删除。请先处理相关订单后再试。');
+      } else {
+        alert('删除失败: ' + errorMessage);
+      }
     }
   } else {
     // 本地数据，直接删除

@@ -174,6 +174,13 @@ export const deletePetProfile = async (id) => {
   return result.affectedRows > 0;
 };
 
+// 检查宠物是否有关联订单
+export const hasOrdersByPetId = async (petId) => {
+  const sql = 'SELECT COUNT(*) as count FROM orders WHERE pet_id = ?';
+  const rows = await query(sql, [petId]);
+  return rows[0]?.count > 0;
+};
+
 // 管理员端：获取所有宠物信息（带用户信息）
 export const findAllPetsWithUsers = async (options = {}) => {
   // 确保参数是有效的数字，防止 NaN
