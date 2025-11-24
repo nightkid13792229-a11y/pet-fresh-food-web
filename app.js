@@ -2018,7 +2018,7 @@ async function loadCustomersFromBackend() {
           neutered: pet.neutered ? 'yes' : 'no',
           lifeStage: pet.lifeStage || 'adult',
           activity: pet.activityLevel || '',
-          kcalFactor: pet.energyMultiplier || 0,
+          kcalFactor: pet.energyMultiplier != null ? Math.round(Number(pet.energyMultiplier)) : 0,
           estKcal: pet.dailyEnergyKcal || 0,
           bcs: pet.bodyConditionScore || null,
           mealsPerDay: pet.mealsPerDay || null,
