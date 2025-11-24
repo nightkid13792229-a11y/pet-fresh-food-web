@@ -1954,16 +1954,9 @@ async function loadCustomersFromBackend() {
       // 将后端数据格式转换为Web端格式
       const customers = await Promise.all(data.items.map(async (pet) => {
         // 加载默认地址
+        // 注意：地址信息需要从地址管理功能中获取
+        // 当前后端地址API需要customer权限，管理员无法直接访问
         let defaultAddress = '';
-        if (pet.userId) {
-          try {
-            // 尝试获取用户的默认地址（需要管理员权限或通过userId查询）
-            // 暂时先设为空，后续通过地址管理功能加载
-            defaultAddress = '';
-          } catch (error) {
-            console.warn('加载地址失败:', error);
-          }
-        }
         
         return {
           id: `pet_${pet.id}`, // 使用pet_前缀避免ID冲突
@@ -1971,7 +1964,7 @@ async function loadCustomersFromBackend() {
           breed: pet.breed || '',
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: defaultAddress,
-          birthday: pet.birthdate ? (pet.birthdate.includes('T') ? pet.birthdate.split('T')[0] : pet.birthdate.split(' ')[0]) : '', // 格式化为 YYYY-MM-DD
+          birthday: pet.birthdate ? (typeof pet.birthdate === 'string' ? (pet.birthdate.includes('T') ? pet.birthdate.split('T')[0] : pet.birthdate.split(' ')[0]) : '') : '', // 格式化为 YYYY-MM-DD
         weightKg: pet.weightKg || 0,
         sex: pet.sex || 'unknown',
         neutered: pet.neutered ? 'yes' : 'no',
