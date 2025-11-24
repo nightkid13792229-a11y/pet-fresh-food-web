@@ -57,79 +57,160 @@ async function loadChinaRegions() {
   
   try {
     // 尝试从GitHub加载数据（使用jsdelivr CDN，更稳定）
-    // 数据源：mumuy/data_location - 中国省市区数据
-    const dataUrl = 'https://cdn.jsdelivr.net/gh/mumuy/data_location@latest/data.json';
+    // 优先使用 caijf/lcn 的 pca.json，格式更标准
+    const dataUrl1 = 'https://cdn.jsdelivr.net/gh/caijf/lcn@master/pca.json';
+    // 备用数据源：mumuy/data_location
+    const dataUrl2 = 'https://cdn.jsdelivr.net/gh/mumuy/data_location@latest/data.json';
     
-    console.log('正在从GitHub加载省市区数据:', dataUrl);
-    const response = await fetch(dataUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    let data = null;
+    let dataSource = '';
+    
+    // 先尝试第一个数据源
+    try {
+      console.log('正在从GitHub加载省市区数据 (caijf/lcn):', dataUrl1);
+      const response1 = await fetch(dataUrl1);
+      if (response1.ok) {
+        data = await response1.json();
+        dataSource = 'caijf/lcn';
+        console.log('✓ 使用 caijf/lcn 数据源');
+      } else {
+        throw new Error(`HTTP ${response1.status}`);
+      }
+    } catch (e1) {
+      console.warn('第一个数据源加载失败，尝试备用数据源:', e1);
+      // 尝试第二个数据源
+      try {
+        console.log('正在从GitHub加载省市区数据 (mumuy/data_location):', dataUrl2);
+        const response2 = await fetch(dataUrl2);
+        if (response2.ok) {
+          data = await response2.json();
+          dataSource = 'mumuy/data_location';
+          console.log('✓ 使用 mumuy/data_location 数据源');
+        } else {
+          throw new Error(`HTTP ${response2.status}`);
+        }
+      } catch (e2) {
+        throw new Error(`所有数据源加载失败: ${e1.message}, ${e2.message}`);
+      }
     }
     
-    const data = await response.json();
-    console.log('GitHub数据加载成功，原始数据格式:', typeof data, 'keys:', Object.keys(data).slice(0, 5));
+    console.log('GitHub数据加载成功，数据源:', dataSource, '原始数据格式:', typeof data, 'keys:', Object.keys(data).slice(0, 5));
     
-    // 转换数据格式：从 {code: {name, child: {...}}} 转换为 {省: {市: [区]}}
+    // 转换数据格式
     const regions = {};
-    
-    // 遍历省份（level=1）
     let provinceCount = 0;
     let cityCount = 0;
     let districtCount = 0;
     
-    Object.keys(data).forEach(provinceCode => {
-      const province = data[provinceCode];
-      if (province && (province.level === 1 || province.level === '1')) {
+    // 检查数据格式：caijf/lcn 的格式是 {code: {name, children: [...]}}
+    // mumuy/data_location 的格式是 {code: {name, level, child: {...}}}
+    const firstKey = Object.keys(data)[0];
+    const firstItem = data[firstKey];
+    const hasChildren = firstItem?.children !== undefined;
+    const hasChild = firstItem?.child !== undefined;
+    const hasLevel = firstItem?.level !== undefined;
+    
+    console.log('数据格式检测:', { hasChildren, hasChild, hasLevel, firstItem });
+    
+    if (hasChildren) {
+      // caijf/lcn 格式：{code: {name, children: [{code, name, children: [...]}]}}
+      Object.keys(data).forEach(provinceCode => {
+        const province = data[provinceCode];
+        if (!province || !province.name) return;
+        
         const provinceName = province.name;
-        if (!provinceName) {
-          console.warn('省份名称为空，code:', provinceCode);
-          return;
-        }
         regions[provinceName] = {};
         provinceCount++;
         
-        // 遍历市（level=2）
-        if (province.child) {
-          Object.keys(province.child).forEach(cityCode => {
-            const city = province.child[cityCode];
-            if (city && (city.level === 2 || city.level === '2')) {
-              const cityName = city.name;
-              if (!cityName) {
-                console.warn('城市名称为空，code:', cityCode);
-                return;
-              }
-              regions[provinceName][cityName] = [];
-              cityCount++;
-              
-              // 遍历区县（level=3）
-              if (city.child) {
-                Object.keys(city.child).forEach(districtCode => {
-                  const district = city.child[districtCode];
-                  if (district && (district.level === 3 || district.level === '3')) {
-                    const districtName = district.name;
-                    if (districtName) {
-                      regions[provinceName][cityName].push(districtName);
-                      districtCount++;
-                    }
-                  }
-                });
-              }
-              
-              // 如果没有区县，至少保留一个空数组
-              if (regions[provinceName][cityName].length === 0) {
-                regions[provinceName][cityName] = ['其他区县'];
-              }
+        if (province.children && Array.isArray(province.children)) {
+          province.children.forEach(city => {
+            if (!city || !city.name) return;
+            
+            const cityName = city.name;
+            regions[provinceName][cityName] = [];
+            cityCount++;
+            
+            if (city.children && Array.isArray(city.children)) {
+              city.children.forEach(district => {
+                if (district && district.name) {
+                  regions[provinceName][cityName].push(district.name);
+                  districtCount++;
+                }
+              });
+            }
+            
+            if (regions[provinceName][cityName].length === 0) {
+              regions[provinceName][cityName] = ['其他区县'];
             }
           });
         }
-      }
-    });
+      });
+    } else if (hasChild) {
+      // mumuy/data_location 格式：{code: {name, level, child: {...}}}
+      Object.keys(data).forEach(provinceCode => {
+        const province = data[provinceCode];
+        const provinceLevel = province?.level;
+        const isProvince = provinceLevel === 1 || provinceLevel === '1' || provinceLevel === 'province';
+        
+        if (province && isProvince && province.name) {
+          const provinceName = province.name;
+          regions[provinceName] = {};
+          provinceCount++;
+          
+          if (province.child) {
+            Object.keys(province.child).forEach(cityCode => {
+              const city = province.child[cityCode];
+              const cityLevel = city?.level;
+              const isCity = cityLevel === 2 || cityLevel === '2' || cityLevel === 'city';
+              
+              if (city && isCity && city.name) {
+                const cityName = city.name;
+                regions[provinceName][cityName] = [];
+                cityCount++;
+                
+                if (city.child) {
+                  Object.keys(city.child).forEach(districtCode => {
+                    const district = city.child[districtCode];
+                    const districtLevel = district?.level;
+                    const isDistrict = districtLevel === 3 || districtLevel === '3' || districtLevel === 'district' || districtLevel === 'area';
+                    
+                    if (district && isDistrict && district.name) {
+                      regions[provinceName][cityName].push(district.name);
+                      districtCount++;
+                    }
+                  });
+                }
+                
+                if (regions[provinceName][cityName].length === 0) {
+                  regions[provinceName][cityName] = ['其他区县'];
+                }
+              }
+            });
+          }
+        }
+      });
+    } else {
+      throw new Error('无法识别的数据格式');
+    }
     
     console.log('✓ 省市区数据转换完成:', { 
+      数据源: dataSource,
       省份数: provinceCount, 
       城市数: cityCount, 
       区县数: districtCount,
       转换后的省份数: Object.keys(regions).length 
+    });
+    
+    // 验证数据：检查每个省份的城市数量
+    Object.keys(regions).forEach(province => {
+      const cities = Object.keys(regions[province]);
+      if (cities.length === 0) {
+        console.warn('省份没有城市数据:', province);
+      } else if (cities.length === 1 && cities[0] === '其他市') {
+        console.warn('省份只有"其他市"选项:', province);
+      } else {
+        console.log(`省份 ${province} 有 ${cities.length} 个城市:`, cities.slice(0, 5).join(', '), cities.length > 5 ? '...' : '');
+      }
     });
     
     if (Object.keys(regions).length === 0) {
