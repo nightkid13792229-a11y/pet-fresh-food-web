@@ -1784,7 +1784,17 @@ async function openCustomerForm(id) {
   card.style.display = 'block';
   if (id) {
     const c = store.customers.find(x => x.id === id);
-    if (!c) return;
+    if (!c) {
+      console.error('未找到顾客数据，ID:', id);
+      return;
+    }
+    console.log('打开编辑表单 - 顾客数据:', {
+      id: c.id,
+      petName: c.petName,
+      birthday: c.birthday,
+      address: c.address,
+      userName: c.userName
+    });
     title.textContent = '编辑顾客';
     $('customer-id').value = c.id;
     
@@ -1797,10 +1807,15 @@ async function openCustomerForm(id) {
     
     // 加载默认地址
     let defaultAddress = c.address || '';
+    console.log('加载地址信息 - customer.address:', c.address, 'defaultAddress:', defaultAddress);
     const addressEl = $('c-address');
     if (addressEl) {
-      addressEl.value = defaultAddress || '（点击"管理地址"查看）';
-      addressEl.placeholder = '默认收货地址';
+      if (defaultAddress) {
+        addressEl.value = defaultAddress;
+      } else {
+        addressEl.value = '';
+        addressEl.placeholder = '（点击"管理地址"查看）';
+      }
     } else {
       console.warn('地址输入框不存在');
     }
@@ -1819,24 +1834,27 @@ async function openCustomerForm(id) {
     
     // 确保生日格式正确（YYYY-MM-DD）
     const birthday = c.birthday || '';
+    console.log('加载生日信息 - customer.birthday:', birthday, 'type:', typeof birthday);
     const birthdayEl = $('c-birthday');
     if (birthdayEl) {
-      if (birthday) {
+      if (birthday && typeof birthday === 'string' && birthday.trim()) {
         // 处理各种可能的日期格式
-        let formattedDate = birthday;
-        if (birthday.includes('T')) {
-          formattedDate = birthday.split('T')[0];
-        } else if (birthday.includes(' ')) {
-          formattedDate = birthday.split(' ')[0];
+        let formattedDate = birthday.trim();
+        if (formattedDate.includes('T')) {
+          formattedDate = formattedDate.split('T')[0];
+        } else if (formattedDate.includes(' ')) {
+          formattedDate = formattedDate.split(' ')[0];
         }
         // 确保格式为 YYYY-MM-DD
         if (formattedDate && formattedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
           birthdayEl.value = formattedDate;
+          console.log('✓ 生日已设置:', formattedDate);
         } else {
           console.warn('生日格式不正确:', birthday, '->', formattedDate);
           birthdayEl.value = '';
         }
       } else {
+        console.warn('生日为空或格式不正确:', birthday, 'type:', typeof birthday);
         birthdayEl.value = '';
       }
     } else {
