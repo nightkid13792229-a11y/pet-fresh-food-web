@@ -56,42 +56,51 @@ async function loadChinaRegions() {
   regionsDataLoading = true;
   
   try {
-    // 尝试从GitHub加载数据（使用jsdelivr CDN，更稳定）
-    // 优先使用 caijf/lcn 的 pca.json，格式更标准
-    const dataUrl1 = 'https://cdn.jsdelivr.net/gh/caijf/lcn@master/pca.json';
-    // 备用数据源：mumuy/data_location
-    const dataUrl2 = 'https://cdn.jsdelivr.net/gh/mumuy/data_location@latest/data.json';
+    // 尝试从多个数据源加载数据
+    // 数据源1: modood/Administrative-divisions-of-China (更完整)
+    const dataUrl1 = 'https://cdn.jsdelivr.net/gh/modood/Administrative-divisions-of-China@master/dist/pca-code.json';
+    // 数据源2: caijf/lcn 的 pca.json
+    const dataUrl2 = 'https://cdn.jsdelivr.net/gh/caijf/lcn@master/pca.json';
+    // 数据源3: mumuy/data_location
+    const dataUrl3 = 'https://cdn.jsdelivr.net/gh/mumuy/data_location@latest/data.json';
     
     let data = null;
     let dataSource = '';
+    let lastError = null;
     
-    // 先尝试第一个数据源
-    try {
-      console.log('正在从GitHub加载省市区数据 (caijf/lcn):', dataUrl1);
-      const response1 = await fetch(dataUrl1);
-      if (response1.ok) {
-        data = await response1.json();
-        dataSource = 'caijf/lcn';
-        console.log('✓ 使用 caijf/lcn 数据源');
-      } else {
-        throw new Error(`HTTP ${response1.status}`);
-      }
-    } catch (e1) {
-      console.warn('第一个数据源加载失败，尝试备用数据源:', e1);
-      // 尝试第二个数据源
+    // 尝试多个数据源
+    const dataSources = [
+      { url: dataUrl1, name: 'modood/Administrative-divisions-of-China' },
+      { url: dataUrl2, name: 'caijf/lcn' },
+      { url: dataUrl3, name: 'mumuy/data_location' }
+    ];
+    
+    for (const source of dataSources) {
       try {
-        console.log('正在从GitHub加载省市区数据 (mumuy/data_location):', dataUrl2);
-        const response2 = await fetch(dataUrl2);
-        if (response2.ok) {
-          data = await response2.json();
-          dataSource = 'mumuy/data_location';
-          console.log('✓ 使用 mumuy/data_location 数据源');
+        console.log(`正在从GitHub加载省市区数据 (${source.name}):`, source.url);
+        const response = await fetch(source.url, { 
+          cache: 'no-cache',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        if (response.ok) {
+          data = await response.json();
+          dataSource = source.name;
+          console.log(`✓ 使用 ${source.name} 数据源`);
+          break;
         } else {
-          throw new Error(`HTTP ${response2.status}`);
+          throw new Error(`HTTP ${response.status}`);
         }
-      } catch (e2) {
-        throw new Error(`所有数据源加载失败: ${e1.message}, ${e2.message}`);
+      } catch (e) {
+        console.warn(`${source.name} 数据源加载失败:`, e);
+        lastError = e;
+        continue;
       }
+    }
+    
+    if (!data) {
+      throw new Error(`所有数据源加载失败: ${lastError?.message || '未知错误'}`);
     }
     
     console.log('GitHub数据加载成功，数据源:', dataSource, '原始数据格式:', typeof data, 'keys:', Object.keys(data).slice(0, 5));
