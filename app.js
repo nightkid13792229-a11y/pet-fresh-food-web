@@ -2079,8 +2079,8 @@ function setupCustomersModule() {
       
       // 打开地址管理对话框
       await openAddressManagementDialog(customer.userId);
-    });
-  }
+    }
+  });
   
   // 如果已登录，从后端加载数据
   if (backendState.token) {
@@ -8293,6 +8293,51 @@ function init() {
   }
   
   loadApp();
+  
+  loadBackendAuth();
+  console.log('初始化后 - 顾客数据:', store.customers.length, '条');
+  console.log('初始化后 - 原料数据:', store.ingredients.length, '条');
+  console.log('初始化后 - 食谱数据:', store.recipes.length, '条');
+  console.log('初始化后 - 订单数据:', store.orders.length, '条');
+  
+  setupNav();
+  setupPWA();
+  setupCustomersModule();
+  setupIngredientsModule();
+  setupRecipesModule();
+  setupOrdersModule();
+  setupBreedsModule();
+  setupSettingsModule();
+  updateAuthUI();
+  renderCustomersList();
+  switchView('customers');
+  const printBtn = $('btn-print'); if (printBtn) printBtn.addEventListener('click', () => window.print());
+  
+  // 登录按钮
+  const loginBtn = $('btn-open-login');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+      const email = prompt('请输入邮箱:');
+      if (!email) return;
+      const password = prompt('请输入密码:');
+      if (!password) return;
+      backendLogin(email, password).then(() => {
+        alert('登录成功！');
+      }).catch(err => {
+        alert('登录失败：' + err.message);
+      });
+    });
+  }
+  
+  // 退出按钮
+  const logoutBtn = $('btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      if (confirm('确定要退出登录吗？')) {
+        clearBackendAuth();
+      }
+    });
+  }
 }
 
 // 地址管理对话框
@@ -8346,51 +8391,6 @@ async function openAddressManagementDialog(userId) {
   content.querySelector('#address-add-btn').addEventListener('click', () => {
     alert('新增地址功能需要用户在小程序端操作');
   });
-}
-  loadBackendAuth();
-  console.log('初始化后 - 顾客数据:', store.customers.length, '条');
-  console.log('初始化后 - 原料数据:', store.ingredients.length, '条');
-  console.log('初始化后 - 食谱数据:', store.recipes.length, '条');
-  console.log('初始化后 - 订单数据:', store.orders.length, '条');
-  
-  setupNav();
-  setupPWA();
-  setupCustomersModule();
-  setupIngredientsModule();
-  setupRecipesModule();
-  setupOrdersModule();
-  setupBreedsModule();
-  setupSettingsModule();
-  updateAuthUI();
-  renderCustomersList();
-  switchView('customers');
-  const printBtn = $('btn-print'); if (printBtn) printBtn.addEventListener('click', () => window.print());
-  
-  // 登录按钮
-  const loginBtn = $('btn-open-login');
-  if (loginBtn) {
-    loginBtn.addEventListener('click', () => {
-      const email = prompt('请输入邮箱:');
-      if (!email) return;
-      const password = prompt('请输入密码:');
-      if (!password) return;
-      backendLogin(email, password).then(() => {
-        alert('登录成功！');
-      }).catch(err => {
-        alert('登录失败：' + err.message);
-      });
-    });
-  }
-  
-  // 退出按钮
-  const logoutBtn = $('btn-logout');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-      if (confirm('确定要退出登录吗？')) {
-        clearBackendAuth();
-      }
-    });
-  }
 }
 
 if (document.readyState === 'loading') {
