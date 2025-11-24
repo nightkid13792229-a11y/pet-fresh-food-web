@@ -880,12 +880,24 @@ async function populateBreedSelect() {
       method: 'GET'
     });
     
-    console.log('品种API响应:', response);
+    console.log('品种API响应:', response, '类型:', typeof response);
     
     // 后端返回格式可能是 { items: [...], total: X } 或直接是数组
-    const breedsArray = Array.isArray(response) ? response : (response.items || []);
+    let breedsArray = [];
+    if (Array.isArray(response)) {
+      breedsArray = response;
+    } else if (response && typeof response === 'object') {
+      breedsArray = response.items || [];
+      if (breedsArray.length === 0 && response.data && Array.isArray(response.data.items)) {
+        breedsArray = response.data.items;
+      }
+    }
     
     console.log('解析后的品种数组:', breedsArray, '长度:', breedsArray.length);
+    
+    if (breedsArray.length === 0) {
+      console.warn('品种数据为空，可能的原因：1. 数据库中没有品种数据；2. API返回格式不正确；3. API调用失败');
+    }
     
     // 清空并添加选项
     select.innerHTML = '<option value="">请选择品种</option>';
@@ -8565,10 +8577,14 @@ async function openAddressManagementDialog(userId) {
       console.error('加载地址失败:', error);
       let errorMsg = error.message || '未知错误';
       // 如果是权限错误，提供更友好的提示
-      if (errorMsg.includes('403') || errorMsg.includes('permission') || errorMsg.includes('权限')) {
-        errorMsg = '权限不足，请确保已使用管理员账号登录';
+      if (errorMsg.includes('403') || errorMsg.includes('permission') || errorMsg.includes('权限') || errorMsg.includes('Insufficient')) {
+        errorMsg = '权限不足，请确保已使用管理员账号登录。如果已登录，请检查后端路由配置是否正确。';
+      } else if (errorMsg.includes('401') || errorMsg.includes('Authentication')) {
+        errorMsg = '未登录或登录已过期，请重新登录管理员账号。';
+      } else if (errorMsg.includes('404') || errorMsg.includes('not found')) {
+        errorMsg = 'API端点不存在，请检查后端路由配置。';
       }
-      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${errorMsg}</p>`;
+      listEl.innerHTML = `<p style="color: red;">加载地址失败: ${errorMsg}</p><p style="color: #999; font-size: 12px; margin-top: 10px;">提示：请检查浏览器控制台的详细错误信息。</p>`;
     }
   };
   
