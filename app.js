@@ -60,37 +60,57 @@ async function loadChinaRegions() {
     // 数据源：mumuy/data_location - 中国省市区数据
     const dataUrl = 'https://cdn.jsdelivr.net/gh/mumuy/data_location@latest/data.json';
     
+    console.log('正在从GitHub加载省市区数据:', dataUrl);
     const response = await fetch(dataUrl);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
     
     const data = await response.json();
+    console.log('GitHub数据加载成功，原始数据格式:', typeof data, 'keys:', Object.keys(data).slice(0, 5));
     
     // 转换数据格式：从 {code: {name, child: {...}}} 转换为 {省: {市: [区]}}
     const regions = {};
     
     // 遍历省份（level=1）
+    let provinceCount = 0;
+    let cityCount = 0;
+    let districtCount = 0;
+    
     Object.keys(data).forEach(provinceCode => {
       const province = data[provinceCode];
-      if (province.level === 1) {
+      if (province && (province.level === 1 || province.level === '1')) {
         const provinceName = province.name;
+        if (!provinceName) {
+          console.warn('省份名称为空，code:', provinceCode);
+          return;
+        }
         regions[provinceName] = {};
+        provinceCount++;
         
         // 遍历市（level=2）
         if (province.child) {
           Object.keys(province.child).forEach(cityCode => {
             const city = province.child[cityCode];
-            if (city.level === 2) {
+            if (city && (city.level === 2 || city.level === '2')) {
               const cityName = city.name;
+              if (!cityName) {
+                console.warn('城市名称为空，code:', cityCode);
+                return;
+              }
               regions[provinceName][cityName] = [];
+              cityCount++;
               
               // 遍历区县（level=3）
               if (city.child) {
                 Object.keys(city.child).forEach(districtCode => {
                   const district = city.child[districtCode];
-                  if (district.level === 3) {
-                    regions[provinceName][cityName].push(district.name);
+                  if (district && (district.level === 3 || district.level === '3')) {
+                    const districtName = district.name;
+                    if (districtName) {
+                      regions[provinceName][cityName].push(districtName);
+                      districtCount++;
+                    }
                   }
                 });
               }
@@ -105,8 +125,18 @@ async function loadChinaRegions() {
       }
     });
     
+    console.log('✓ 省市区数据转换完成:', { 
+      省份数: provinceCount, 
+      城市数: cityCount, 
+      区县数: districtCount,
+      转换后的省份数: Object.keys(regions).length 
+    });
+    
+    if (Object.keys(regions).length === 0) {
+      throw new Error('数据转换后为空，可能数据格式不匹配');
+    }
+    
     chinaRegionsData = regions;
-    console.log('✓ 省市区数据加载成功，共', Object.keys(regions).length, '个省份');
     return regions;
   } catch (error) {
     console.warn('从GitHub加载省市区数据失败，使用备用数据:', error);
