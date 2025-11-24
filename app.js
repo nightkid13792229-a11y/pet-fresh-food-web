@@ -1797,9 +1797,16 @@ async function openCustomerForm(id) {
     
     // 加载默认地址
     let defaultAddress = c.address || '';
-    // 注意：地址信息需要从地址管理功能中获取
-    // 当前后端API需要customer权限，管理员无法直接访问
-    $('c-address').value = defaultAddress || '（点击"管理地址"查看）';
+    const addressEl = $('c-address');
+    if (addressEl) {
+      addressEl.value = defaultAddress || '（点击"管理地址"查看）';
+    }
+    
+    // 确保地址管理按钮可见
+    const addressManageBtn = $('c-address-manage');
+    if (addressManageBtn) {
+      addressManageBtn.style.display = 'inline-block';
+    }
     
     $('c-petName').value = c.petName || '';
     $('c-breed').value = c.breed || '';
@@ -2093,7 +2100,11 @@ function setupCustomersModule() {
     const act = $('c-activity').value;
     // 使用共享工具库获取能量系数
     const factor = PetUtils ? PetUtils.getEnergyMultiplierByActivity(act) : activityKcalFactor(act);
-    const fEl = $('c-kcalFactor'); if (fEl) fEl.value = factor || '';
+    const fEl = $('c-kcalFactor'); 
+    if (fEl) {
+      // 显示为整数
+      fEl.value = factor != null ? Math.round(Number(factor)) : '';
+    }
     computeAndFillEstKcal();
   };
   const wEl = $('c-weightKg'); if (wEl) wEl.addEventListener('change', computeAndFillEstKcal);
@@ -2196,7 +2207,7 @@ function setupCustomersModule() {
         neutered: $('c-neutered').value === 'yes',
         lifeStage: $('c-lifeStage').value || null,
         activityLevel: activity || null,
-        energyMultiplier: Number($('c-kcalFactor').value) || null,
+        energyMultiplier: $('c-kcalFactor').value ? Math.round(Number($('c-kcalFactor').value)) : null,
         dailyEnergyKcal: estKcal || null,
         bodyConditionScore: bcs || null,
         mealsPerDay: mealsPerDay || null,
