@@ -114,26 +114,47 @@ async function loadChinaRegions() {
     
     if (hasChildren) {
       // caijf/lcn 格式：{code: {name, children: [{code, name, children: [...]}]}}
-      Object.keys(data).forEach(provinceCode => {
-        const province = data[provinceCode];
-        if (!province || !province.name) return;
+      // 或者可能是 {name: {children: [...]}} 格式
+      Object.keys(data).forEach(provinceKey => {
+        const province = data[provinceKey];
+        if (!province) return;
         
-        const provinceName = province.name;
+        // 获取省份名称：可能是 key 本身，也可能是 province.name
+        const provinceName = province.name || provinceKey;
+        if (!provinceName) return;
+        
         regions[provinceName] = {};
         provinceCount++;
         
         if (province.children && Array.isArray(province.children)) {
           province.children.forEach(city => {
-            if (!city || !city.name) return;
+            if (!city) return;
             
-            const cityName = city.name;
+            // 获取城市名称：可能是 city.name，也可能是 city 本身是字符串
+            const cityName = typeof city === 'string' ? city : (city.name || city.code);
+            if (!cityName) return;
+            
             regions[provinceName][cityName] = [];
             cityCount++;
             
+            // 处理区县：可能是 city.children 数组，也可能是其他格式
             if (city.children && Array.isArray(city.children)) {
               city.children.forEach(district => {
-                if (district && district.name) {
-                  regions[provinceName][cityName].push(district.name);
+                if (!district) return;
+                
+                // 获取区县名称：可能是 district.name，也可能是 district 本身是字符串
+                const districtName = typeof district === 'string' ? district : (district.name || district.code);
+                if (districtName) {
+                  regions[provinceName][cityName].push(districtName);
+                  districtCount++;
+                }
+              });
+            } else if (Array.isArray(city)) {
+              // 如果 city 本身是数组（区县列表）
+              city.forEach(district => {
+                const districtName = typeof district === 'string' ? district : (district?.name || district?.code);
+                if (districtName) {
+                  regions[provinceName][cityName].push(districtName);
                   districtCount++;
                 }
               });
@@ -143,6 +164,12 @@ async function loadChinaRegions() {
               regions[provinceName][cityName] = ['其他区县'];
             }
           });
+        }
+        
+        // 记录每个省份的城市数量用于调试
+        const citiesInProvince = Object.keys(regions[provinceName]).length;
+        if (citiesInProvince > 0) {
+          console.log(`省份 ${provinceName} 有 ${citiesInProvince} 个城市`);
         }
       });
     } else if (hasChild) {
@@ -209,7 +236,11 @@ async function loadChinaRegions() {
       } else if (cities.length === 1 && cities[0] === '其他市') {
         console.warn('省份只有"其他市"选项:', province);
       } else {
-        console.log(`省份 ${province} 有 ${cities.length} 个城市:`, cities.slice(0, 5).join(', '), cities.length > 5 ? '...' : '');
+        const cityList = cities.filter(c => c !== '其他市');
+        console.log(`省份 ${province} 有 ${cities.length} 个城市 (${cityList.length} 个实际城市):`, cityList.slice(0, 10).join(', '), cityList.length > 10 ? '...' : '');
+        if (cityList.length <= 2) {
+          console.warn(`⚠️ 省份 ${province} 的城市数量可能不足，只有 ${cityList.length} 个城市`);
+        }
       }
     });
     
