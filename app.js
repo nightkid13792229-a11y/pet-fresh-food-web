@@ -156,6 +156,10 @@ async function backendRequest(path, options = {}) {
   if (data && typeof data === 'object' && data.success === false) {
     throw new Error(data.message || '请求失败');
   }
+  // 如果返回格式是 {success: true, data: {...}}，自动解包 data 字段
+  if (data && typeof data === 'object' && data.success === true && data.data !== undefined) {
+    return data.data;
+  }
   return data;
 }
 
@@ -876,8 +880,12 @@ async function populateBreedSelect() {
       method: 'GET'
     });
     
+    console.log('品种API响应:', response);
+    
     // 后端返回格式可能是 { items: [...], total: X } 或直接是数组
     const breedsArray = Array.isArray(response) ? response : (response.items || []);
+    
+    console.log('解析后的品种数组:', breedsArray, '长度:', breedsArray.length);
     
     // 清空并添加选项
     select.innerHTML = '<option value="">请选择品种</option>';
@@ -1989,12 +1997,17 @@ async function loadCustomersFromBackend() {
         let defaultAddress = '';
         if (pet.userId && backendState.token) {
           try {
+            console.log(`加载用户 ${pet.userId} 的地址...`);
             const addresses = await backendRequest(`/api/v1/addresses/customer/${pet.userId}`, {
               method: 'GET'
             });
-            if (addresses && Array.isArray(addresses) && addresses.length > 0) {
+            console.log(`用户 ${pet.userId} 的地址响应:`, addresses);
+            // 处理返回格式：可能是数组或 {items: []}
+            const addressList = Array.isArray(addresses) ? addresses : (addresses.items || []);
+            if (addressList && addressList.length > 0) {
               // 优先查找默认地址，如果没有默认地址则使用第一个
-              const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
+              const defaultAddr = addressList.find(a => a.isDefault) || addressList[0];
+              console.log(`用户 ${pet.userId} 的默认地址:`, defaultAddr);
               if (defaultAddr) {
                 // 格式化地址显示：联系人 电话 地区 详细地址
                 const parts = [];
@@ -2014,8 +2027,15 @@ async function loadCustomersFromBackend() {
               }
             }
           } catch (error) {
-            console.warn('加载地址失败:', error);
+            console.warn(`加载用户 ${pet.userId} 的地址失败:`, error);
             // 地址加载失败不影响其他数据加载
+          }
+        } else {
+          if (!pet.userId) {
+            console.warn(`宠物 ${pet.id} 没有 userId`);
+          }
+          if (!backendState.token) {
+            console.warn('未登录，无法加载地址');
           }
         }
         
@@ -2026,28 +2046,38 @@ async function loadCustomersFromBackend() {
           wechat: pet.userContactInfo || pet.userEmail || '',
           address: defaultAddress,
           birthday: pet.birthdate ? (() => {
+            console.log(`处理生日数据 - 原始值:`, pet.birthdate, '类型:', typeof pet.birthdate);
             // 后端已使用 DATE_FORMAT 返回 YYYY-MM-DD 格式的字符串
             if (typeof pet.birthdate === 'string') {
               // 如果是ISO格式（带T），提取日期部分
               if (pet.birthdate.includes('T')) {
-                return pet.birthdate.split('T')[0];
+                const result = pet.birthdate.split('T')[0];
+                console.log(`ISO格式转换: ${pet.birthdate} -> ${result}`);
+                return result;
               }
               // 如果是空格分隔的日期时间，提取日期部分
               if (pet.birthdate.includes(' ')) {
-                return pet.birthdate.split(' ')[0];
+                const result = pet.birthdate.split(' ')[0];
+                console.log(`空格分隔转换: ${pet.birthdate} -> ${result}`);
+                return result;
               }
               // 如果已经是 YYYY-MM-DD 格式，直接返回
               if (pet.birthdate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                console.log(`直接使用: ${pet.birthdate}`);
                 return pet.birthdate;
               }
+              console.warn(`无法识别的日期格式: ${pet.birthdate}`);
             }
             // 如果是Date对象（备用处理），转换为UTC日期字符串
             if (pet.birthdate instanceof Date) {
               const year = pet.birthdate.getUTCFullYear();
               const month = String(pet.birthdate.getUTCMonth() + 1).padStart(2, '0');
               const day = String(pet.birthdate.getUTCDate()).padStart(2, '0');
-              return `${year}-${month}-${day}`;
+              const result = `${year}-${month}-${day}`;
+              console.log(`Date对象转换: ${pet.birthdate} -> ${result}`);
+              return result;
             }
+            console.warn(`无法处理的生日数据:`, pet.birthdate);
             return '';
           })() : '', // 格式化为 YYYY-MM-DD
         weightKg: pet.weightKg || 0,
@@ -8470,14 +8500,21 @@ async function openAddressManagementDialog(userId) {
       }
       
       // 使用管理员API获取地址列表
-      const addresses = await backendRequest(`/api/v1/addresses/customer/${userId}`, {
+      console.log(`加载用户 ${userId} 的地址列表...`);
+      const response = await backendRequest(`/api/v1/addresses/customer/${userId}`, {
         method: 'GET'
       });
+      console.log(`地址API响应:`, response);
+      
+      // 处理返回格式：可能是数组或 {items: []}
+      const addresses = Array.isArray(response) ? response : (response.items || []);
       
       if (!addresses || addresses.length === 0) {
         listEl.innerHTML = '<p style="color: #999;">该用户暂无收货地址</p>';
         return;
       }
+      
+      console.log(`找到 ${addresses.length} 个地址`);
       
       // 渲染地址列表
       listEl.innerHTML = addresses.map((addr, index) => `
