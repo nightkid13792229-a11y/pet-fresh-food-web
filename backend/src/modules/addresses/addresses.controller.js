@@ -13,29 +13,54 @@ import {
   getAddressForCustomerAdmin
 } from './addresses.service.js';
 
-export const listAddresses = async (req, res) => {
-  const addresses = await listCustomerAddresses(req.user.id);
-  return success(res, addresses);
+export const listAddresses = async (req, res, next) => {
+  try {
+    const addresses = await listCustomerAddresses(req.user.id);
+    return success(res, addresses);
+  } catch (error) {
+    console.error('listAddresses error:', error);
+    next(error);
+  }
 };
 
-export const createAddressHandler = async (req, res) => {
-  const address = await createCustomerAddress(req.user.id, req.body);
-  return success(res, address, 201);
+export const createAddressHandler = async (req, res, next) => {
+  try {
+    const address = await createCustomerAddress(req.user.id, req.body);
+    return success(res, address, 201);
+  } catch (error) {
+    console.error('createAddressHandler error:', error);
+    next(error);
+  }
 };
 
-export const updateAddressHandler = async (req, res) => {
-  const address = await updateCustomerAddress(req.user.id, Number(req.params.id), req.body);
-  return success(res, address);
+export const updateAddressHandler = async (req, res, next) => {
+  try {
+    const address = await updateCustomerAddress(req.user.id, Number(req.params.id), req.body);
+    return success(res, address);
+  } catch (error) {
+    console.error('updateAddressHandler error:', error);
+    next(error);
+  }
 };
 
-export const deleteAddressHandler = async (req, res) => {
-  await deleteCustomerAddress(req.user.id, Number(req.params.id));
-  return success(res, true);
+export const deleteAddressHandler = async (req, res, next) => {
+  try {
+    await deleteCustomerAddress(req.user.id, Number(req.params.id));
+    return success(res, true);
+  } catch (error) {
+    console.error('deleteAddressHandler error:', error);
+    next(error);
+  }
 };
 
-export const getAddressHandler = async (req, res) => {
-  const address = await getCustomerAddress(req.user.id, Number(req.params.id));
-  return success(res, address);
+export const getAddressHandler = async (req, res, next) => {
+  try {
+    const address = await getCustomerAddress(req.user.id, Number(req.params.id));
+    return success(res, address);
+  } catch (error) {
+    console.error('getAddressHandler error:', error);
+    next(error);
+  }
 };
 
 // 管理员专用：获取指定用户的所有地址
