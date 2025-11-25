@@ -325,7 +325,26 @@ const defaultApiBaseUrl = (() => {
     const stored = localStorage.getItem(API_BASE_STORAGE_KEY);
     if (stored) return stored;
   } catch (e) {}
-  return detectedOrigin || 'http://8.137.166.134:3000';
+  
+  // 如果检测到的origin是8080端口（前端静态服务器），自动改为3000端口（后端API服务器）
+  if (detectedOrigin) {
+    try {
+      const url = new URL(detectedOrigin);
+      if (url.port === '8080' || (!url.port && url.hostname === '8.137.166.134')) {
+        // 前端静态服务器在8080，后端API在3000
+        return `http://${url.hostname}:3000`;
+      }
+      // 其他情况，如果端口不是3000，也尝试使用3000
+      if (url.port && url.port !== '3000') {
+        return `http://${url.hostname}:3000`;
+      }
+      return detectedOrigin;
+    } catch (e) {
+      // URL解析失败，使用默认值
+    }
+  }
+  
+  return 'http://8.137.166.134:3000';
 })();
 
 const backendState = {
