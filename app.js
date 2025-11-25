@@ -3,7 +3,6 @@ const $ = (id) => document.getElementById(id);
 const STORAGE_KEY_APP = 'pff-app-v2';
 const STORAGE_KEY_BACKUPS = 'pff-backups-v1';
 const MAX_BACKUPS = 10; // 最多保留10个备份
-let deferredPrompt = null;
 
 const store = {
   customers: [],
@@ -169,6 +168,24 @@ async function loadChinaRegions() {
               });
             }
             
+            // 对于直辖市，如果城市名与省份名相同或包含省份名，确保数据正确
+            const municipalities = ['北京市', '天津市', '上海市', '重庆市'];
+            if (municipalities.includes(provinceName)) {
+              // 直辖市：如果城市名不是省份名，尝试使用省份名作为键
+              if (cityName !== provinceName && cityName !== provinceName.replace('市', '')) {
+                // 如果还没有省份名作为键，创建一个
+                if (!regions[provinceName][provinceName]) {
+                  regions[provinceName][provinceName] = [];
+                }
+                // 合并区县数据到省份名键下
+                if (regions[provinceName][cityName].length > 0) {
+                  regions[provinceName][provinceName] = regions[provinceName][provinceName].concat(regions[provinceName][cityName]);
+                  // 去重
+                  regions[provinceName][provinceName] = [...new Set(regions[provinceName][provinceName])];
+                }
+              }
+            }
+            
             if (regions[provinceName][cityName].length === 0) {
               regions[provinceName][cityName] = ['其他区县'];
             }
@@ -178,7 +195,16 @@ async function loadChinaRegions() {
         // 记录每个省份的城市数量用于调试
         const citiesInProvince = Object.keys(regions[provinceName]).length;
         if (citiesInProvince > 0) {
-          console.log(`省份 ${provinceName} 有 ${citiesInProvince} 个城市`);
+          console.log(`省份 ${provinceName} 有 ${citiesInProvince} 个城市:`, Object.keys(regions[provinceName]).join(', '));
+          // 对于直辖市，特别记录区县数量
+          const municipalities = ['北京市', '天津市', '上海市', '重庆市'];
+          if (municipalities.includes(provinceName)) {
+            const cityKeys = Object.keys(regions[provinceName]);
+            cityKeys.forEach(cityKey => {
+              const districtCount = regions[provinceName][cityKey]?.length || 0;
+              console.log(`  城市 ${cityKey}: ${districtCount} 个区县`);
+            });
+          }
         }
       });
     } else if (hasChild) {
@@ -466,10 +492,12 @@ async function backendLogin(email, password) {
     body: { email, password },
     skipAuth: true
   });
-  if (!payload || payload.success !== true || !payload.data) {
+  // backendRequest 已经自动解包了 {success: true, data: {...}} 格式，直接返回 data 内容
+  // 所以 payload 直接是 {token, user} 格式
+  if (!payload || !payload.token || !payload.user) {
     throw new Error((payload && payload.message) || '登录失败，请检查账号或密码。');
   }
-  const { token, user } = payload.data;
+  const { token, user } = payload;
   backendState.token = token;
   backendState.user = user;
   try {
@@ -718,14 +746,17 @@ function restoreBackup(backupId) {
     
     if (confirm(`确定要恢复到 ${backup.date} 的备份吗？当前数据将被替换。`)) {
       store.customers = Array.isArray(backup.data.customers) ? backup.data.customers : [];
-      store.ingredients = Array.isArray(backup.data.ingredients) ? backup.data.ingredients : [];
+      // store.ingredients = Array.isArray(backup.data.ingredients) ? backup.data.ingredients : []; // 原料数据已迁移到后端
       store.recipes = Array.isArray(backup.data.recipes) ? backup.data.recipes : [];
       
               // 保存恢复的数据
       if (saveAppWithoutBackup()) {
         alert('恢复成功！');
         renderCustomersList();
-        renderIngredientsList();
+        // renderIngredientsList(); // 原料数据已迁移到后端，需要从后端加载
+        if (backendState.token) {
+          loadIngredientsFromBackend();
+        }
         renderRecipesList();
         renderBackupsList(); // 刷新备份列表
         return true;
@@ -747,7 +778,7 @@ function saveAppWithoutBackup() {
   try {
     const dataToSave = { 
       customers: store.customers,
-      ingredients: store.ingredients,
+      // ingredients: store.ingredients, // 原料数据已迁移到后端，不再保存到本地
       recipes: store.recipes,
       orders: store.orders
     };
@@ -770,7 +801,7 @@ function saveApp() {
   try {
     const dataToSave = { 
       customers: store.customers,
-      ingredients: store.ingredients,
+      // ingredients: store.ingredients, // 原料数据已迁移到后端，不再保存到本地
       recipes: store.recipes,
       orders: store.orders
     };
@@ -835,11 +866,11 @@ function loadApp() {
       try {
         const data = JSON.parse(raw);
         store.customers = Array.isArray(data.customers) ? data.customers : [];
-        store.ingredients = Array.isArray(data.ingredients) ? data.ingredients : [];
+        // store.ingredients = Array.isArray(data.ingredients) ? data.ingredients : []; // 原料数据已迁移到后端，不再从本地加载
         store.recipes = Array.isArray(data.recipes) ? data.recipes : [];
         store.orders = Array.isArray(data.orders) ? data.orders : [];
-        console.log('加载数据成功 - 顾客:', store.customers.length, '原料:', store.ingredients.length, '食谱:', store.recipes.length);
-        if (store.customers.length > 0 || store.ingredients.length > 0 || store.recipes.length > 0) {
+        console.log('加载数据成功 - 顾客:', store.customers.length, '食谱:', store.recipes.length);
+        if (store.customers.length > 0 || store.recipes.length > 0) {
           return;
         }
       } catch (parseError) {
@@ -856,7 +887,7 @@ function loadApp() {
           const oldData = JSON.parse(oldRaw);
           if (Array.isArray(oldData.customers)) {
             store.customers = oldData.customers;
-            store.ingredients = Array.isArray(oldData.ingredients) ? oldData.ingredients : [];
+            // store.ingredients = Array.isArray(oldData.ingredients) ? oldData.ingredients : []; // 原料数据已迁移到后端
             store.recipes = Array.isArray(oldData.recipes) ? oldData.recipes : [];
             // 迁移到新key
             saveApp();
@@ -891,6 +922,21 @@ function genId() { return 'id_' + Math.random().toString(36).slice(2, 9); }
 
 function switchView(view) {
   console.log('切换视图到:', view);
+  // 保存当前视图到localStorage
+  try {
+    localStorage.setItem('pff-current-view', view);
+  } catch (e) {
+    console.warn('保存当前视图失败:', e);
+  }
+  
+  // 更新导航按钮的active状态
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.view === view) {
+      btn.classList.add('active');
+    }
+  });
+  
   document.querySelectorAll('.view').forEach(v => {
     v.style.display = 'none';
     v.removeAttribute('style');
@@ -899,10 +945,14 @@ function switchView(view) {
   if (el) {
     el.setAttribute('style', 'display: block !important');
     console.log('视图元素:', el, '显示状态:', el.style.display);
-    // 如果切换到原料视图，重新渲染列表
-    if (view === 'inventory') {
+    // 如果切换到原料视图，从后端加载数据
+    if (view === 'inventory' && backendState.token) {
+      setTimeout(async () => {
+        await loadIngredientsFromBackend();
+      }, 100);
+    } else if (view === 'inventory') {
       setTimeout(() => {
-        updateNameFilterSelect();
+        store.ingredients = [];
         renderIngredientsList();
       }, 100);
     }
@@ -1014,7 +1064,7 @@ function lactFactorFromStage(stage) {
 
 // 使用共享工具库更新生命阶段
 function updateLifeStageFromBirthday() {
-  if (!PetUtils) {
+  if (typeof PetUtils === 'undefined' || !PetUtils) {
     // 回退到旧逻辑
     autoSetLifeStageFromBirthday();
     return;
@@ -1096,7 +1146,7 @@ function computeAndFillEstKcal() {
   if (w <= 0) { estEl.value = ''; setEstHint(''); return; }
   
   // 优先使用共享工具库
-  if (PetUtils) {
+  if (typeof PetUtils !== 'undefined' && PetUtils) {
     const life = $('c-lifeStage').value;
     const kcalFactor = Number($('c-kcalFactor').value) || 0;
     if (!kcalFactor) {
@@ -2031,43 +2081,166 @@ function closeQuoteResult() {
   if (contentEl) contentEl.innerHTML = '';
 }
 
-function formatDetails(c) {
-  const parts = [];
+async function formatDetails(c) {
+  // 构建紧凑的表格单元格
+  const buildCell = (label, value) => {
+    return `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; white-space:nowrap;">${escapeHtml(label)}</td>
+      <td style="padding:4px 6px; border:1px solid var(--border); font-size:12px;">${value}</td>`;
+  };
+  
+  let html = '<div class="item-details"><table style="width:100%; border-collapse:collapse; font-size:12px; margin:8px 0;">';
+  
+  // 如果有主人信息，先显示主人信息
+  if (c.userId) {
+    html += '<tr><td colspan="4" style="padding:6px; background:var(--bg-secondary); font-weight:600; text-align:center; font-size:13px;">主人信息</td></tr>';
+    
+    // 主人信息使用两列布局
+    html += '<tr>';
+    html += buildCell('主人昵称', escapeHtml(c.userName || '-'));
+    
+    // 微信号/手机号
+    const contactInfo = c.wechat || c.phone || '-';
+    html += buildCell('微信号/手机号', escapeHtml(contactInfo));
+    html += '</tr>';
+    
+    // 收货地址（如果有userId，异步加载）
+    html += '<tr>';
+    if (backendState.token && c.userId) {
+      try {
+        const addresses = await backendRequest(`/api/v1/addresses/customer/${c.userId}`, {
+          method: 'GET'
+        });
+        const addressList = Array.isArray(addresses) ? addresses : (addresses.items || []);
+        if (addressList && addressList.length > 0) {
+          const addressHtml = addressList.map(addr => {
+            const addrStr = `${addr.region || ''} ${addr.detail || ''}`.trim();
+            const isDefault = addr.isDefault ? ' <span style="color:var(--primary); font-size:11px;">(默认)</span>' : '';
+            return `<div style="margin-bottom:2px;">${escapeHtml(addrStr)}${isDefault}</div>`;
+          }).join('');
+          html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; vertical-align:top;">收货地址</td>
+            <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px; vertical-align:top;">${addressHtml}</td>`;
+        } else {
+          html += buildCell('收货地址', escapeHtml(c.address || '-'));
+          html += '<td colspan="2"></td>';
+        }
+      } catch (error) {
+        console.warn('加载地址失败:', error);
+        html += buildCell('收货地址', escapeHtml(c.address || '-'));
+        html += '<td colspan="2"></td>';
+      }
+    } else {
+      html += buildCell('收货地址', escapeHtml(c.address || '-'));
+      html += '<td colspan="2"></td>';
+    }
+    html += '</tr>';
+    
+    html += '<tr><td colspan="4" style="padding:2px;"></td></tr>'; // 空行分隔
+  }
+  
+  // 宠物信息
+  html += '<tr><td colspan="4" style="padding:6px; background:var(--bg-secondary); font-weight:600; text-align:center; font-size:13px;">宠物信息</td></tr>';
+  
   const years = calcAgeYears(c.birthday);
   const showAge = c.lifeStage === 'adult' || c.lifeStage === 'pregnancy' || c.lifeStage === 'lactation';
   const showPuppy = c.lifeStage === 'puppy';
   const showLact = c.lifeStage === 'lactation';
-
-  parts.push(`宠物昵称：${c.petName || '-'}`);
-  parts.push(`品种：${c.breed || '-'}`);
-  parts.push(`微信号：${c.wechat || '-'}`);
-  parts.push(`收货信息：${c.address || '-'}`);
-  if (showAge && years != null) parts.push(`年龄：${years.toFixed(1)} 岁`);
-  parts.push(`生日：${c.birthday || '-'}`);
-  parts.push(`体重：${c.weightKg || '-'} kg`);
-  parts.push(`性别：${zh(c.sex, sexMap)}`);
-  parts.push(`是否绝育：${zh(c.neutered, neuterMap)}`);
-  parts.push(`生命阶段：${zh(c.lifeStage, lifeMap)}`);
-  parts.push(`活动水平：${zh(c.activity, actMap)}`);
+  
+  // 基本信息 - 两列布局
+  html += '<tr>';
+  html += buildCell('宠物昵称', escapeHtml(c.petName || '-'));
+  html += buildCell('品种', escapeHtml(c.breed || '-'));
+  html += '</tr>';
+  
+  html += '<tr>';
+  html += buildCell('年龄', formatAgeDisplay(c));
+  html += buildCell('生日', escapeHtml(c.birthday || '-'));
+  html += '</tr>';
+  
+  html += '<tr>';
+  html += buildCell('体重', c.weightKg != null ? `${formatNumber(c.weightKg, 2)} kg` : '-');
+  html += buildCell('性别', zh(c.sex, sexMap));
+  html += '</tr>';
+  
+  html += '<tr>';
+  html += buildCell('是否绝育', zh(c.neutered, neuterMap));
+  html += buildCell('生命阶段', zh(c.lifeStage, lifeMap));
+  html += '</tr>';
+  
+  // 活动水平用中文显示，热量系数只保留整数
+  const activityText = c.activity ? zh(c.activity, actMap) : '-';
+  const kcalFactor = c.kcalFactor != null ? Math.round(c.kcalFactor) : (c.activity ? activityKcalFactor(c.activity) : '-');
+  html += '<tr>';
+  html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px;">活动水平</td>
+    <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px;">${activityText !== '-' ? `${activityText}（热量系数 ${kcalFactor}）` : '-'}</td>`;
+  html += '</tr>';
+  
   if (showPuppy) {
-    if (c.monthAge != null) parts.push(`月龄：${c.monthAge}`);
-    if (c.monthFactor != null) parts.push(`月龄系数：${c.monthFactor}`);
+    html += '<tr>';
+    if (c.monthAge != null) html += buildCell('月龄', c.monthAge);
+    if (c.monthFactor != null) html += buildCell('月龄系数', c.monthFactor);
+    if (c.monthAge == null && c.monthFactor == null) html += '<td colspan="4"></td>';
+    html += '</tr>';
   }
   if (showLact) {
-    parts.push(`哺乳阶段：${zh(c.lactStage, lactMap)}`);
-    if (c.lactFactor != null) parts.push(`哺乳阶段因子：${c.lactFactor}`);
-    parts.push(`产仔数：${c.litterCount != null ? c.litterCount : '-'}`);
+    html += '<tr>';
+    html += buildCell('哺乳阶段', zh(c.lactStage, lactMap));
+    html += buildCell('产仔数', c.litterCount != null ? c.litterCount : '-');
+    html += '</tr>';
+    if (c.lactFactor != null) {
+      html += '<tr>';
+      html += buildCell('哺乳阶段因子', c.lactFactor);
+      html += '<td colspan="2"></td>';
+      html += '</tr>';
+    }
   }
-  if (c.kcalFactor != null) parts.push(`热量系数：${c.kcalFactor}`);
-  if (c.estKcal != null) parts.push(`每日能量估算：${c.estKcal} kcal/日`);
-  if (c.bcs != null) parts.push(`体况评分：${c.bcs}`);
-  if (c.mealsPerDay != null) parts.push(`每日吃几顿饭：${c.mealsPerDay}`);
-  if (c.allergies) parts.push(`过敏/不耐受：${c.allergies}`);
-  if (c.avoid) parts.push(`挑食/尽量不吃：${c.avoid}`);
-  if (c.fav) parts.push(`非常喜欢：${c.fav}`);
-  if (c.med) parts.push(`症状史/疾病史：${c.med}`);
-  if (c.notes) parts.push(`备注：${c.notes}`);
-  return `<div class="item-details">${parts.map(t => `<div>${t}</div>`).join('')}</div>`;
+  
+  html += '<tr>';
+  if (c.estKcal != null) html += buildCell('每日能量估算', `${c.estKcal} kcal/日`);
+  if (c.bcs != null) html += buildCell('体况评分', c.bcs);
+  if (c.estKcal == null && c.bcs == null) html += '<td colspan="4"></td>';
+  html += '</tr>';
+  
+  if (c.mealsPerDay != null) {
+    html += '<tr>';
+    html += buildCell('每日吃几顿饭', c.mealsPerDay);
+    html += '<td colspan="2"></td>';
+    html += '</tr>';
+  }
+  
+  // 备注类信息 - 占用整行
+  if (c.allergies) {
+    html += '<tr>';
+    html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; vertical-align:top;">过敏/不耐受</td>
+      <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px; vertical-align:top;">${escapeHtml(c.allergies)}</td>`;
+    html += '</tr>';
+  }
+  if (c.avoid) {
+    html += '<tr>';
+    html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; vertical-align:top;">挑食/尽量不吃</td>
+      <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px; vertical-align:top;">${escapeHtml(c.avoid)}</td>`;
+    html += '</tr>';
+  }
+  if (c.fav) {
+    html += '<tr>';
+    html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; vertical-align:top;">非常喜欢</td>
+      <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px; vertical-align:top;">${escapeHtml(c.fav)}</td>`;
+    html += '</tr>';
+  }
+  if (c.med) {
+    html += '<tr>';
+    html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; vertical-align:top;">症状史/疾病史</td>
+      <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px; vertical-align:top;">${escapeHtml(c.med)}</td>`;
+    html += '</tr>';
+  }
+  if (c.notes) {
+    html += '<tr>';
+    html += `<td style="padding:4px 6px; border:1px solid var(--border); background:var(--bg-tertiary); font-weight:500; font-size:12px; width:100px; vertical-align:top;">备注</td>
+      <td colspan="3" style="padding:4px 6px; border:1px solid var(--border); font-size:12px; vertical-align:top;">${escapeHtml(c.notes)}</td>`;
+    html += '</tr>';
+  }
+  
+  html += '</table></div>';
+  return html;
 }
 
 function paginatedCustomers() {
@@ -2101,15 +2274,17 @@ function renderCustomersList() {
     list.innerHTML = '<div class="muted">暂无记录</div>';
   } else {
     list.innerHTML = pageItems.map((c, i) => {
-      const idx = (store.page - 1) * store.pageSize + i + 1;
+      const ownerName = c.userName || '-';
+      const contactInfo = c.wechat || c.phone || '-';
       return `
         <div class="list-item" data-id="${c.id}">
           <div class="list-item-row">
-            <div>${idx}</div>
-            <div>${c.petName || '-'}</div>
-            <div>${c.breed || '-'}</div>
-            <div>${c.wechat || '-'}</div>
-            <div>${c.address || '-'}</div>
+            <div>${escapeHtml(c.petName || '-')}</div>
+            <div>${escapeHtml(c.breed || '-')}</div>
+            <div>${formatAgeDisplay(c)}</div>
+            <div>${c.weightKg != null ? `${formatNumber(c.weightKg, 2)} kg` : '-'}</div>
+            <div>${escapeHtml(ownerName)}</div>
+            <div>${escapeHtml(contactInfo)}</div>
           </div>
           <div class="item-actions">
             <button class="btn small" data-quote="${c.id}">筛选食谱</button>
@@ -2120,14 +2295,28 @@ function renderCustomersList() {
         </div>`;
     }).join('');
   }
-  list.querySelectorAll('[data-detail]').forEach(btn => btn.addEventListener('click', () => {
+  list.querySelectorAll('[data-detail]').forEach(btn => btn.addEventListener('click', async () => {
     const id = btn.dataset.detail;
     const wrap = list.querySelector(`.list-item[data-id="${id}"]`);
     const existing = wrap.querySelector('.item-details');
     if (existing) { existing.remove(); return; }
     const c = store.customers.find(x => x.id === id);
     if (!c) return;
-    wrap.insertAdjacentHTML('beforeend', formatDetails(c));
+    // 显示加载中
+    wrap.insertAdjacentHTML('beforeend', '<div class="item-details">加载中...</div>');
+    try {
+      const detailsHtml = await formatDetails(c);
+      const loadingEl = wrap.querySelector('.item-details');
+      if (loadingEl) {
+        loadingEl.outerHTML = detailsHtml;
+      }
+    } catch (error) {
+      console.error('加载详细信息失败:', error);
+      const loadingEl = wrap.querySelector('.item-details');
+      if (loadingEl) {
+        loadingEl.innerHTML = '<div style="color:red;">加载详细信息失败: ' + escapeHtml(error.message || '未知错误') + '</div>';
+      }
+    }
   }));
   list.querySelectorAll('[data-quote]').forEach(btn => btn.addEventListener('click', () => openQuoteRecipeSelector(btn.dataset.quote)));
   list.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
@@ -2211,11 +2400,15 @@ async function openCustomerForm(id) {
       console.warn('地址输入框不存在');
     }
     
-    // 确保地址管理按钮可见
+    // 确保地址管理按钮可见（只有在有userId且已登录时才显示）
     const addressManageBtn = $('c-address-manage');
     if (addressManageBtn) {
-      addressManageBtn.style.display = 'inline-block';
-      addressManageBtn.textContent = '管理地址';
+      if (c.userId && backendState.token) {
+        addressManageBtn.style.display = 'inline-block';
+        addressManageBtn.textContent = '管理地址';
+      } else {
+        addressManageBtn.style.display = 'none';
+      }
     } else {
       console.warn('地址管理按钮不存在');
     }
@@ -2305,6 +2498,11 @@ async function openCustomerForm(id) {
       otherBreedInput.value = '';
       otherBreedInput.required = false;
     }
+    // 新增顾客时隐藏地址管理按钮（因为没有userId）
+    const addressManageBtn = $('c-address-manage');
+    if (addressManageBtn) {
+      addressManageBtn.style.display = 'none';
+    }
     $('c-sex').value = 'unknown';
     $('c-neutered').value = 'unknown';
     $('c-lifeStage').value = 'adult';
@@ -2360,6 +2558,71 @@ async function deleteCustomer(id) {
     store.customers = store.customers.filter(c => c.id !== id);
     saveApp();
     renderCustomersList();
+  }
+}
+
+// 从后端加载原料数据
+async function loadIngredientsFromBackend() {
+  if (!backendState.token) {
+    console.warn('未登录，无法加载原料数据');
+    store.ingredients = [];
+    renderIngredientsList();
+    return;
+  }
+  
+  try {
+    const search = $('ingredient-search')?.value || '';
+    const category = $('ingredient-category-filter')?.value || '';
+    const classification = ''; // 预留，暂时不使用
+    
+    const params = new URLSearchParams({
+      page: store.ingredientPage || 1,
+      pageSize: store.ingredientPageSize || 20
+    });
+    
+    if (search) params.append('search', search);
+    if (category) params.append('category', category);
+    if (classification) params.append('classification', classification);
+    
+    const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+    
+    // 转换数据格式（将后端返回的数据转换为前端格式）
+    const ingredients = (data.items || []).map(ing => ({
+      id: `ing_${ing.id}`, // 使用ing_前缀避免ID冲突
+      code: ing.code || '',
+      category: ing.category || '',
+      name: ing.name || '',
+      brand: ing.brand || '',
+      cost: ing.cost || null,
+      quantity: ing.quantity || null,
+      unit: ing.unit || 'g',
+      pricePer500: ing.pricePer500 || null,
+      ediblePortion: ing.ediblePortion !== undefined ? ing.ediblePortion : 1.0,
+      ediblePricePer500: ing.ediblePricePer500 || null,
+      weightPerUnit: ing.weightPerUnit || null,
+      classification: ing.classification || null,
+      description: ing.description || '',
+      mainFunction: ing.mainFunction || '',
+      createdAt: ing.createdAt ? new Date(ing.createdAt).getTime() : Date.now(),
+      updatedAt: ing.updatedAt ? new Date(ing.updatedAt).getTime() : Date.now(),
+      // 保存后端ID用于更新和删除
+      _backendId: ing.id
+    }));
+    
+    // 更新store
+    store.ingredients = ingredients;
+    store.totalIngredients = data.total || 0;
+    store.ingredientTotalPages = data.totalPages || 1;
+    
+    console.log(`✓ 从后端加载了 ${ingredients.length} 条原料记录（共 ${data.total} 条）`);
+    
+    renderIngredientsList();
+    updateNameFilterSelect();
+  } catch (error) {
+    console.error('加载原料列表失败:', error);
+    alert('加载原料列表失败：' + error.message);
+    store.ingredients = [];
+    renderIngredientsList();
   }
 }
 
@@ -3149,6 +3412,16 @@ function renderIngredientsList() {
 }
 
 function paginatedIngredients() {
+  // 如果使用后端数据，直接返回当前页数据（后端已处理分页和搜索）
+  if (backendState.token && store.totalIngredients !== undefined) {
+    return {
+      pageItems: store.ingredients,
+      total: store.totalIngredients || store.ingredients.length,
+      totalPages: store.ingredientTotalPages || 1
+    };
+  }
+  
+  // 本地数据：客户端分页和搜索（仅用于未登录时的降级方案）
   const searchQ = ($('ingredient-search').value || '').trim().toLowerCase();
   const categoryFilter = ($('ingredient-category-filter').value || '').trim();
   const nameFilter = ($('ingredient-name-filter').value || '').trim();
@@ -3183,10 +3456,13 @@ function openIngredientForm(id = null) {
   
   if (id) {
     const ing = store.ingredients.find(x => x.id === id);
-    if (!ing) return;
+    if (!ing) {
+      console.error('未找到原料数据，ID:', id);
+      return;
+    }
     
     if (title) title.textContent = '编辑原料';
-    $('ingredient-id').value = ing.id;
+    $('ingredient-id').value = ing.id; // 保存前端ID（带ing_前缀）
     $('i-code').value = ing.code || '';
     
     // 先设置类别，然后更新项目下拉框
@@ -3248,18 +3524,35 @@ function openIngredientForm(id = null) {
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function deleteIngredient(id) {
+async function deleteIngredient(id) {
   if (!confirm('确定要删除这个原料吗？')) return;
-  const idx = store.ingredients.findIndex(x => x.id === id);
-  if (idx >= 0) {
-    store.ingredients.splice(idx, 1);
-    saveApp();
-    updateNameFilterSelect(); // 更新名称筛选下拉框
-    renderIngredientsList();
+  
+  if (!backendState.token) {
+    alert('请先登录');
+    return;
+  }
+  
+  try {
+    const ingredient = store.ingredients.find(x => x.id === id);
+    if (!ingredient || !ingredient._backendId) {
+      alert('无法找到原料的后端ID');
+      return;
+    }
+    
+    await backendRequest(`/api/v1/ingredients/${ingredient._backendId}`, {
+      method: 'DELETE'
+    });
+    
+    alert('删除成功！');
+    await loadIngredientsFromBackend();
+    updateNameFilterSelect();
+  } catch (error) {
+    console.error('删除原料失败:', error);
+    alert('删除失败：' + error.message);
   }
 }
 // 批量生成缺失的编号
-function generateMissingCodes() {
+async function generateMissingCodes() {
   // 找出所有编号为空或无效的原料（只检查编号）
   const missingCodes = store.ingredients.filter(ing => {
     return !ing.code || ing.code.trim() === '';
@@ -3285,121 +3578,44 @@ function generateMissingCodes() {
     return;
   }
   
-  // 创建备份
-  const currentData = {
-    customers: store.customers,
-    ingredients: store.ingredients
-  };
-  createBackup(currentData);
+  if (!backendState.token) {
+    alert('请先登录才能生成编号');
+    return;
+  }
   
-  // 为每个缺少编号的原料生成编号
+  // 为每个缺少编号的原料生成编号并更新到后端
   let generated = 0;
   let failed = 0;
   
-  validMissing.forEach(ing => {
+  for (const ing of validMissing) {
     if (!ing.code || ing.code.trim() === '') {
       const code = generateIngredientCode(ing.category, ing.name, ing.id);
-      if (code) {
-        ing.code = code;
-        generated++;
+      if (code && ing._backendId) {
+        try {
+          await backendRequest(`/api/v1/ingredients/${ing._backendId}`, {
+            method: 'PUT',
+            body: { code: code }
+          });
+          ing.code = code;
+          generated++;
+        } catch (error) {
+          console.error(`更新编号失败: ${code}`, error);
+          failed++;
+        }
       } else {
         console.warn('生成编号失败:', ing.category, ing.name);
         failed++;
       }
     }
-  });
-  
-  // 保存数据
-  if (saveApp()) {
-    updateNameFilterSelect();
-    renderIngredientsList();
-    alert(`编号生成完成！\n成功生成: ${generated} 条\n失败: ${failed} 条${invalidMissing > 0 ? `\n缺少类别/项目: ${invalidMissing} 条` : ''}`);
-  } else {
-    alert('保存失败，请重试');
   }
+  
+  // 重新加载列表
+  await loadIngredientsFromBackend();
+  updateNameFilterSelect();
+  alert(`编号生成完成！\n成功生成: ${generated} 条\n失败: ${failed} 条${invalidMissing > 0 ? `\n缺少类别/项目: ${invalidMissing} 条` : ''}`);
 }
 
-function importFromExcel(file) {
-  if (!file) return;
-  
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      
-      let imported = 0;
-      let skipped = 0;
-      
-      jsonData.forEach(row => {
-        // 检查是否已存在（按编号判断）
-        const code = (row['编号'] || '').toString().trim();
-        if (!code) { skipped++; return; }
-        
-        const exists = store.ingredients.some(ing => ing.code === code);
-        if (exists) { skipped++; return; }
-        
-        const cost = parseFloat(row['费用']) || 0;
-        const quantity = parseFloat(row['单量']) || 0;
-        const unit = (row['单位'] || 'g').toString().trim();
-        // Excel中的可食部是0-1的小数，保持原样
-        const ediblePortion = parseFloat(row['可食部']) || 1;
-        const pricePer500 = parseFloat(row['单价/500单位']) || calculatePricePer500(cost, quantity, unit);
-        const ediblePricePer500 = parseFloat(row['可食部单价/500单位']) || (pricePer500 / ediblePortion);
-        
-        // 自动生成编号（如果Excel中没有编号）
-        const category = (row['类别'] || '').toString().trim();
-        const name = (row['项目'] || '').toString().trim();
-        let finalCode = code;
-        if (!finalCode && category && name) {
-          finalCode = generateIngredientCode(category, name, null);
-        }
-        
-        const ingredient = {
-          id: genId(),
-          code: finalCode || '',
-          category: category,
-          name: name,
-          brand: (row['品牌/来源'] || '').toString().trim(),
-          cost: cost,
-          quantity: quantity,
-          unit: unit,
-          pricePer500: pricePer500,
-          ediblePortion: ediblePortion,
-          ediblePricePer500: ediblePricePer500,
-          weightPerUnit: parseFloat(row['每单位重量(g)']) || null,
-          description: (row['说明'] || '').toString().trim(),
-          mainFunction: (row['主要作用'] || '').toString().trim(),
-          createdAt: Date.now()
-        };
-        
-        if (!ingredient.name) { skipped++; return; }
-        
-        store.ingredients.push(ingredient);
-        imported++;
-      });
-      
-      saveApp();
-      updateNameFilterSelect(); // 更新名称筛选下拉框
-      renderIngredientsList();
-      alert(`导入完成！成功导入 ${imported} 条，跳过 ${skipped} 条（已存在或无名称）`);
-      
-      const importCard = $('import-excel-card');
-      if (importCard) importCard.style.display = 'none';
-      const fileInput = $('excel-file-input');
-      if (fileInput) fileInput.value = '';
-      
-    } catch (error) {
-      console.error('导入Excel失败:', error);
-      alert('导入失败：' + error.message);
-    }
-  };
-  
-  reader.readAsArrayBuffer(file);
-}
+// Excel导入功能已移除，数据已迁移到后端
 
 // 渲染类别管理列表
 function renderCategoryManageList() {
@@ -3608,21 +3824,33 @@ function setupIngredientsModule() {
   }
   
   const searchEl = $('ingredient-search');
-  if (searchEl) searchEl.addEventListener('input', () => {
+  if (searchEl) searchEl.addEventListener('input', async () => {
     store.ingredientPage = 1;
-    renderIngredientsList();
+    if (backendState.token) {
+      await loadIngredientsFromBackend();
+    } else {
+      renderIngredientsList();
+    }
   });
   
   const categoryFilterEl = $('ingredient-category-filter');
-  if (categoryFilterEl) categoryFilterEl.addEventListener('change', () => {
+  if (categoryFilterEl) categoryFilterEl.addEventListener('change', async () => {
     store.ingredientPage = 1;
-    renderIngredientsList();
+    if (backendState.token) {
+      await loadIngredientsFromBackend();
+    } else {
+      renderIngredientsList();
+    }
   });
   
   const nameFilterEl = $('ingredient-name-filter');
-  if (nameFilterEl) nameFilterEl.addEventListener('change', () => {
+  if (nameFilterEl) nameFilterEl.addEventListener('change', async () => {
     store.ingredientPage = 1;
-    renderIngredientsList();
+    if (backendState.token) {
+      await loadIngredientsFromBackend();
+    } else {
+      renderIngredientsList();
+    }
   });
   
   const prevBtn = $('ingredients-prev');
@@ -3652,9 +3880,15 @@ function setupIngredientsModule() {
   // 表单提交
   const form = $('ingredient-form');
   if (form) {
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const id = $('ingredient-id').value || genId();
+      
+      if (!backendState.token) {
+        alert('请先登录');
+        return;
+      }
+      
+      const id = $('ingredient-id').value;
       const name = $('i-name').value.trim();
       if (!name) {
         alert('请填写原料名称');
@@ -3679,69 +3913,64 @@ function setupIngredientsModule() {
       const pricePer500 = Number($('i-pricePer500').value) || 0;
       const ediblePricePer500 = Number($('i-ediblePricePer500').value) || 0;
       
-      const record = {
-        id,
+      const data = {
         code: code || '',
         category: $('i-category').value.trim(),
         name: name,
-        brand: $('i-brand').value.trim(),
-        cost: cost,
-        quantity: quantity,
+        brand: $('i-brand').value.trim() || null,
+        cost: cost || null,
+        quantity: quantity || null,
         unit: unit,
-        pricePer500: pricePer500,
+        pricePer500: pricePer500 || null,
         ediblePortion: ediblePortion,
-        ediblePricePer500: ediblePricePer500,
+        ediblePricePer500: ediblePricePer500 || null,
         weightPerUnit: $('i-weightPerUnit').value ? Number($('i-weightPerUnit').value) : null,
-        description: $('i-description').value.trim(),
-        mainFunction: $('i-mainFunction').value.trim(),
-        updatedAt: Date.now()
+        classification: null, // 预留字段，暂时为空
+        description: $('i-description').value.trim() || null,
+        mainFunction: $('i-mainFunction').value.trim() || null
       };
       
-      const existsIdx = store.ingredients.findIndex(x => x.id === id);
-      if (existsIdx >= 0) {
-        // 保留创建时间
-        record.createdAt = store.ingredients[existsIdx].createdAt;
-        store.ingredients.splice(existsIdx, 1, record);
-      } else {
-        record.createdAt = Date.now();
-        store.ingredients.unshift(record);
+      try {
+        if (id && id.startsWith('ing_')) {
+          // 编辑：使用后端ID
+          const backendId = store.ingredients.find(x => x.id === id)?._backendId;
+          if (backendId) {
+            await backendRequest(`/api/v1/ingredients/${backendId}`, {
+              method: 'PUT',
+              body: data
+            });
+            alert('更新成功！');
+          } else {
+            throw new Error('无法找到原料的后端ID');
+          }
+        } else {
+          // 新增
+          await backendRequest('/api/v1/ingredients', {
+            method: 'POST',
+            body: data
+          });
+          alert('创建成功！');
+        }
+        
+        // 重新加载列表
+        await loadIngredientsFromBackend();
+        updateNameFilterSelect();
+        const card = $('ingredient-form-card');
+        if (card) card.style.display = 'none';
+      } catch (error) {
+        console.error('保存原料失败:', error);
+        alert('保存失败：' + error.message);
       }
-      
-      saveApp();
-      updateNameFilterSelect(); // 更新名称筛选下拉框
-      const card = $('ingredient-form-card');
-      if (card) card.style.display = 'none';
-      renderIngredientsList();
     });
   }
   
-  // Excel导入
-  const importBtn = $('btn-import-excel');
-  if (importBtn) importBtn.addEventListener('click', () => {
-    const importCard = $('import-excel-card');
-    if (importCard) importCard.style.display = 'block';
-  });
-  
-  const cancelImportBtn = $('btn-cancel-import');
-  if (cancelImportBtn) cancelImportBtn.addEventListener('click', () => {
-    const importCard = $('import-excel-card');
-    if (importCard) importCard.style.display = 'none';
-    const fileInput = $('excel-file-input');
-    if (fileInput) fileInput.value = '';
-  });
-  
-  const confirmImportBtn = $('btn-confirm-import');
-  if (confirmImportBtn) confirmImportBtn.addEventListener('click', () => {
-    const fileInput = $('excel-file-input');
-    if (fileInput && fileInput.files.length > 0) {
-      importFromExcel(fileInput.files[0]);
-    } else {
-      alert('请先选择Excel文件');
-    }
-  });
-  
-  // 初始渲染
-  renderIngredientsList();
+  // 初始加载：如果已登录，从后端加载；否则显示空列表
+  if (backendState.token) {
+    loadIngredientsFromBackend();
+  } else {
+    store.ingredients = [];
+    renderIngredientsList();
+  }
   
   // 当数据变化时，更新名称筛选下拉框
   const originalSaveApp = saveApp;
@@ -4871,19 +5100,8 @@ function setupNav() {
 }
 
 function setupPWA() {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const bi = $('btn-install'); if (bi) bi.style.display = 'inline-flex';
-  });
-  const bi = $('btn-install');
-  if (bi) bi.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    bi.style.display = 'none';
-  });
+  // PWA安装功能已移除
+  // 保留函数以避免调用错误
 }
 
 // 渲染备份列表
@@ -8852,8 +9070,18 @@ function init() {
   setupSettingsModule();
   updateAuthUI();
   renderCustomersList();
-  switchView('customers');
-  const printBtn = $('btn-print'); if (printBtn) printBtn.addEventListener('click', () => window.print());
+  
+  // 恢复上次的视图，如果没有则默认显示customers
+  let savedView = 'customers';
+  try {
+    const saved = localStorage.getItem('pff-current-view');
+    if (saved && ['customers', 'recipes', 'inventory', 'orders', 'settings', 'breeds', 'users'].includes(saved)) {
+      savedView = saved;
+    }
+  } catch (e) {
+    console.warn('读取保存的视图失败:', e);
+  }
+  switchView(savedView);
   
   // 登录按钮
   const loginBtn = $('btn-open-login');
@@ -9191,16 +9419,48 @@ async function openAddressManagementDialog(userId) {
               citySelect.disabled = true;
               citySelect.value = ''; // 清空城市选择
               
-              // 直辖市的数据结构：{ '北京市': [区列表] } 或 { '市辖区': [区列表] }
+              // 直辖市的数据结构：{ '北京市': [区列表] } 或 { '市辖区': [区列表] } 或 { '重庆市': [区列表] }
               const cityKeys = Object.keys(regionsData[province]);
               let districts = [];
               
+              console.log(`直辖市 ${province} 的城市键:`, cityKeys);
+              
               // 尝试获取区县数据
               if (cityKeys.length > 0) {
-                // 通常直辖市只有一个"城市"键（如"北京市"或"市辖区"）
-                const firstCityKey = cityKeys[0];
-                districts = regionsData[province][firstCityKey] || [];
+                // 优先查找与省份同名的城市键（如"北京市"、"重庆市"）
+                let targetCityKey = cityKeys.find(key => key === province || key === province.replace('市', '') || key === province.replace('省', ''));
+                
+                // 如果没找到，尝试查找"市辖区"或第一个非"其他市"的键
+                if (!targetCityKey) {
+                  targetCityKey = cityKeys.find(key => key === '市辖区' || key.includes('市') || key !== '其他市');
+                }
+                
+                // 如果还是没找到，使用第一个键
+                if (!targetCityKey && cityKeys.length > 0) {
+                  targetCityKey = cityKeys[0];
+                }
+                
+                console.log(`直辖市 ${province} 使用的城市键:`, targetCityKey);
+                
+                if (targetCityKey) {
+                  districts = regionsData[province][targetCityKey] || [];
+                  
+                  // 如果第一个键没有数据，尝试合并所有城市键的区县数据
+                  if (districts.length === 0 && cityKeys.length > 1) {
+                    console.log('第一个城市键没有数据，尝试合并所有城市键的区县数据');
+                    cityKeys.forEach(key => {
+                      const cityDistricts = regionsData[province][key];
+                      if (Array.isArray(cityDistricts) && cityDistricts.length > 0) {
+                        districts = districts.concat(cityDistricts);
+                      }
+                    });
+                    // 去重
+                    districts = [...new Set(districts)];
+                  }
+                }
               }
+              
+              console.log(`直辖市 ${province} 的区县数据:`, districts.length, '个区县', districts.slice(0, 10));
               
               if (districts.length > 0) {
                 districtSelect.disabled = false;
@@ -9210,7 +9470,9 @@ async function openAddressManagementDialog(userId) {
                   option.textContent = district;
                   districtSelect.appendChild(option);
                 });
-                console.log('直辖市区县列表已加载:', districts.length, '个区县');
+                console.log(`✓ 直辖市区县列表已加载: ${province} 有 ${districts.length} 个区县`);
+              } else {
+                console.warn(`⚠️ 直辖市 ${province} 没有找到区县数据，城市键:`, cityKeys, '数据结构:', regionsData[province]);
               }
             } else {
               // 非直辖市：显示市级选择
