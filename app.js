@@ -3555,16 +3555,9 @@ async function preloadCommonCategories() {
           console.log(`[Preload] Preloaded 0 categories for: ${classification}`);
         }
       } catch (error) {
-        // 静默处理预加载错误，完全不输出任何日志
-        // 404/400错误是预期的，API可能还未完全实现
-        const errorMessage = error.message || '';
-        if (!errorMessage.includes('404') && !errorMessage.includes('Not Found') && 
-            !errorMessage.includes('400') && !errorMessage.includes('484') &&
-            !errorMessage.includes('Resource not found')) {
-          // 只有非404错误才记录
-          console.log(`[Preload] 非404错误 for ${classification}:`, errorMessage);
-        }
-        // 无论什么错误，都静默处理，不显示
+        // 完全静默处理预加载错误，不输出任何日志
+        // 404/400/484错误是预期的，API可能还未完全实现
+        // 不显示任何错误信息，避免控制台报错
       }
     });
     
