@@ -3604,11 +3604,14 @@ async function loadCategoriesForForm(classification, useCache = true) {
     
     return categories;
   } catch (error) {
-    console.error('加载分类失败:', error);
     // 如果加载失败，尝试从现有原料数据中提取类别
     const errorMessage = error.message || '';
-    if (errorMessage.includes('CORS') || errorMessage.includes('Failed to fetch') || errorMessage.includes('网络')) {
-      console.warn('网络错误，尝试从现有数据中提取类别');
+    
+    // 404/400错误或网络错误时，从现有数据中提取类别
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || 
+        errorMessage.includes('400') || errorMessage.includes('CORS') || 
+        errorMessage.includes('Failed to fetch') || errorMessage.includes('网络')) {
+      console.log('从现有数据中提取类别');
       // 从store.ingredients中提取该分类下的所有类别
       const existingCategories = [...new Set(
         store.ingredients
@@ -3627,9 +3630,11 @@ async function loadCategoriesForForm(classification, useCache = true) {
         console.log(`从现有数据中加载了 ${existingCategories.length} 个类别`);
         return existingCategories.map(cat => ({ category: cat }));
       } else {
-        categorySelect.innerHTML = '<option value="">加载失败，请检查网络连接</option>';
+        categorySelect.innerHTML = '<option value="">暂无类别数据</option>';
       }
     } else {
+      // 其他错误才显示错误信息
+      console.error('加载分类失败:', error);
       categorySelect.innerHTML = '<option value="">加载失败</option>';
     }
     return null;
