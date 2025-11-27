@@ -3663,9 +3663,11 @@ function populateCategorySelects() {
   if (classificationSelect && classificationSelect.value) {
     // 异步加载，不阻塞
     loadCategoriesForForm(classificationSelect.value).catch(err => {
-      // 404/400错误时静默处理，不显示错误
+      // 404/400/484错误时静默处理，不显示错误
       const errorMessage = err.message || '';
-      if (!errorMessage.includes('404') && !errorMessage.includes('Not Found') && !errorMessage.includes('400')) {
+      if (!errorMessage.includes('404') && !errorMessage.includes('Not Found') && 
+          !errorMessage.includes('400') && !errorMessage.includes('484') &&
+          !errorMessage.includes('Resource not found')) {
         console.error('加载分类失败:', err);
       }
       // 失败时使用旧的静态列表
