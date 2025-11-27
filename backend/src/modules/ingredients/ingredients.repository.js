@@ -7,6 +7,7 @@ const baseSelect = `
     category,
     name,
     brand,
+    source,
     cost,
     quantity,
     unit,
@@ -17,6 +18,11 @@ const baseSelect = `
     classification,
     description,
     main_function AS mainFunction,
+    subject,
+    part,
+    origin_type AS originType,
+    model,
+    unit_content AS unitContent,
     created_at AS createdAt,
     updated_at AS updatedAt,
     created_by AS createdBy,
@@ -88,10 +94,12 @@ export const findIngredientByCode = async (code) => {
 export const createIngredient = async (payload, userId) => {
   const sql = `
     INSERT INTO ingredients (
-      code, category, name, brand, cost, quantity, unit,
+      code, category, name, brand, source, cost, quantity, unit,
       price_per_500, edible_portion, edible_price_per_500, weight_per_unit,
-      classification, description, main_function, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      classification, description, main_function,
+      subject, part, origin_type, model, unit_content,
+      created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   
   const params = [
@@ -99,6 +107,7 @@ export const createIngredient = async (payload, userId) => {
     payload.category,
     payload.name,
     payload.brand || null,
+    payload.source || null,
     payload.cost || null,
     payload.quantity || null,
     payload.unit || 'g',
@@ -109,6 +118,11 @@ export const createIngredient = async (payload, userId) => {
     payload.classification || null,
     payload.description || null,
     payload.mainFunction || null,
+    payload.subject || null,
+    payload.part || null,
+    payload.originType || null,
+    payload.model || null,
+    payload.unitContent || null,
     userId || null
   ];
   
@@ -135,6 +149,10 @@ export const updateIngredient = async (id, payload, userId) => {
   if (payload.brand !== undefined) {
     fields.push('brand = ?');
     params.push(payload.brand || null);
+  }
+  if (payload.source !== undefined) {
+    fields.push('source = ?');
+    params.push(payload.source || null);
   }
   if (payload.cost !== undefined) {
     fields.push('cost = ?');
@@ -176,6 +194,26 @@ export const updateIngredient = async (id, payload, userId) => {
     fields.push('main_function = ?');
     params.push(payload.mainFunction || null);
   }
+  if (payload.subject !== undefined) {
+    fields.push('subject = ?');
+    params.push(payload.subject || null);
+  }
+  if (payload.part !== undefined) {
+    fields.push('part = ?');
+    params.push(payload.part || null);
+  }
+  if (payload.originType !== undefined) {
+    fields.push('origin_type = ?');
+    params.push(payload.originType || null);
+  }
+  if (payload.model !== undefined) {
+    fields.push('model = ?');
+    params.push(payload.model || null);
+  }
+  if (payload.unitContent !== undefined) {
+    fields.push('unit_content = ?');
+    params.push(payload.unitContent || null);
+  }
   
   if (fields.length === 0) {
     return null;
@@ -195,5 +233,7 @@ export const deleteIngredient = async (id) => {
   const sql = 'DELETE FROM ingredients WHERE id = ?';
   await query(sql, [id]);
 };
+
+
 
 

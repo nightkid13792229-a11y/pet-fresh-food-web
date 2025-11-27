@@ -14,6 +14,7 @@ export const createIngredientSchema = Joi.object({
     'any.required': '项目名称为必填项'
   }),
   brand: Joi.string().max(200).allow('', null),
+  source: Joi.string().max(200).allow('', null), // 采购渠道
   cost: Joi.number().min(0).allow(null),
   quantity: Joi.number().min(0).allow(null),
   unit: Joi.string().max(20).default('g'),
@@ -23,7 +24,13 @@ export const createIngredientSchema = Joi.object({
   weightPerUnit: Joi.number().min(0).allow(null),
   classification: Joi.string().max(100).allow('', null), // 预留字段
   description: Joi.string().allow('', null),
-  mainFunction: Joi.string().allow('', null)
+  mainFunction: Joi.string().allow('', null),
+  // 新增字段
+  subject: Joi.string().max(200).allow('', null), // 所属科目（仅食材）
+  part: Joi.string().max(200).allow('', null), // 部位（仅食材）
+  originType: Joi.string().max(200).allow('', null), // 产地类型（仅食材）
+  model: Joi.string().max(200).allow('', null), // 型号（所有分类）
+  unitContent: Joi.string().max(200).allow('', null) // 每单位含量（仅营养补充剂）
 });
 
 export const updateIngredientSchema = Joi.object({
@@ -37,6 +44,7 @@ export const updateIngredientSchema = Joi.object({
     'string.empty': '项目名称不能为空'
   }),
   brand: Joi.string().max(200).allow('', null),
+  source: Joi.string().max(200).allow('', null), // 采购渠道
   cost: Joi.number().min(0).allow(null),
   quantity: Joi.number().min(0).allow(null),
   unit: Joi.string().max(20),
@@ -46,7 +54,13 @@ export const updateIngredientSchema = Joi.object({
   weightPerUnit: Joi.number().min(0).allow(null),
   classification: Joi.string().max(100).allow('', null),
   description: Joi.string().allow('', null),
-  mainFunction: Joi.string().allow('', null)
+  mainFunction: Joi.string().allow('', null),
+  // 新增字段
+  subject: Joi.string().max(200).allow('', null), // 所属科目（仅食材）
+  part: Joi.string().max(200).allow('', null), // 部位（仅食材）
+  originType: Joi.string().max(200).allow('', null), // 产地类型（仅食材）
+  model: Joi.string().max(200).allow('', null), // 型号（所有分类）
+  unitContent: Joi.string().max(200).allow('', null) // 每单位含量（仅营养补充剂）
 }).min(1).messages({
   'object.min': '至少需要提供一个要更新的字段'
 });
@@ -58,5 +72,7 @@ export const listIngredientsQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   pageSize: Joi.number().integer().min(1).max(1000).default(20)
 });
+
+
 
 

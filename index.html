@@ -3,58 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>宠物鲜食助手</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>">
+  <title>Seven的厨房</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#10b981" />
   <link rel="stylesheet" href="styles.css" />
-  <script src="shared/pet-utils-web.js"></script>
 </head>
 <body>
   <header class="app-header">
-    <h1>宠物鲜食助手</h1>
+    <h1>Seven的厨房</h1>
     <nav class="top-nav" id="top-nav">
       <button data-view="customers" class="nav-btn active">顾客</button>
       <button data-view="recipes" class="nav-btn">食谱</button>
-      <button data-view="breeds" class="nav-btn">品种</button>
-      <button data-view="users" class="nav-btn">账号管理</button>
       <button data-view="inventory" class="nav-btn">原料</button>
       <button data-view="orders" class="nav-btn">订单</button>
-      <button data-view="labels" class="nav-btn">标签</button>
+      <button data-view="breeds" class="nav-btn">品种</button>
       <button data-view="settings" class="nav-btn">设置</button>
     </nav>
     <div class="auth-panel">
-      <span id="auth-status" class="muted">未登录</span>
+      <span id="auth-status" style="font-size:13px; color:var(--text-secondary);">未登录</span>
       <div class="auth-actions">
-        <button id="btn-open-login" class="btn small">登录</button>
-        <button id="btn-logout" class="btn small ghost" style="display:none;">退出</button>
+        <button id="btn-open-login" class="btn small" style="display:none;">登录</button>
+        <button id="btn-logout" class="btn small" style="display:none;">退出</button>
       </div>
     </div>
-    <div class="preview-mode-control">
-      <label for="preview-mode-select" class="sr-only">预览模式</label>
-      <select id="preview-mode-select" class="preview-mode-select">
-        <option value="desktop" selected>网页</option>
-        <option value="mobile">手机</option>
-      </select>
-    </div>
-    <button id="btn-print" class="btn primary">导出/打印</button>
   </header>
 
   <main class="container">
     <!-- Customers Module -->
     <section class="view" id="view-customers" style="display:none">
       <div class="card">
-        <h2>顾客与宠物信息（犬）</h2>
+        <h2>主人与爱犬信息</h2>
         <div class="actions">
           <input id="customer-search" type="text" placeholder="搜索：微信/宠物/收货信息..." style="flex:1" />
           <button id="btn-new-customer" class="btn" onclick="window.__openCustomer ? window.__openCustomer() : (function(){var c=document.getElementById('customer-form-card'); if(c) c.style.display='block';})();">新增</button>
         </div>
         <div id="customers-head" class="list-head">
-          <div>编号</div>
           <div>宠物昵称</div>
           <div>品种</div>
-          <div>微信号</div>
-          <div>收货信息</div>
+          <div>年龄</div>
+          <div>体重</div>
+          <div>主人昵称</div>
+          <div>微信号/手机号</div>
         </div>
         <div id="customers-list" class="list"></div>
         <div id="customers-pagination" class="pagination">
@@ -73,12 +62,12 @@
 
           <div class="section-title">顾客信息</div>
           <div class="grid">
-            <label>主人昵称<input id="c-userName" type="text" readonly /></label>
-            <label>微信号<input id="c-wechat" type="text" /></label>
-            <label>收货地址
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <input id="c-address" type="text" placeholder="默认收货地址" readonly style="flex: 1;" />
-                <button type="button" id="c-address-manage" class="btn small" style="white-space: nowrap;">管理地址</button>
+            <label>主人昵称<input id="c-userName" type="text" /></label>
+            <label>微信号/手机号<input id="c-wechat" type="text" /></label>
+            <label>收货信息
+              <div style="display:flex; gap:8px; align-items:flex-start;">
+                <textarea id="c-address" rows="3" style="flex:1; resize:vertical;" placeholder="多条地址将换行显示，默认地址会标注"></textarea>
+                <button type="button" id="c-address-manage" class="btn small" style="display:none; margin-top:0;">管理地址</button>
               </div>
             </label>
           </div>
@@ -87,12 +76,9 @@
           <div class="grid">
             <label>宠物昵称<input id="c-petName" type="text" required /></label>
             <label>品种
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <select id="c-breed" style="flex: 1;">
-                  <option value="">请选择品种</option>
-                </select>
-                <input type="text" id="c-breed-other" placeholder="其它品种名称" style="flex: 1; display: none; padding: 8px;" />
-              </div>
+              <select id="c-breed">
+                <option value="">请选择品种</option>
+              </select>
             </label>
             <label>生日<input id="c-birthday" type="date" /></label>
 
@@ -112,12 +98,11 @@
               </select>
             </label>
 
-            <label>生命阶段（自动匹配）
+            <label>生命阶段（可自动/可手动）
               <select id="c-lifeStage">
                 <option value="puppy">幼年期</option>
                 <option value="adult" selected>成年期</option>
               </select>
-              <div id="life-stage-description" class="muted" style="font-size:12px; margin-top:4px;"></div>
             </label>
             <label id="wrap-monthAge" style="display:none">月龄
               <input id="c-monthAge" type="number" min="0" step="1" readonly />
@@ -141,15 +126,14 @@
             </label>
             <label>日均活动水平
               <select id="c-activity">
-                <option value="">请选择活动水平</option>
                 <option value="low">低运动量（＜1小时/天，例如牵绳散步）</option>
                 <option value="medium">中等运动量（1-3小时/天，例如散步+室内玩耍）</option>
                 <option value="high">较高运动量（1-3小时/天，例如跑跳、追逐等）</option>
                 <option value="very_high">高运动量（3-6小时/天，例如牧羊等工作）</option>
               </select>
             </label>
-            <label>运动-能量系数
-              <input id="c-kcalFactor" type="number" min="0" step="1" placeholder="随活动自动填入" readonly style="background-color:#f5f5f5;" />
+            <label>热量系数
+              <input id="c-kcalFactor" type="number" min="0" step="1" placeholder="随活动自动填入，可手动调整" />
             </label>
             <label>每日能量估算 (kcal/天)
               <input id="c-estKcal" type="number" min="0" step="1" placeholder="自动计算" readonly />
@@ -160,7 +144,6 @@
             <label>每日吃几顿饭<input id="c-mealsPerDay" type="number" min="1" max="10" step="1" /></label>
             <label>过敏/不耐受<textarea id="c-allergies" rows="2" placeholder="如：鸡肉、乳制品"></textarea></label>
             <label>挑食/尽量不吃<textarea id="c-avoid" rows="2" placeholder="不爱吃/尽量避免的食物"></textarea></label>
-            <label>非常喜欢吃<textarea id="c-fav" rows="2" placeholder="最喜欢的食物"></textarea></label>
             <label>症状史/疾病史<textarea id="c-med" rows="2" placeholder="既往病史、症状记录..."></textarea></label>
             <label>备注<textarea id="c-notes" rows="2" placeholder="其他备注..."></textarea></label>
           </div>
@@ -197,25 +180,8 @@
         <h3>食谱对比单</h3>
         <div id="quote-result-content" class="detail-content"></div>
         <div class="actions" style="margin-top:16px; justify-content:flex-end;">
-          <button id="btn-export-quote-image" class="btn">预览图片</button>
+          <button id="btn-export-quote-image" class="btn">生成图片</button>
           <button id="btn-close-quote-result" class="btn ghost">关闭</button>
-        </div>
-      </div>
-
-      <div id="quote-image-preview" class="quote-preview" style="display:none">
-        <div class="quote-preview-overlay" id="quote-preview-overlay"></div>
-        <div class="quote-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="quote-preview-title">
-          <div class="quote-preview-header">
-            <h4 id="quote-preview-title">图片预览</h4>
-            <button type="button" class="quote-preview-close" id="quote-preview-close" aria-label="关闭预览">×</button>
-          </div>
-          <div class="quote-preview-body">
-            <img id="quote-preview-image" alt="食谱对比单预览" />
-          </div>
-          <div class="quote-preview-actions">
-            <button type="button" class="btn" id="quote-preview-download">下载图片</button>
-            <button type="button" class="btn ghost" id="quote-preview-cancel">关闭</button>
-          </div>
         </div>
       </div>
     </section>
@@ -353,6 +319,7 @@
 
     <!-- Inventory Module -->
     <section class="view" id="view-inventory" style="display:none">
+      <!-- 原料列表 -->
       <div class="card">
         <h2>原料管理</h2>
         <div class="actions">
@@ -361,14 +328,142 @@
             <option value="">全部类别</option>
           </select>
           <select id="ingredient-name-filter" style="width:150px">
-            <option value="">全部项目</option>
+            <option value="">全部食材名称</option>
           </select>
-          <button id="btn-import-excel" class="btn">从Excel导入</button>
           <button id="btn-new-ingredient" class="btn">新增</button>
+          <button id="btn-manage-categories" class="btn">管理分类</button>
+        </div>
+        
+        <!-- 原料编辑表单（放在搜索框下方） -->
+        <div class="card" id="ingredient-form-card" style="display:none; margin-top:16px;">
+          <h3 id="ingredient-form-title">新增原料</h3>
+          <form id="ingredient-form">
+            <input type="hidden" id="ingredient-id" />
+            <!-- 第一行：原料搜索栏 -->
+            <div style="margin-bottom:16px;">
+              <label>搜索原料（选择后自动匹配分类、类别和食材名称）
+                <div style="position:relative;">
+                  <input type="text" id="i-ingredient-search" placeholder="搜索原料名称、品牌..." autocomplete="off" style="width:100%;" />
+                  <div id="i-ingredient-search-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto; z-index:1000; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-top:2px;">
+                    <!-- 搜索结果将在这里显示 -->
+                  </div>
+                </div>
+              </label>
+            </div>
+            <div class="grid">
+              <label>原料分类
+                <select id="i-classification" required>
+                  <option value="">请选择原料分类</option>
+                  <option value="食材">食材</option>
+                  <option value="营养补充剂">营养补充剂</option>
+                  <option value="包材">包材</option>
+                </select>
+              </label>
+              <label>类别
+                <select id="i-category" required style="flex:1">
+                  <option value="">请选择类别</option>
+                </select>
+              </label>
+              <label id="i-name-label">食材名称
+                <select id="i-name" required>
+                  <option value="">请先选择原料分类和类别</option>
+                </select>
+                <input type="hidden" id="i-name-item-id" />
+              </label>
+            </div>
+            <!-- 详细信息区域（初始隐藏，新增模式下通过JS控制显示） -->
+            <div id="ingredient-details-section" class="ingredient-details-hidden" style="display:none !important; visibility:hidden !important; height:0 !important; overflow:hidden !important; margin:0 !important; padding:0 !important; border:none !important;">
+              <div class="grid" style="display:none !important;">
+                <label>编号<input id="i-code" type="text" placeholder="自动生成" readonly /></label>
+                
+                <!-- 新增字段：所属科目（仅食材，在食材名称后、部位前） -->
+                <label id="i-subject-label" data-classification="食材" style="display:none;">
+                  所属科目
+                  <input id="i-subject" type="text" placeholder="如：动物性原料、植物性原料等" />
+                </label>
+                
+                <!-- 新增字段：部位（仅食材） -->
+                <label id="i-part-label" data-classification="食材" style="display:none;">
+                  部位
+                  <input id="i-part" type="text" placeholder="如：鸡胸、鸡腿等" />
+                </label>
+                
+                <!-- 新增字段：产地类型（仅食材） -->
+                <label id="i-originType-label" data-classification="食材" style="display:none;">
+                  产地类型
+                  <select id="i-originType">
+                    <option value="">请选择产地类型</option>
+                    <option value="国产">国产</option>
+                    <option value="进口">进口</option>
+                    <option value="有机">有机</option>
+                    <option value="无抗">无抗</option>
+                    <option value="其他">其他</option>
+                  </select>
+                </label>
+                
+                <label id="i-brand-label">品牌
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="i-brand" style="flex:1;">
+                      <option value="">请选择品牌</option>
+                    </select>
+                    <button type="button" id="btn-manage-brands" class="btn small" style="white-space:nowrap;">管理</button>
+                  </div>
+                </label>
+                
+                <!-- 新增字段：型号（所有分类） -->
+                <label id="i-model-label">
+                  型号
+                  <input id="i-model" type="text" placeholder="产品型号" />
+                </label>
+                
+                <label id="i-source-label">采购渠道
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="i-source" style="flex:1;">
+                      <option value="">请选择采购渠道</option>
+                    </select>
+                    <button type="button" id="btn-manage-sources" class="btn small" style="white-space:nowrap;">管理</button>
+                  </div>
+                </label>
+                
+                <label id="i-cost-label">费用（采购价格）<input id="i-cost" type="number" min="0" step="0.01" /></label>
+                <label id="i-quantity-label">单量（采购数量）<input id="i-quantity" type="number" min="0" step="0.1" /></label>
+                <label id="i-unit-label">单位
+                  <select id="i-unit">
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                    <option value="ml">ml</option>
+                    <option value="L">L</option>
+                    <option value="个">个</option>
+                    <option value="包">包</option>
+                    <option value="盒">盒</option>
+                    <option value="瓶">瓶</option>
+                    <option value="袋">袋</option>
+                  </select>
+                </label>
+                <label>单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                <label id="i-ediblePortion-label" data-classification="包材" style="display:none;">可食部（%）<input id="i-ediblePortion" type="number" min="0" max="100" step="1" value="100" /></label>
+                <label>可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                
+                <!-- 新增字段：每单位含量（仅营养补充剂） -->
+                <label id="i-unitContent-label" data-classification="营养补充剂" style="display:none;">
+                  每单位含量
+                  <input id="i-unitContent" type="text" placeholder="如：500mg/粒" />
+                </label>
+                
+                <label>每单位重量(g)<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
+                <label>说明<textarea id="i-description" rows="2" placeholder="原料描述、备注"></textarea></label>
+                <label id="i-mainFunction-label" data-classification="包材" style="display:none;">主要营养价值<textarea id="i-mainFunction" rows="2" placeholder="主要营养价值描述"></textarea></label>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn primary">保存</button>
+              <button type="button" id="btn-cancel-ingredient" class="btn ghost">取消</button>
+            </div>
+          </form>
         </div>
         <div id="ingredients-head" class="list-head" style="grid-template-columns: 1fr 1.2fr 1fr 0.8fr 1fr 1.2fr 1.2fr;">
           <div>类别</div>
-          <div>项目</div>
+          <div>食材名称</div>
           <div>品牌/来源</div>
           <div>单位</div>
           <div>单价/500单位</div>
@@ -385,76 +480,51 @@
         </div>
       </div>
 
-      <div class="card" id="ingredient-form-card" style="display:none">
-        <h3 id="ingredient-form-title">新增原料</h3>
-        <form id="ingredient-form">
-          <input type="hidden" id="ingredient-id" />
-          <div class="grid">
-            <label>类别
-              <div style="display:flex; gap:8px; align-items:center;">
-                <select id="i-category" required style="flex:1">
-                  <option value="">请选择类别</option>
-                </select>
-                <button type="button" id="btn-edit-category" class="btn small">编辑</button>
-              </div>
-            </label>
-            <label>项目（名称）
-              <div style="display:flex; gap:8px; align-items:center;">
-                <select id="i-name" required style="flex:1">
-                  <option value="">请先选择类别</option>
-                </select>
-                <button type="button" id="btn-edit-name" class="btn small">编辑</button>
-              </div>
-            </label>
-            <label>编号<input id="i-code" type="text" placeholder="自动生成" readonly /></label>
-            <label>品牌/来源<input id="i-brand" type="text" /></label>
-            <label>费用（采购价格）<input id="i-cost" type="number" min="0" step="0.01" /></label>
-            <label>单量（采购数量）<input id="i-quantity" type="number" min="0" step="0.1" /></label>
-            <label>单位
-              <select id="i-unit">
-                <option value="g">g</option>
-                <option value="kg">kg</option>
-                <option value="ml">ml</option>
-                <option value="L">L</option>
-                <option value="个">个</option>
-                <option value="包">包</option>
-                <option value="盒">盒</option>
-                <option value="瓶">瓶</option>
-                <option value="袋">袋</option>
-              </select>
-            </label>
-            <label>单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
-            <label>可食部（%）<input id="i-ediblePortion" type="number" min="0" max="100" step="1" value="100" /></label>
-            <label>可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
-            <label>每单位重量(g)<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
-            <label>说明<textarea id="i-description" rows="2" placeholder="原料描述、备注"></textarea></label>
-            <label>主要作用<textarea id="i-mainFunction" rows="2" placeholder="主要作用描述"></textarea></label>
-          </div>
-          <div class="actions">
-            <button type="submit" class="btn primary">保存</button>
-            <button type="button" id="btn-cancel-ingredient" class="btn ghost">取消</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card" style="display:none" id="import-excel-card">
-        <h3>从Excel导入原料</h3>
-        <p class="muted" style="margin-bottom:12px">请选择"原材料信息.xlsx"文件进行导入。导入会添加新数据，不会覆盖已有数据。</p>
-        <input id="excel-file-input" type="file" accept=".xlsx,.xls" />
-        <div class="actions" style="margin-top:12px">
-          <button id="btn-confirm-import" class="btn primary">确认导入</button>
-          <button id="btn-cancel-import" class="btn ghost">取消</button>
+      <!-- 分类管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:800px; max-height:90vh; overflow-y:auto; z-index:1000; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="category-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>原料分类管理</h3>
+          <button id="btn-close-category-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 标签页 -->
+        <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:2px solid var(--border);">
+          <button class="category-tab-btn btn" data-classification="食材" style="border-bottom:2px solid transparent; border-radius:0; margin-bottom:-2px;">食材</button>
+          <button class="category-tab-btn btn" data-classification="营养补充剂" style="border-bottom:2px solid transparent; border-radius:0; margin-bottom:-2px;">营养补充剂</button>
+          <button class="category-tab-btn btn" data-classification="包材" style="border-bottom:2px solid transparent; border-radius:0; margin-bottom:-2px;">包材</button>
+        </div>
+        
+        <!-- 当前分类显示 -->
+        <div style="margin-bottom:12px; padding:8px; background:var(--bg-secondary); border-radius:4px;">
+          <strong>当前分类：</strong><span id="current-classification-display">食材</span>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="category-search-input" type="text" placeholder="搜索分类..." style="flex:1;" />
+          <button id="btn-add-category" class="btn small">添加分类</button>
+          <button id="btn-import-preset-categories" class="btn small">导入预设分类</button>
+        </div>
+        
+        <!-- 分类列表 -->
+        <div id="category-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 分类列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="category-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
         </div>
       </div>
 
-      <!-- 编辑类别对话框 -->
+      <!-- 编辑类别对话框（保留用于向后兼容，但可能不再使用） -->
       <div class="card" style="display:none" id="edit-category-card">
         <h3>编辑类别</h3>
         <div style="margin-bottom:12px;">
           <input id="new-category-input" type="text" placeholder="输入新类别名称" style="width:100%; margin-bottom:8px;" />
-          <button id="btn-add-category" class="btn small">添加类别</button>
+          <button id="btn-add-category-old" class="btn small">添加类别</button>
         </div>
-        <div id="category-list-manage" style="display:grid; gap:6px; margin-bottom:12px;">
+        <div id="category-list-manage-old" style="display:grid; gap:6px; margin-bottom:12px;">
           <!-- 类别列表将在这里显示 -->
         </div>
         <div class="actions">
@@ -462,7 +532,84 @@
         </div>
       </div>
 
-      <!-- 编辑项目对话框 -->
+      <!-- 项目管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1001; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="item-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 id="item-management-title">项目管理</h3>
+          <button id="btn-close-item-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 当前分类显示 -->
+        <div style="margin-bottom:12px; padding:8px; background:var(--bg-secondary); border-radius:4px;">
+          <strong>当前分类：</strong><span id="current-category-display">-</span>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="item-search-input" type="text" placeholder="搜索项目..." style="flex:1;" />
+          <button id="btn-add-item" class="btn small">添加项目</button>
+        </div>
+        
+        <!-- 项目列表 -->
+        <div id="item-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 项目列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="item-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 品牌管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1002; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="brand-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>品牌管理</h3>
+          <button id="btn-close-brand-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="brand-search-input" type="text" placeholder="搜索品牌..." style="flex:1;" />
+          <button id="btn-add-brand" class="btn small">添加品牌</button>
+        </div>
+        
+        <!-- 品牌列表 -->
+        <div id="brand-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 品牌列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="brand-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 采购渠道管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1002; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="source-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>采购渠道管理</h3>
+          <button id="btn-close-source-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="source-search-input" type="text" placeholder="搜索采购渠道..." style="flex:1;" />
+          <button id="btn-add-source" class="btn small">添加采购渠道</button>
+        </div>
+        
+        <!-- 采购渠道列表 -->
+        <div id="source-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 采购渠道列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="source-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 编辑项目对话框（保留用于向后兼容） -->
       <div class="card" style="display:none" id="edit-name-card">
         <h3>编辑项目</h3>
         <div style="margin-bottom:12px;">
@@ -479,218 +626,7 @@
     </section>
 
     <!-- Orders Module -->
-    <!-- Breeds Module -->
-    <section class="view" id="view-breeds" style="display:none">
-      <div class="card">
-        <h2>品种管理</h2>
-        <div class="actions">
-          <input id="breed-search" type="text" placeholder="搜索：品种名称或分类..." style="flex:1" />
-          <select id="breed-category-filter" style="width:200px">
-            <option value="">全部分类</option>
-          </select>
-          <select id="breed-size-filter" style="width:120px">
-            <option value="">全部体型</option>
-            <option value="small">小型</option>
-            <option value="medium">中型</option>
-            <option value="large">大型</option>
-            <option value="xlarge">超大型</option>
-          </select>
-          <button id="btn-new-breed" class="btn">新增</button>
-        </div>
-        <div id="breeds-head" class="list-head" style="grid-template-columns: 1.5fr 1fr 0.8fr 1fr 1fr 1.2fr;">
-          <div>品种分类</div>
-          <div>品种名称</div>
-          <div>体型分类</div>
-          <div>体重范围 (kg)</div>
-          <div>成熟月龄</div>
-          <div>操作</div>
-        </div>
-        <div id="breeds-list" class="list"></div>
-        <div id="breeds-pagination" class="pagination">
-          <div id="breeds-total" class="total">共 0 条</div>
-          <div class="spacer"></div>
-          <button id="breeds-prev" class="btn small">上一页</button>
-          <span id="breeds-pageinfo" class="muted"></span>
-          <button id="breeds-next" class="btn small">下一页</button>
-        </div>
-      </div>
-
-      <div class="card" id="breed-form-card" style="display:none">
-        <h3 id="breed-form-title">新增品种</h3>
-        <form id="breed-form">
-          <input type="hidden" id="breed-id" />
-          
-          <div class="section-title">基本信息</div>
-          <div class="grid">
-            <label>品种分类
-              <input id="b-category" type="text" placeholder="如：第1组：牧羊犬和牧牛犬" required />
-            </label>
-            <label>品种名称
-              <input id="b-name" type="text" placeholder="如：金毛寻回犬" required />
-            </label>
-            <label>体型分类
-              <select id="b-sizeCategory" required>
-                <option value="">请选择</option>
-                <option value="small">小型 (≤5kg)</option>
-                <option value="medium">中型 (5-20kg)</option>
-                <option value="large">大型 (20-40kg)</option>
-                <option value="xlarge">超大型 (≥40kg)</option>
-              </select>
-            </label>
-            <label>成年体重最小值 (kg)
-              <input id="b-weightMin" type="number" min="0" max="200" step="0.1" placeholder="如：25.0" />
-            </label>
-            <label>成年体重最大值 (kg)
-              <input id="b-weightMax" type="number" min="0" max="200" step="0.1" placeholder="如：34.0" />
-            </label>
-            <label>成熟月龄
-              <input id="b-maturityMonths" type="number" min="1" max="36" placeholder="如：18" />
-            </label>
-          </div>
-
-          <div class="actions" style="margin-top:24px;">
-            <button type="submit" class="btn primary">保存</button>
-            <button type="button" id="breed-form-cancel" class="btn ghost">取消</button>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <!-- Users Management Module -->
-    <section class="view" id="view-users" style="display:none">
-      <div class="card">
-        <h2>账号管理</h2>
-        <div class="actions">
-          <input id="user-search" type="text" placeholder="搜索：邮箱或姓名..." style="flex:1" />
-          <select id="user-role-filter" style="width:120px">
-            <option value="">全部角色</option>
-            <option value="admin">管理员</option>
-            <option value="employee">员工</option>
-            <option value="customer">顾客</option>
-          </select>
-          <select id="user-status-filter" style="width:100px">
-            <option value="">全部状态</option>
-            <option value="active">启用</option>
-            <option value="disabled">禁用</option>
-          </select>
-          <button id="btn-new-user" class="btn">新增用户</button>
-        </div>
-        <div id="users-head" class="list-head" style="grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 1fr 1.5fr;">
-          <div>邮箱</div>
-          <div>姓名</div>
-          <div>角色</div>
-          <div>状态</div>
-          <div>创建时间</div>
-          <div>操作</div>
-        </div>
-        <div id="users-list" class="list"></div>
-        <div id="users-pagination" class="pagination">
-          <div id="users-total" class="total">共 0 条</div>
-          <div class="spacer"></div>
-          <button id="users-prev" class="btn small">上一页</button>
-          <span id="users-pageinfo" class="muted"></span>
-          <button id="users-next" class="btn small">下一页</button>
-        </div>
-      </div>
-
-      <div class="card" id="user-form-card" style="display:none">
-        <h3 id="user-form-title">新增用户</h3>
-        <form id="user-form">
-          <input type="hidden" id="user-id" />
-          
-          <div class="section-title">基本信息</div>
-          <div class="grid">
-            <label>邮箱
-              <input id="u-email" type="email" placeholder="user@example.com" required />
-            </label>
-            <label>姓名
-              <input id="u-name" type="text" placeholder="请输入姓名" required />
-            </label>
-            <label>角色
-              <select id="u-role" required>
-                <option value="">请选择</option>
-                <option value="admin">管理员</option>
-                <option value="employee">员工</option>
-                <option value="customer">顾客</option>
-              </select>
-            </label>
-            <label id="u-password-label">密码
-              <input id="u-password" type="password" placeholder="至少8个字符" minlength="8" />
-            </label>
-            <label id="u-status-label" style="display:none;">状态
-              <select id="u-status">
-                <option value="active">启用</option>
-                <option value="disabled">禁用</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="actions" style="margin-top:24px;">
-            <button type="submit" class="btn primary">保存</button>
-            <button type="button" id="user-form-cancel" class="btn ghost">取消</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- 操作日志视图 -->
-      <div class="card" id="audit-logs-card" style="display:none">
-        <div class="card-header">
-          <h3>操作日志</h3>
-          <button id="btn-close-audit-logs" class="btn small ghost">关闭</button>
-        </div>
-        <div class="actions" style="margin-bottom:12px;">
-          <select id="audit-action-filter" style="width:150px">
-            <option value="">全部操作</option>
-            <option value="login">登录</option>
-            <option value="logout">登出</option>
-            <option value="create_user">创建用户</option>
-            <option value="update_user">更新用户</option>
-            <option value="delete_user">删除用户</option>
-            <option value="enable_user">启用用户</option>
-            <option value="disable_user">禁用用户</option>
-            <option value="reset_password">重置密码</option>
-          </select>
-          <input id="audit-user-filter" type="number" placeholder="用户ID" style="width:120px" />
-        </div>
-        <div id="audit-logs-list" class="list"></div>
-        <div id="audit-logs-pagination" class="pagination">
-          <div id="audit-logs-total" class="total">共 0 条</div>
-          <div class="spacer"></div>
-          <button id="audit-logs-prev" class="btn small">上一页</button>
-          <span id="audit-logs-pageinfo" class="muted"></span>
-          <button id="audit-logs-next" class="btn small">下一页</button>
-        </div>
-      </div>
-    </section>
-
     <section class="view" id="view-orders" style="display:none">
-      <div class="card" id="backend-orders-card">
-        <div class="card-header">
-          <h2>后台订单数据</h2>
-          <div class="actions" style="gap:8px;">
-            <button id="btn-refresh-backend-orders" class="btn small">刷新</button>
-          </div>
-        </div>
-        <div id="backend-orders-status" class="muted">请先登录后台。</div>
-        <div class="table-wrapper" id="backend-orders-table-wrapper" style="display:none;">
-          <table class="detail-table">
-            <thead>
-              <tr>
-                <th>订单编号</th>
-                <th>顾客</th>
-                <th>宠物</th>
-                <th>订单状态</th>
-                <th>支付状态</th>
-                <th>订单总价</th>
-                <th>制作日期</th>
-                <th>更新时间</th>
-              </tr>
-            </thead>
-            <tbody id="backend-orders-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
       <div class="card">
         <h2>订单管理</h2>
         <div class="actions">
@@ -704,9 +640,7 @@
             <option value="after_sale">申请售后</option>
             <option value="completed">已完成</option>
           </select>
-          <button id="btn-procurement" class="btn">生成采购单</button>
-          <button id="btn-procurement-cancel" class="btn ghost" style="display:none">取消</button>
-          <button id="btn-new-order" class="btn primary">新增订单</button>
+          <button id="btn-new-order" class="btn">新增订单</button>
         </div>
         <div id="orders-head" class="list-head" style="grid-template-columns: 1.2fr 1.4fr 1fr 1fr 1.4fr 1fr;">
           <div>订单创建日期</div>
@@ -723,50 +657,6 @@
           <button id="orders-prev" class="btn small">上一页</button>
           <span id="orders-pageinfo" class="muted"></span>
           <button id="orders-next" class="btn small">下一页</button>
-        </div>
-      </div>
-
-      <div id="orders-utility-panels">
-        <div class="card" id="procurement-panel" style="display:none">
-          <div class="panel-header">
-            <div class="panel-header-title">
-              <h3>采购单</h3>
-              <div class="muted" id="procurement-summary"></div>
-            </div>
-            <label class="procurement-date-control">
-              <span>采购日期</span>
-              <input type="date" id="procurement-date" />
-            </label>
-          </div>
-          <div class="table-wrapper">
-            <table class="detail-table" id="procurement-table">
-              <thead>
-                <tr>
-                  <th style="width:40%">原料</th>
-                  <th style="width:30%">建议供应商</th>
-                  <th style="width:30%">采购量</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div class="panel-note">
-            <label>备注（可选）：
-              <textarea id="procurement-note" placeholder="补充采购注意事项..." rows="3"></textarea>
-            </label>
-          </div>
-          <div class="actions" style="justify-content:flex-end">
-            <button id="btn-procurement-close" class="btn ghost">关闭</button>
-          </div>
-        </div>
-
-        <div class="card" id="production-preview-panel" style="display:none">
-          <div id="production-preview-body"></div>
-          <div class="actions" style="justify-content:flex-end">
-            <button id="btn-production-close" class="btn ghost">关闭</button>
-            <button id="btn-production-preview" class="btn">打印预览</button>
-            <button id="btn-production-print" class="btn primary">开始打印</button>
-          </div>
         </div>
       </div>
 
@@ -953,11 +843,48 @@
       </div>
     </section>
 
-    <!-- Labels Module -->
-    <section class="view" id="view-labels" style="display:none">
+    <!-- Breeds Module -->
+    <section class="view" id="view-breeds" style="display:none">
       <div class="card">
-        <h2>标签打印（后续完善）</h2>
-        <p>标签模板、预览与打印机对接。</p>
+        <h2>品种管理</h2>
+        <div class="actions">
+          <input id="breed-search" type="text" placeholder="搜索品种名称..." style="flex:1" />
+          <button id="btn-new-breed" class="btn">新增</button>
+        </div>
+        <div id="breeds-list" class="list"></div>
+        <div id="breeds-pagination" class="pagination">
+          <div id="breeds-total" class="total">共 0 条</div>
+          <div class="spacer"></div>
+          <button id="breeds-prev" class="btn small">上一页</button>
+          <span id="breeds-pageinfo" class="muted"></span>
+          <button id="breeds-next" class="btn small">下一页</button>
+        </div>
+      </div>
+
+      <div class="card" id="breed-form-card" style="display:none">
+        <h3 id="breed-form-title">新增品种</h3>
+        <form id="breed-form">
+          <input type="hidden" id="breed-id" />
+          <div class="grid">
+            <label>分类<input id="b-category" type="text" required /></label>
+            <label>名称<input id="b-name" type="text" required /></label>
+            <label>体型分类
+              <select id="b-sizeCategory" required>
+                <option value="small">小型</option>
+                <option value="medium">中型</option>
+                <option value="large">大型</option>
+                <option value="xlarge">超大型</option>
+              </select>
+            </label>
+            <label>体重最小值 (kg)<input id="b-weightMin" type="number" min="0" step="0.1" /></label>
+            <label>体重最大值 (kg)<input id="b-weightMax" type="number" min="0" step="0.1" /></label>
+            <label>成熟月龄<input id="b-maturityMonths" type="number" min="1" max="36" step="1" /></label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn primary">保存</button>
+            <button type="button" id="btn-cancel-breed" class="btn ghost">取消</button>
+          </div>
+        </form>
       </div>
     </section>
 
@@ -971,15 +898,6 @@
           <label>数据导入（JSON）<input id="import-json" type="file" accept="application/json" /></label>
           <button id="btn-export-json" class="btn">导出全部数据</button>
         </div>
-
-        <div class="section-title">后台接口配置</div>
-        <div class="grid">
-          <label>API 基础地址
-            <input id="settings-api-base" type="text" placeholder="例如：http://127.0.0.1:3000" />
-          </label>
-          <button id="btn-save-api-base" class="btn">保存接口地址</button>
-        </div>
-        <p class="muted" style="font-size:12px; margin-top:-8px;">提示：地址应指向后端服务，例如 http://127.0.0.1:3000 或部署域名。</p>
 
         <div class="section-title">自动备份管理</div>
         <div style="margin-bottom:16px;">
@@ -1005,37 +923,13 @@
     </section>
   </main>
 
-  <div id="auth-dialog" class="modal" style="display:none;">
-    <div class="modal-overlay" id="auth-dialog-overlay"></div>
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title">
-      <div class="modal-header">
-        <h3 id="auth-dialog-title">后台登录</h3>
-        <button type="button" id="auth-dialog-close" class="modal-close" aria-label="关闭">×</button>
-      </div>
-      <form id="auth-form" class="modal-body">
-        <label>邮箱
-          <input id="auth-email" type="email" required placeholder="admin@demo.local" />
-        </label>
-        <label>密码
-          <input id="auth-password" type="password" required placeholder="请输入密码" />
-        </label>
-        <div class="muted" id="auth-error" style="display:none;"></div>
-        <div class="modal-actions">
-          <button type="submit" class="btn primary" id="auth-submit">登录</button>
-          <button type="button" class="btn ghost" id="auth-cancel">取消</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <footer class="app-footer">
-    <span>© 宠物鲜食助手</span>
-    <button id="btn-install" class="btn small">安装到手机/桌面</button>
+    <span>© Seven的厨房</span>
   </footer>
 
-  <script src="libs/html-to-image.min.js"></script>
-  <script src="libs/xlsx.full.min.js"></script>
-  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="app.js?v=20241127-02"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
