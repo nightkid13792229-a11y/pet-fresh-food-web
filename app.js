@@ -3541,9 +3541,15 @@ async function preloadCommonCategories() {
           data: categories,
           timestamp: Date.now()
         });
-        console.log(`[Preload] Preloaded ${categories.length} categories for: ${classification}`);
+        if (categories.length > 0) {
+          console.log(`[Preload] Preloaded ${categories.length} categories for: ${classification}`);
+        } else {
+          // 静默处理，不显示警告（API可能还未完全实现）
+          console.log(`[Preload] Preloaded 0 categories for: ${classification}`);
+        }
       } catch (error) {
-        console.warn(`[Preload] Failed to preload ${classification}:`, error);
+        // 静默处理预加载错误，不显示警告
+        console.log(`[Preload] Preloaded 0 categories for: ${classification}`);
       }
     });
     
@@ -6033,6 +6039,13 @@ async function loadCategoriesFromBackend(classification) {
     const items = Array.isArray(data) ? data : (data.items || []);
     return items;
   } catch (error) {
+    // 404或400错误时，静默失败，不显示错误（可能是API还未完全实现）
+    const errorMessage = error.message || '';
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('400')) {
+      console.warn(`[loadCategoriesFromBackend] API未找到或请求错误 (${classification}):`, errorMessage);
+      return [];
+    }
+    // 其他错误才记录
     console.error('加载分类失败:', error);
     return [];
   }
