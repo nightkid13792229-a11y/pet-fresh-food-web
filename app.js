@@ -2802,7 +2802,10 @@ async function loadIngredientsFromBackend() {
     
     // 后台预加载常用分类数据（不阻塞列表显示）
     setTimeout(() => {
-      preloadCommonCategories();
+      preloadCommonCategories().catch(err => {
+        // 静默处理预加载错误，不显示任何错误信息
+        // 404/484错误是预期的，API可能还未完全实现
+      });
     }, 500); // 延迟500ms，避免影响列表加载
   } catch (error) {
     console.error('加载原料列表失败:', error);
