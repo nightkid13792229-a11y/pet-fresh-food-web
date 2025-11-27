@@ -6267,9 +6267,11 @@ async function loadAndRenderCategories() {
       statsEl.innerHTML = `共 ${totalCategories} 个分类，${totalUsage} 个原料正在使用`;
     }
   } catch (error) {
-    // 404/400错误时静默处理，显示空列表
+    // 404/400/484错误时静默处理，显示空列表
     const errorMessage = error.message || '';
-    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('400')) {
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || 
+        errorMessage.includes('400') || errorMessage.includes('484') ||
+        errorMessage.includes('Resource not found')) {
       console.log('分类API未找到，显示空列表');
       listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无分类数据</div>';
       if (statsEl) {
@@ -6847,9 +6849,11 @@ async function moveItemToCategory(itemId, itemName) {
       }
     });
   } catch (error) {
-    // 404/400错误时静默处理
+    // 404/400/484错误时静默处理
     const errorMessage = error.message || '';
-    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('400')) {
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || 
+        errorMessage.includes('400') || errorMessage.includes('484') ||
+        errorMessage.includes('Resource not found')) {
       console.log('分类API未找到，跳过移动操作');
       // 不显示错误，直接返回
       return;
