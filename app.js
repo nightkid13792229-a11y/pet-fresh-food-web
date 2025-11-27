@@ -572,6 +572,10 @@ async function backendRequest(path, options = {}) {
     throw new Error('登录已过期，请重新登录。');
   }
   if (!response.ok) {
+    // 404错误时，使用更友好的错误消息
+    if (response.status === 404) {
+      throw new Error('Resource not found');
+    }
     const message = data && typeof data === 'object'
       ? data.message || data.error || `请求失败 (${response.status})`
       : `请求失败 (${response.status})`;
