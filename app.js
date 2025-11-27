@@ -3651,7 +3651,11 @@ function populateCategorySelects() {
   if (classificationSelect && classificationSelect.value) {
     // 异步加载，不阻塞
     loadCategoriesForForm(classificationSelect.value).catch(err => {
-      console.error('加载分类失败:', err);
+      // 404/400错误时静默处理，不显示错误
+      const errorMessage = err.message || '';
+      if (!errorMessage.includes('404') && !errorMessage.includes('Not Found') && !errorMessage.includes('400')) {
+        console.error('加载分类失败:', err);
+      }
       // 失败时使用旧的静态列表
       if (categorySelect) {
         categorySelect.innerHTML = '<option value="">请选择类别</option>';
@@ -6247,8 +6251,19 @@ async function loadAndRenderCategories() {
       statsEl.innerHTML = `共 ${totalCategories} 个分类，${totalUsage} 个原料正在使用`;
     }
   } catch (error) {
-    console.error('加载分类失败:', error);
-    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#f44336;">加载失败：' + escapeHtml(error.message) + '</div>';
+    // 404/400错误时静默处理，显示空列表
+    const errorMessage = error.message || '';
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('400')) {
+      console.log('分类API未找到，显示空列表');
+      listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无分类数据</div>';
+      if (statsEl) {
+        statsEl.innerHTML = '共 0 个分类，0 个原料正在使用';
+      }
+    } else {
+      // 其他错误才显示错误信息
+      console.error('加载分类失败:', error);
+      listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#f44336;">加载失败：' + escapeHtml(error.message) + '</div>';
+    }
   }
 }
 
@@ -6816,8 +6831,17 @@ async function moveItemToCategory(itemId, itemName) {
       }
     });
   } catch (error) {
-    console.error('加载分类失败:', error);
-    alert('加载分类失败：' + (error.message || '未知错误'));
+    // 404/400错误时静默处理
+    const errorMessage = error.message || '';
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('400')) {
+      console.log('分类API未找到，跳过移动操作');
+      // 不显示错误，直接返回
+      return;
+    } else {
+      // 其他错误才显示错误信息
+      console.error('加载分类失败:', error);
+      alert('加载分类失败：' + (error.message || '未知错误'));
+    }
   }
 }
 
