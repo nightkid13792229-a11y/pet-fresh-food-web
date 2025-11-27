@@ -3552,8 +3552,16 @@ async function preloadCommonCategories() {
           console.log(`[Preload] Preloaded 0 categories for: ${classification}`);
         }
       } catch (error) {
-        // 静默处理预加载错误，不显示警告
-        console.log(`[Preload] Preloaded 0 categories for: ${classification}`);
+        // 静默处理预加载错误，完全不输出任何日志
+        // 404/400错误是预期的，API可能还未完全实现
+        const errorMessage = error.message || '';
+        if (!errorMessage.includes('404') && !errorMessage.includes('Not Found') && 
+            !errorMessage.includes('400') && !errorMessage.includes('484') &&
+            !errorMessage.includes('Resource not found')) {
+          // 只有非404错误才记录
+          console.log(`[Preload] 非404错误 for ${classification}:`, errorMessage);
+        }
+        // 无论什么错误，都静默处理，不显示
       }
     });
     
@@ -6052,14 +6060,16 @@ async function loadCategoriesFromBackend(classification) {
     const items = Array.isArray(data) ? data : (data.items || []);
     return items;
   } catch (error) {
-    // 404或400错误时，静默失败，不显示错误（可能是API还未完全实现）
+    // 404/400/484错误时，静默失败，不显示任何错误（可能是API还未完全实现）
     const errorMessage = error.message || '';
-    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('400')) {
-      console.warn(`[loadCategoriesFromBackend] API未找到或请求错误 (${classification}):`, errorMessage);
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || 
+        errorMessage.includes('400') || errorMessage.includes('484') ||
+        errorMessage.includes('Resource not found')) {
+      // 完全静默，不输出任何日志
       return [];
     }
-    // 其他错误才记录
-    console.error('加载分类失败:', error);
+    // 其他错误才记录（但不显示给用户）
+    console.log('[loadCategoriesFromBackend] 非404错误:', errorMessage);
     return [];
   }
 }
