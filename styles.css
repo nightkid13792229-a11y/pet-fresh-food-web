@@ -1003,20 +1003,35 @@ select {
   box-shadow: none;
 }
 
-/* 强制隐藏原料详细信息区域（新增模式） */
+/* 隐藏原料详细信息区域（通过类控制） */
 #ingredient-details-section.ingredient-details-hidden {
-  display: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
+  display: none;
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
-/* 确保详细信息区域在新增模式下隐藏 */
-#ingredient-form-card:not([data-editing="true"]) #ingredient-details-section {
-  display: none !important;
+#ingredient-details-section.ingredient-details-hidden .grid {
+  display: none;
+}
+
+/* 显示原料详细信息区域（通过类控制） */
+#ingredient-details-section.ingredient-details-visible {
+  display: block !important;
+  visibility: visible !important;
+  height: auto !important;
+  overflow: visible !important;
+  margin-top: 20px !important;
+  padding-top: 24px !important;  /* 增加上内边距，避免字段太靠上 */
+  border-top: 1px solid var(--border) !important;
+}
+
+#ingredient-details-section.ingredient-details-visible .grid {
+  display: grid !important;
+  margin-top: 0;  /* 确保 grid 没有额外的上边距 */
 }
 
 .quote-export-mode .quote-summary-grid {

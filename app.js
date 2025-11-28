@@ -4937,17 +4937,24 @@ class DetailsSectionStateManager {
       }
       
       // 验证：如果计算后的样式仍然是 none，强制设置（可能父元素隐藏导致）
-      // 使用 requestAnimationFrame 确保在下一帧检查，此时父元素应该已经显示
+      // 使用双重 requestAnimationFrame 确保在DOM完全渲染后检查
       requestAnimationFrame(() => {
-        const computedDisplay = window.getComputedStyle(this.detailsSection).display;
-        if (computedDisplay === 'none') {
-          console.warn('[DetailsSectionState] Computed display is still none after class application, forcing block');
-          this.detailsSection.style.setProperty('display', 'block', 'important');
-          // 同时确保 grid 也显示
-          if (grid) {
-            grid.style.setProperty('display', 'grid', 'important');
+        requestAnimationFrame(() => {
+          const computedDisplay = window.getComputedStyle(this.detailsSection).display;
+          // 检查父元素是否可见
+          const parent = this.detailsSection.parentElement;
+          const parentDisplay = parent ? window.getComputedStyle(parent).display : 'block';
+          
+          // 只有在父元素可见但子元素仍然隐藏时才警告和强制设置
+          if (computedDisplay === 'none' && parentDisplay !== 'none') {
+            console.warn('[DetailsSectionState] Computed display is still none after class application, forcing block');
+            this.detailsSection.style.setProperty('display', 'block', 'important');
+            // 同时确保 grid 也显示
+            if (grid) {
+              grid.style.setProperty('display', 'grid', 'important');
+            }
           }
-        }
+        });
       });
     } else {
       // 隐藏时，移除显示类，添加隐藏类
