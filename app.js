@@ -6389,11 +6389,15 @@ async function loadAndRenderCategories() {
     });
     
     // 渲染分类列表
-    console.log('[loadAndRenderCategories] 过滤后', filtered.length, '个分类', 'filtered内容:', filtered);
+    console.log('[loadAndRenderCategories] 过滤后', filtered.length, '个分类', 'filtered内容:', JSON.stringify(filtered, null, 2));
     if (filtered.length === 0) {
       console.warn('[loadAndRenderCategories] 没有分类数据可显示，categories:', categories, 'validCategories:', validCategories, 'filtered:', filtered);
       listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无分类数据</div>';
+      if (statsEl) {
+        statsEl.innerHTML = '共 0 个分类，0 个原料正在使用';
+      }
     } else {
+      console.log('[loadAndRenderCategories] 开始渲染', filtered.length, '个分类到列表');
       listEl.innerHTML = filtered.map(cat => {
         const usageCount = statsMap[cat.category] || 0;
         const usageText = usageCount > 0 ? `（${usageCount}个原料）` : '';
@@ -6420,7 +6424,8 @@ async function loadAndRenderCategories() {
       listEl.querySelectorAll('[data-manage-items]').forEach(btn => {
         btn.addEventListener('click', () => {
           const categoryId = Number(btn.dataset.manageItems);
-          const category = categories.find(c => c.id === categoryId);
+          // 使用filtered而不是categories，因为filtered是实际显示的分类
+          const category = filtered.find(c => c.id === categoryId) || categories.find(c => c.id === categoryId);
           if (category) {
             openItemManagement(categoryId, category.category);
           }
@@ -6466,7 +6471,8 @@ async function loadAndRenderCategories() {
       listEl.querySelectorAll('[data-delete-category]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = Number(btn.dataset.deleteCategory);
-          const category = categories.find(c => c.id === id);
+          // 使用filtered而不是categories，因为filtered是实际显示的分类
+          const category = filtered.find(c => c.id === id);
           if (category) {
             await deleteCategory(id, category.category);
           }
@@ -6476,8 +6482,10 @@ async function loadAndRenderCategories() {
     
     // 更新统计信息
     if (statsEl) {
-      const totalCategories = categories.length;
+      // 使用filtered.length而不是categories.length，因为filtered是实际显示的分类
+      const totalCategories = filtered.length;
       const totalUsage = Object.values(statsMap).reduce((sum, count) => sum + count, 0);
+      console.log('[loadAndRenderCategories] 更新统计信息：', totalCategories, '个分类，', totalUsage, '个原料正在使用');
       statsEl.innerHTML = `共 ${totalCategories} 个分类，${totalUsage} 个原料正在使用`;
     }
   } catch (error) {
