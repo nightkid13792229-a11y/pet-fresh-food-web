@@ -6264,19 +6264,50 @@ async function loadAndRenderCategories() {
     let categories = [];
     try {
       categories = await loadCategoriesFromBackend(currentCategoryClassification);
-      console.log('[loadAndRenderCategories] 加载到', categories.length, '个分类:', categories.map(c => c.category || c));
+      console.log('[loadAndRenderCategories] API返回', categories.length, '个分类，类型:', typeof categories, '是否为数组:', Array.isArray(categories));
+      console.log('[loadAndRenderCategories] 分类详情:', JSON.stringify(categories, null, 2));
     } catch (error) {
       console.error('[loadAndRenderCategories] 加载分类失败，尝试从store.ingredients提取:', error);
       // 如果加载失败，直接尝试从store.ingredients提取
       categories = await extractCategoriesFromIngredients(currentCategoryClassification);
-      console.log('[loadAndRenderCategories] 从store.ingredients提取到', categories.length, '个分类');
+      console.log('[loadAndRenderCategories] 从store.ingredients提取到', categories.length, '个分类，类型:', typeof categories, '是否为数组:', Array.isArray(categories));
+      console.log('[loadAndRenderCategories] 提取的分类详情:', JSON.stringify(categories, null, 2));
     }
     
     // 确保categories是数组
     if (!Array.isArray(categories)) {
       console.warn('[loadAndRenderCategories] categories不是数组，转换为数组:', categories);
-      categories = [];
+      if (categories && typeof categories === 'object') {
+        categories = Object.values(categories);
+      } else {
+        categories = [];
+      }
     }
+    
+    // 确保每个分类都是对象格式
+    categories = categories.map((cat, index) => {
+      if (typeof cat === 'string') {
+        console.warn('[loadAndRenderCategories] 发现字符串分类，转换为对象:', cat);
+        return { id: -(index + 1), category: cat, classification: currentCategoryClassification };
+      }
+      if (typeof cat === 'object' && cat !== null) {
+        // 确保有必要的属性
+        if (!cat.category && cat.name) {
+          cat.category = cat.name;
+        }
+        if (!cat.id) {
+          cat.id = -(index + 1);
+        }
+        if (!cat.classification) {
+          cat.classification = currentCategoryClassification;
+        }
+        return cat;
+      }
+      console.warn('[loadAndRenderCategories] 发现无效的分类数据:', cat);
+      return null;
+    }).filter(cat => cat !== null);
+    
+    console.log('[loadAndRenderCategories] 规范化后', categories.length, '个分类:', categories);
     
     categoryManagementData[currentCategoryClassification] = categories;
     
@@ -6321,15 +6352,46 @@ async function loadAndRenderCategories() {
     
     // 应用搜索过滤
     const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
-    const filtered = categories.filter(cat => {
+    console.log('[loadAndRenderCategories] 搜索文本:', searchText, 'categories类型:', typeof categories, '是否为数组:', Array.isArray(categories), 'categories内容:', categories);
+    
+    // 确保categories是数组且每个元素都有category属性
+    const validCategories = categories.map(cat => {
+      // 如果cat是字符串，转换为对象
+      if (typeof cat === 'string') {
+        console.warn('[loadAndRenderCategories] 发现字符串类型的分类，转换为对象:', cat);
+        return { id: -Date.now(), category: cat, classification: currentCategoryClassification };
+      }
+      // 如果cat是对象但没有category属性，尝试使用name或其他属性
+      if (typeof cat === 'object' && cat !== null) {
+        if (!cat.category && cat.name) {
+          cat.category = cat.name;
+        }
+        if (!cat.category) {
+          console.warn('[loadAndRenderCategories] 发现没有category属性的分类对象:', cat);
+          return null;
+        }
+        return cat;
+      }
+      console.warn('[loadAndRenderCategories] 发现无效的分类数据:', cat);
+      return null;
+    }).filter(cat => cat !== null);
+    
+    console.log('[loadAndRenderCategories] 有效分类数量:', validCategories.length, '有效分类:', validCategories);
+    
+    const filtered = validCategories.filter(cat => {
       if (!searchText) return true;
-      return cat.category.toLowerCase().includes(searchText);
+      const categoryName = cat.category || cat;
+      if (typeof categoryName !== 'string') {
+        console.warn('[loadAndRenderCategories] 分类名称不是字符串:', categoryName, 'cat:', cat);
+        return false;
+      }
+      return categoryName.toLowerCase().includes(searchText);
     });
     
     // 渲染分类列表
-    console.log('[loadAndRenderCategories] 过滤后', filtered.length, '个分类');
+    console.log('[loadAndRenderCategories] 过滤后', filtered.length, '个分类', 'filtered内容:', filtered);
     if (filtered.length === 0) {
-      console.warn('[loadAndRenderCategories] 没有分类数据可显示');
+      console.warn('[loadAndRenderCategories] 没有分类数据可显示，categories:', categories, 'validCategories:', validCategories, 'filtered:', filtered);
       listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无分类数据</div>';
     } else {
       listEl.innerHTML = filtered.map(cat => {
