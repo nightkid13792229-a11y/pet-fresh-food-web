@@ -6111,12 +6111,28 @@ async function extractCategoriesFromIngredients(classification) {
     console.warn('[extractCategoriesFromIngredients] 警告：未提取到任何分类，allIngredients.length:', allIngredients.length, 'classification:', classification);
     // 调试：查看所有原料的分类分布
     const classificationMap = {};
+    const categoryDistribution = {};
     allIngredients.forEach(ing => {
       if (ing.classification) {
         classificationMap[ing.classification] = (classificationMap[ing.classification] || 0) + 1;
       }
+      if (ing.classification === classification && ing.category) {
+        const catName = ing.category.trim();
+        categoryDistribution[catName] = (categoryDistribution[catName] || 0) + 1;
+      }
     });
     console.log('[extractCategoriesFromIngredients] 所有原料的分类分布:', classificationMap);
+    console.log('[extractCategoriesFromIngredients] 该分类下的类别分布:', categoryDistribution);
+  } else {
+    // 即使提取到了分类，也显示类别分布以便调试
+    const categoryDistribution = {};
+    allIngredients.forEach(ing => {
+      if (ing.classification === classification && ing.category) {
+        const catName = ing.category.trim();
+        categoryDistribution[catName] = (categoryDistribution[catName] || 0) + 1;
+      }
+    });
+    console.log('[extractCategoriesFromIngredients] 该分类下的类别分布:', categoryDistribution);
   }
   
   return categories;
@@ -6150,19 +6166,28 @@ function extractCategoriesFromArray(ingredients, classification) {
             category: categoryName,
             classification: ing.classification
           });
+          console.log('[extractCategoriesFromArray] 发现新分类:', categoryName, '来自原料:', ing.id || index, ing.name || '');
         }
       } else {
         console.log('[extractCategoriesFromArray] 原料', ing.id || index, '没有category字段:', ing);
+      }
+    } else {
+      // 调试：记录不匹配的原料
+      if (ing.classification) {
+        console.log('[extractCategoriesFromArray] 原料', ing.id || index, '分类不匹配:', ing.classification, '期望:', classification, '类别:', ing.category);
       }
     }
   });
   
   console.log('[extractCategoriesFromArray] 处理了', processedCount, '个匹配分类的原料，找到', categoryMap.size, '个唯一分类');
+  console.log('[extractCategoriesFromArray] 提取到的分类列表:', Array.from(categoryMap.keys()));
   
   // 转换为数组并按类别名称排序
   const categories = Array.from(categoryMap.values()).sort((a, b) => {
     return a.category.localeCompare(b.category, 'zh-CN');
   });
+  
+  console.log('[extractCategoriesFromArray] 排序后的分类:', categories.map(c => c.category));
   
   return categories;
 }
