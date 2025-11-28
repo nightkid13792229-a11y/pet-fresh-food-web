@@ -6147,10 +6147,26 @@ function extractCategoriesFromArray(ingredients, classification) {
   
   console.log('[extractCategoriesFromArray] 开始提取，ingredients.length:', ingredients.length, 'classification:', classification);
   
+  // 调试：先统计所有原料的分类和类别分布
+  const allClassificationStats = {};
+  const allCategoryStats = {};
+  ingredients.forEach(ing => {
+    if (ing.classification) {
+      allClassificationStats[ing.classification] = (allClassificationStats[ing.classification] || 0) + 1;
+    }
+    if (ing.classification === classification && ing.category) {
+      const catName = ing.category.trim();
+      allCategoryStats[catName] = (allCategoryStats[catName] || 0) + 1;
+    }
+  });
+  console.log('[extractCategoriesFromArray] 所有原料的分类统计:', allClassificationStats);
+  console.log('[extractCategoriesFromArray] 该分类下的类别统计:', allCategoryStats);
+  
   // 提取该分类下的所有唯一类别
   const categorySet = new Set();
   const categoryMap = new Map(); // 用于存储 category -> { id, category, classification }
   let processedCount = 0;
+  let categoryIndex = 0; // 用于生成唯一的ID
   
   ingredients.forEach((ing, index) => {
     // 检查分类是否匹配
@@ -6160,20 +6176,21 @@ function extractCategoriesFromArray(ingredients, classification) {
         const categoryName = ing.category.trim();
         if (!categorySet.has(categoryName)) {
           categorySet.add(categoryName);
+          categoryIndex++;
           // 创建一个类似API返回格式的对象（使用负数作为临时ID，因为这是从本地数据提取的）
           categoryMap.set(categoryName, {
-            id: -(index + 1), // 使用负数ID，避免与真实ID冲突
+            id: -categoryIndex, // 使用递增的负数ID，避免与真实ID冲突
             category: categoryName,
             classification: ing.classification
           });
-          console.log('[extractCategoriesFromArray] 发现新分类:', categoryName, '来自原料:', ing.id || index, ing.name || '');
+          console.log('[extractCategoriesFromArray] 发现新分类:', categoryName, '来自原料:', ing.id || index, ing.name || '', '完整数据:', JSON.stringify(ing));
         }
       } else {
-        console.log('[extractCategoriesFromArray] 原料', ing.id || index, '没有category字段:', ing);
+        console.log('[extractCategoriesFromArray] 原料', ing.id || index, '没有category字段，完整数据:', JSON.stringify(ing));
       }
     } else {
-      // 调试：记录不匹配的原料
-      if (ing.classification) {
+      // 调试：记录不匹配的原料（只在需要时记录，避免日志过多）
+      if (ing.classification && index < 10) { // 只记录前10个不匹配的，避免日志过多
         console.log('[extractCategoriesFromArray] 原料', ing.id || index, '分类不匹配:', ing.classification, '期望:', classification, '类别:', ing.category);
       }
     }
