@@ -6310,6 +6310,7 @@ async function loadAndRenderCategories() {
     }
     
     // 确保每个分类都是对象格式
+    console.log('[loadAndRenderCategories] 规范化前，categories数量:', categories.length, 'categories内容:', JSON.stringify(categories, null, 2));
     categories = categories.map((cat, index) => {
       if (typeof cat === 'string') {
         console.warn('[loadAndRenderCategories] 发现字符串分类，转换为对象:', cat);
@@ -6318,7 +6319,12 @@ async function loadAndRenderCategories() {
       if (typeof cat === 'object' && cat !== null) {
         // 确保有必要的属性
         if (!cat.category && cat.name) {
+          console.log('[loadAndRenderCategories] 分类对象没有category属性，使用name:', cat.name);
           cat.category = cat.name;
+        }
+        if (!cat.category) {
+          console.warn('[loadAndRenderCategories] 分类对象既没有category也没有name属性:', cat, '对象键:', Object.keys(cat));
+          return null;
         }
         if (!cat.id) {
           cat.id = -(index + 1);
@@ -6328,11 +6334,11 @@ async function loadAndRenderCategories() {
         }
         return cat;
       }
-      console.warn('[loadAndRenderCategories] 发现无效的分类数据:', cat);
+      console.warn('[loadAndRenderCategories] 发现无效的分类数据:', cat, '类型:', typeof cat);
       return null;
     }).filter(cat => cat !== null);
     
-    console.log('[loadAndRenderCategories] 规范化后', categories.length, '个分类:', categories);
+    console.log('[loadAndRenderCategories] 规范化后', categories.length, '个分类:', JSON.stringify(categories, null, 2));
     
     categoryManagementData[currentCategoryClassification] = categories;
     
