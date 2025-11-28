@@ -688,14 +688,35 @@ const PINYIN_MAP = {
 // 获取单个字符的拼音首字母
 function getCharPinyinInitial(char) {
   if (!char || char.length === 0) return '';
+  
   // 如果是英文字母或数字，直接返回大写
   if (/[A-Za-z0-9]/.test(char)) {
     return char.toUpperCase();
   }
-  // 查找映射表
+  
+  // 优先使用 pinyin-pro 库（如果已加载）
+  if (typeof pinyinPro !== 'undefined' && pinyinPro && typeof pinyinPro.pinyin === 'function') {
+    try {
+      // 使用 pinyin-pro 获取拼音首字母
+      // pattern: 'first' 表示只返回首字母
+      const py = pinyinPro.pinyin(char, { pattern: 'first' });
+      if (py && py.length > 0) {
+        const firstLetter = py.charAt(0).toUpperCase();
+        // 确保返回的是字母
+        if (/[A-Z]/.test(firstLetter)) {
+          return firstLetter;
+        }
+      }
+    } catch (e) {
+      console.warn('[getCharPinyinInitial] pinyin-pro 转换失败:', e, '字符:', char);
+    }
+  }
+  
+  // 回退到映射表
   if (PINYIN_MAP[char]) {
     return PINYIN_MAP[char];
   }
+  
   // 如果没有映射，使用Unicode范围粗略判断（基于Unicode范围）
   const code = char.charCodeAt(0);
   // 汉字Unicode范围：0x4E00-0x9FFF
@@ -729,6 +750,7 @@ function getCharPinyinInitial(char) {
       }
     }
   }
+  
   // 如果都不匹配，返回默认值
   return 'X';
 }
@@ -776,11 +798,7 @@ function generateIngredientCode(classification, category, excludeId = null) {
     return '';
   }
   
-  // 包材不需要编号
-  if (classification === '包材') {
-    return '';
-  }
-  
+  // 所有分类都需要编号（包括包材）
   const prefix = getClassificationPrefix(classification);
   const categoryAbbr = getCategoryAbbreviation(category);
   
@@ -3980,12 +3998,6 @@ function autoGenerateCode() {
   const ingredientId = $('ingredient-id').value || null;
   
   console.log('[autoGenerateCode] 类别:', category, '分类:', classification, 'ID:', ingredientId);
-  
-  // 包材不需要编号
-  if (classification === '包材') {
-    if (codeEl) codeEl.value = '';
-    return;
-  }
   
   // 编辑模式：如果已有编号，不重新生成（保持编号不变，即使类别名称变化）
   if (ingredientId && codeEl && codeEl.value.trim()) {
@@ -7892,14 +7904,14 @@ function setupIngredientsModule() {
       const ediblePortion = ediblePortionPercent / 100;
       
       // 自动生成编号（如果是新增且没有编号，或编辑时编号为空）
-      // 包材不需要编号
+      // 所有分类都需要编号（包括包材）
       let code = $('i-code').value.trim();
       
       // 编辑模式：如果已有编号，保持编号不变（即使类别名称变化）
       if (id && code) {
         console.log('[Save Ingredient] 编辑模式，保持原有编号:', code);
-      } else if (!code && classification !== '包材') {
-        // 新增模式或编辑时编号为空，自动生成
+      } else if (!code) {
+        // 新增模式或编辑时编号为空，自动生成（包括包材）
         code = generateIngredientCode(classification, category, id || null);
         if (code) {
           $('i-code').value = code;
@@ -7908,10 +7920,6 @@ function setupIngredientsModule() {
           alert('编号生成失败，请检查分类和类别是否正确');
           return;
         }
-      } else if (classification === '包材') {
-        // 包材不需要编号
-        code = '';
-        $('i-code').value = '';
       }
       
       updateIngredientPriceFields();
