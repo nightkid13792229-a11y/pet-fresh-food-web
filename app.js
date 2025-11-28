@@ -748,60 +748,98 @@ function getPinyinInitials(text) {
   return result;
 }
 
-// 自动生成编号（新规则：类别每个字的拼音首字母 + 项目每个字的拼音首字母 + 两位数）
-function generateIngredientCode(category, name, excludeId = null) {
-  if (!category || !name) return '';
+// 获取分类前缀
+function getClassificationPrefix(classification) {
+  const prefixMap = {
+    '食材': 'ING',
+    '营养补充剂': 'SUP',
+    '包材': 'PKG'
+  };
+  return prefixMap[classification] || '';
+}
+
+// 获取类别缩写（类别名称的拼音首字母，2-5位）
+function getCategoryAbbreviation(category) {
+  if (!category) return '';
+  const initials = getPinyinInitials(category);
+  if (!initials) return '';
+  // 限制在2-5位之间，转换为大写
+  const abbr = initials.length > 5 ? initials.substring(0, 5) : initials;
+  return abbr.toUpperCase();
+}
+
+// 自动生成编号（新规则：分类前缀-类别缩写-3位序号）
+// 格式：ING-QRL-001, SUP-DBS-001, PKG-BZRQ-001
+function generateIngredientCode(classification, category, excludeId = null) {
+  if (!classification || !category) {
+    console.warn('[generateIngredientCode] 分类或类别为空');
+    return '';
+  }
   
-  const catInitials = getPinyinInitials(category);
-  const nameInitials = getPinyinInitials(name);
+  // 包材不需要编号
+  if (classification === '包材') {
+    return '';
+  }
   
-  if (!catInitials || !nameInitials) return '';
+  const prefix = getClassificationPrefix(classification);
+  const categoryAbbr = getCategoryAbbreviation(category);
   
-  // 基础前缀：类别每个字的拼音首字母 + 项目每个字的拼音首字母
-  const basePrefix = catInitials + nameInitials;
+  if (!prefix || !categoryAbbr) {
+    console.warn('[generateIngredientCode] 无法生成编号：分类或类别无效', { classification, category, prefix, categoryAbbr });
+    return '';
+  }
   
-  // 找到相同类别+项目的所有原料，计算下一个编号
-  const sameCategoryName = store.ingredients
+  // 基础前缀：分类前缀-类别缩写-
+  const basePrefix = `${prefix}-${categoryAbbr}-`;
+  
+  // 找到相同分类+类别的所有原料，计算下一个序号
+  const sameClassificationCategory = store.ingredients
     .filter(ing => {
       if (excludeId && ing.id === excludeId) return false;
-      return ing.category === category && ing.name === name;
+      return ing.classification === classification && ing.category === category;
     });
   
-  // 找到相同类别+项目的最大编号（只考虑没有字母后缀的编号）
+  // 找到相同分类+类别的最大序号
   let maxNum = 0;
-  sameCategoryName.forEach(ing => {
+  sameClassificationCategory.forEach(ing => {
     if (ing.code && ing.code.startsWith(basePrefix)) {
-      // 匹配格式：ZZYMZ01 或 ZZYMZ01a
-      const match = ing.code.match(new RegExp(`^${basePrefix}(\\d{2})([a-z]?)$`));
-      if (match && match[2] === '') {
-        // 只计算没有字母后缀的编号
+      // 匹配格式：ING-QRL-001
+      // 转义特殊字符，避免正则表达式错误
+      const escapedPrefix = basePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = ing.code.match(new RegExp(`^${escapedPrefix}(\\d{3})$`));
+      if (match) {
         const num = parseInt(match[1], 10);
         maxNum = Math.max(maxNum, num);
       }
     }
   });
   
-  // 计算下一个编号
+  // 计算下一个序号
   let nextNum = maxNum + 1;
-  let code = basePrefix + String(nextNum).padStart(2, '0');
   
-  // 检查是否有重复（包括所有原料，不仅仅是相同类别+项目的）
-  let suffixIndex = 0;
-  const suffixLetters = 'abcdefghijklmnopqrstuvwxyz';
-  while (store.ingredients.some(ing => {
-    if (excludeId && ing.id === excludeId) return false;
-    return ing.code === code;
-  })) {
-    code = basePrefix + String(nextNum).padStart(2, '0') + suffixLetters[suffixIndex];
-    suffixIndex++;
-    if (suffixIndex >= suffixLetters.length) {
-      // 如果26个字母都用完了，增加编号
-      nextNum++;
-      suffixIndex = 0;
-      code = basePrefix + String(nextNum).padStart(2, '0');
-    }
+  // 如果超过999，从001重新开始查找（理论上不应该发生）
+  if (nextNum > 999) {
+    console.warn('[generateIngredientCode] 序号超过999，从001重新查找');
+    nextNum = 1;
   }
   
+  let code = basePrefix + String(nextNum).padStart(3, '0');
+  
+  // 检查是否有重复（全局检查，包括不同分类+类别的原料）
+  // 使用自动递增序号机制
+  while (store.ingredients.some(ing => {
+    if (excludeId && ing.id === excludeId) return false;
+    return ing.code && ing.code.trim().toUpperCase() === code.trim().toUpperCase();
+  })) {
+    nextNum++;
+    if (nextNum > 999) {
+      console.error('[generateIngredientCode] 无法生成唯一编号，序号已超过999');
+      return ''; // 返回空，让用户知道有问题
+    }
+    code = basePrefix + String(nextNum).padStart(3, '0');
+  }
+  
+  console.log('[generateIngredientCode] 生成编号:', code, { classification, category, nextNum });
   return code;
 }
 
@@ -3937,32 +3975,37 @@ async function updateNameSelectByCategory() {
 // 自动生成编号（当类别和项目都填写后）
 function autoGenerateCode() {
   const category = $('i-category').value.trim();
-  const name = $('i-name').value.trim(); // 从隐藏字段获取
+  const classification = $('i-classification') ? $('i-classification').value.trim() : '';
   const codeEl = $('i-code');
   const ingredientId = $('ingredient-id').value || null;
-  const classification = $('i-classification') ? $('i-classification').value.trim() : '';
   
-  console.log('自动生成编号 - 类别:', category, '项目:', name, 'ID:', ingredientId);
+  console.log('[autoGenerateCode] 类别:', category, '分类:', classification, 'ID:', ingredientId);
   
-  // 包材不需要name，所以不需要生成编号
+  // 包材不需要编号
   if (classification === '包材') {
     if (codeEl) codeEl.value = '';
     return;
   }
   
-  if (!category || !name) {
-    console.log('类别或项目为空，无法生成编号');
+  // 编辑模式：如果已有编号，不重新生成（保持编号不变，即使类别名称变化）
+  if (ingredientId && codeEl && codeEl.value.trim()) {
+    console.log('[autoGenerateCode] 编辑模式且已有编号，保持编号不变:', codeEl.value);
+    return;
+  }
+  
+  if (!classification || !category) {
+    console.log('[autoGenerateCode] 分类或类别为空，无法生成编号');
     if (codeEl) codeEl.value = '';
     return;
   }
   
   if (codeEl) {
-    const code = generateIngredientCode(category, name, ingredientId);
-    console.log('生成的编号:', code);
+    const code = generateIngredientCode(classification, category, ingredientId);
+    console.log('[autoGenerateCode] 生成的编号:', code);
     if (code) {
       codeEl.value = code;
     } else {
-      console.warn('编号生成失败');
+      console.warn('[autoGenerateCode] 编号生成失败');
       codeEl.value = '';
     }
   }
@@ -7849,11 +7892,26 @@ function setupIngredientsModule() {
       const ediblePortion = ediblePortionPercent / 100;
       
       // 自动生成编号（如果是新增且没有编号，或编辑时编号为空）
-      // 包材不需要name，所以编号生成逻辑需要调整
+      // 包材不需要编号
       let code = $('i-code').value.trim();
-      if (!code && name) {
-        code = generateIngredientCode(category, name, id || null);
-        if (code) $('i-code').value = code;
+      
+      // 编辑模式：如果已有编号，保持编号不变（即使类别名称变化）
+      if (id && code) {
+        console.log('[Save Ingredient] 编辑模式，保持原有编号:', code);
+      } else if (!code && classification !== '包材') {
+        // 新增模式或编辑时编号为空，自动生成
+        code = generateIngredientCode(classification, category, id || null);
+        if (code) {
+          $('i-code').value = code;
+          console.log('[Save Ingredient] 自动生成编号:', code);
+        } else {
+          alert('编号生成失败，请检查分类和类别是否正确');
+          return;
+        }
+      } else if (classification === '包材') {
+        // 包材不需要编号
+        code = '';
+        $('i-code').value = '';
       }
       
       updateIngredientPriceFields();
