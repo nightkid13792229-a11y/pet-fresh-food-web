@@ -694,21 +694,24 @@ function getCharPinyinInitial(char) {
     return char.toUpperCase();
   }
   
-  // 优先使用 pinyin-pro 库（如果已加载）
-  if (typeof pinyinPro !== 'undefined' && pinyinPro && typeof pinyinPro.pinyin === 'function') {
+  // 优先使用 pinyin 库（如果已加载）
+  if (typeof pinyin !== 'undefined' && pinyin && typeof pinyin === 'function') {
     try {
-      // 使用 pinyin-pro 获取拼音首字母
-      // pattern: 'first' 表示只返回首字母
-      const py = pinyinPro.pinyin(char, { pattern: 'first' });
-      if (py && py.length > 0) {
-        const firstLetter = py.charAt(0).toUpperCase();
+      // 使用 pinyin 库获取拼音首字母
+      // STYLE_FIRST_LETTER 表示只返回首字母
+      const pyArray = pinyin(char, {
+        style: pinyin.STYLE_FIRST_LETTER,
+        heteronym: false
+      });
+      if (pyArray && pyArray.length > 0 && pyArray[0] && pyArray[0].length > 0) {
+        const firstLetter = pyArray[0][0].toUpperCase();
         // 确保返回的是字母
         if (/[A-Z]/.test(firstLetter)) {
           return firstLetter;
         }
       }
     } catch (e) {
-      console.warn('[getCharPinyinInitial] pinyin-pro 转换失败:', e, '字符:', char);
+      console.warn('[getCharPinyinInitial] pinyin 库转换失败:', e, '字符:', char);
     }
   }
   
