@@ -372,8 +372,8 @@
               </label>
             </div>
             <!-- 详细信息区域（初始隐藏，新增模式下通过JS控制显示） -->
-            <div id="ingredient-details-section" class="ingredient-details-hidden" style="display:none !important; visibility:hidden !important; height:0 !important; overflow:hidden !important; margin:0 !important; padding:0 !important; border:none !important;">
-              <div class="grid" style="display:none !important;">
+            <div id="ingredient-details-section" class="ingredient-details-hidden">
+              <div class="grid">
                 <label>编号<input id="i-code" type="text" placeholder="自动生成" readonly /></label>
                 
                 <!-- 新增字段：所属科目（仅食材，在食材名称后、部位前） -->
@@ -929,7 +929,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241127-13"></script>
+  <script src="app.js?v=20241128-14"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

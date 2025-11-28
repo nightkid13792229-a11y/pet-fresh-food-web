@@ -4428,6 +4428,7 @@ async function searchIngredientForForm(query) {
     }
     
     // 搜索匹配的原料
+    console.log('[searchIngredientForForm] Searching for:', searchText, 'in', allIngredients.length, 'ingredients');
     const matched = allIngredients.filter(ing => {
       const nameMatch = (ing.name || '').toLowerCase().includes(searchText);
       const brandMatch = (ing.brand || '').toLowerCase().includes(searchText);
@@ -4435,6 +4436,11 @@ async function searchIngredientForForm(query) {
       const classificationMatch = (ing.classification || '').toLowerCase().includes(searchText);
       return nameMatch || brandMatch || categoryMatch || classificationMatch;
     }).slice(0, 20); // 最多显示20个结果
+    
+    console.log('[searchIngredientForForm] Found', matched.length, 'matches');
+    if (matched.length > 0) {
+      console.log('[searchIngredientForForm] First few matches:', matched.slice(0, 3).map(m => m.name));
+    }
     
     if (matched.length === 0) {
       dropdown.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-secondary);">未找到匹配的原料</div>';
@@ -4500,7 +4506,28 @@ async function selectIngredientForForm(ingredientId, name, category, classificat
     classificationSelect.value = classification;
     // 更新字段显示/隐藏
     updateIngredientFieldsVisibility(classification);
-    classificationSelect.dispatchEvent(new Event('change'));
+    
+    // 新增模式：如果选择了分类，显示详细信息区域
+    const detailsSection = $('ingredient-details-section');
+    const card = $('ingredient-form-card');
+    const currentId = $('ingredient-id')?.value;
+    const isEditMode = (card && card.hasAttribute('data-editing')) || (currentId && currentId.trim() !== '');
+    
+    console.log('[selectIngredientForForm] classification:', classification, 'isEditMode:', isEditMode, 'detailsSection exists:', !!detailsSection);
+    
+    // 使用统一的状态管理器更新显示/隐藏（单一入口）
+    if (classification && !isEditMode) {
+      console.log('[selectIngredientForForm] Updating details section state for classification:', classification);
+      detailsSectionState.updateState({
+        classification: classification,
+        isEditMode: false
+      });
+    }
+    
+    // 延迟触发 change 事件，确保 detailsSection 先显示
+    setTimeout(() => {
+      classificationSelect.dispatchEvent(new Event('change'));
+    }, 50);
   }
   
   // 等待分类加载完成后再设置类别
@@ -4687,6 +4714,8 @@ async function selectIngredientItem(itemId, name, categoryId, category, classifi
   // 自动匹配分类和类别
   if (classificationSelect && classification) {
     classificationSelect.value = classification;
+    // 更新字段显示/隐藏
+    updateIngredientFieldsVisibility(classification);
     classificationSelect.dispatchEvent(new Event('change'));
   }
   
@@ -4702,30 +4731,12 @@ async function selectIngredientItem(itemId, name, categoryId, category, classifi
     categorySelect.dispatchEvent(new Event('change'));
   }
   
-  // 显示详细信息区域
-  const detailsSection = $('ingredient-details-section');
-  if (detailsSection) {
-    // 移除important，恢复正常显示
-    detailsSection.style.removeProperty('display');
-    detailsSection.style.removeProperty('visibility');
-    detailsSection.style.removeProperty('height');
-    detailsSection.style.removeProperty('overflow');
-    detailsSection.style.display = 'block';
-    detailsSection.style.visibility = 'visible';
-    detailsSection.style.height = 'auto';
-    detailsSection.style.overflow = 'visible';
-    detailsSection.style.marginTop = '20px';
-    detailsSection.style.paddingTop = '20px';
-    detailsSection.style.borderTop = '1px solid var(--border)';
-    detailsSection.classList.remove('ingredient-details-hidden');
-    detailsSection.classList.add('ingredient-details-visible');
-    // 显示内部grid
-    const grid = detailsSection.querySelector('.grid');
-    if (grid) {
-      grid.style.removeProperty('display');
-      grid.style.display = 'grid';
-    }
-  }
+  // 显示详细信息区域（使用统一的状态管理器）
+  detailsSectionState.init();
+  detailsSectionState.updateState({
+    classification: classification || '',
+    isEditMode: false
+  });
   
   // 自动生成编号（延迟一点确保所有值都已设置）
   setTimeout(() => {
@@ -4838,6 +4849,89 @@ class IngredientFormStateManager {
 const ingredientFormState = new IngredientFormStateManager();
 
 // ============================================
+// 详细信息区域状态管理器（统一管理显示/隐藏）
+// ============================================
+class DetailsSectionStateManager {
+  constructor() {
+    this.isVisible = false;
+    this.classification = '';
+    this.isEditMode = false;
+    this.detailsSection = null;
+  }
+  
+  // 初始化（获取DOM元素）
+  init() {
+    this.detailsSection = document.getElementById('ingredient-details-section');
+    if (!this.detailsSection) {
+      console.warn('[DetailsSectionState] Element not found');
+    }
+  }
+  
+  // 更新状态（单一入口，所有显示/隐藏逻辑都通过这里）
+  updateState({ classification = '', isEditMode = false }) {
+    this.classification = classification || '';
+    this.isEditMode = isEditMode || false;
+    
+    // 判断是否应该显示（单一逻辑）
+    const shouldBeVisible = this.shouldBeVisible();
+    
+    // 如果状态没有变化，不执行操作
+    if (shouldBeVisible === this.isVisible && this.detailsSection) {
+      return;
+    }
+    
+    this.isVisible = shouldBeVisible;
+    this.applyState();
+    
+    console.log('[DetailsSectionState] Updated:', {
+      classification: this.classification,
+      isEditMode: this.isEditMode,
+      isVisible: this.isVisible
+    });
+  }
+  
+  // 判断是否应该显示（单一逻辑）
+  shouldBeVisible() {
+    // 编辑模式：始终显示
+    if (this.isEditMode) {
+      return true;
+    }
+    // 新增模式：有分类就显示
+    return this.classification.trim() !== '';
+  }
+  
+  // 应用状态到DOM（单一操作）
+  applyState() {
+    if (!this.detailsSection) {
+      this.init();
+      if (!this.detailsSection) {
+        console.warn('[DetailsSectionState] Cannot apply state, element not found');
+        return;
+      }
+    }
+    
+    if (this.isVisible) {
+      this.detailsSection.classList.remove('ingredient-details-hidden');
+      this.detailsSection.classList.add('ingredient-details-visible');
+    } else {
+      this.detailsSection.classList.add('ingredient-details-hidden');
+      this.detailsSection.classList.remove('ingredient-details-visible');
+    }
+  }
+  
+  // 强制刷新（用于确保状态同步）
+  refresh() {
+    if (!this.detailsSection) {
+      this.init();
+    }
+    this.applyState();
+  }
+}
+
+// 创建全局详细信息区域状态管理器实例
+const detailsSectionState = new DetailsSectionStateManager();
+
+// ============================================
 // 辅助函数：安全执行DOM操作
 // ============================================
 function safeDOMOperation(element, operation, description = '') {
@@ -4940,104 +5034,30 @@ function setFormPosition(card, id, insertAfterElement) {
 }
 
 // ============================================
-// 辅助函数：管理详细信息区域的显示/隐藏
+// 辅助函数：管理详细信息区域的显示/隐藏（简化版，统一使用状态管理器）
 // ============================================
 function setupDetailsSectionVisibility(detailsSection, isEditMode, signal) {
-  if (!detailsSection) return;
-  
-  if (isEditMode) {
-    // 编辑模式：确保详细信息区域保持显示
-    const ensureDetailsVisible = () => {
-      if (signal?.aborted) return;
-      
-      const computedDisplay = window.getComputedStyle(detailsSection).display;
-      if (computedDisplay === 'none') {
-        safeDOMOperation(detailsSection, () => {
-          detailsSection.style.cssText = 'display:block !important; visibility:visible !important; height:auto !important; overflow:visible !important; margin-top:20px !important; padding-top:20px !important; border-top:1px solid var(--border) !important;';
-          detailsSection.classList.remove('ingredient-details-hidden');
-          detailsSection.classList.add('ingredient-details-visible');
-          const grid = detailsSection.querySelector('.grid');
-          if (grid) {
-            grid.style.cssText = 'display:grid !important;';
-          }
-        }, 'ensureDetailsVisible');
-      }
-    };
-    
-    // 定期检查并确保显示（每200ms检查一次）
-    const showInterval = setInterval(() => {
-      if (signal?.aborted) {
-        clearInterval(showInterval);
-        return;
-      }
-      if (ingredientFormState.isEditMode()) {
-        ensureDetailsVisible();
-      }
-    }, 200);
-    
-    ingredientFormState.registerInterval(showInterval);
-    
-  } else {
-    // 新增模式：强制隐藏详细信息区域
-    const forceHideDetails = () => {
-      if (signal?.aborted) return;
-      
-      // 检查当前是否仍然是新增模式
-      const currentId = $('ingredient-id')?.value;
-      if (currentId) return; // 如果已经有ID，说明已切换到编辑模式
-      
-      const computedDisplay = window.getComputedStyle(detailsSection).display;
-      if (computedDisplay !== 'none') {
-        safeDOMOperation(detailsSection, () => {
-          detailsSection.style.cssText = 'display:none !important; visibility:hidden !important; height:0 !important; overflow:hidden !important; margin:0 !important; padding:0 !important; border:none !important;';
-          detailsSection.classList.add('ingredient-details-hidden');
-          detailsSection.classList.remove('ingredient-details-visible');
-          const grid = detailsSection.querySelector('.grid');
-          if (grid) {
-            grid.style.cssText = 'display:none !important;';
-          }
-        }, 'forceHideDetails');
-      }
-    };
-    
-    // 初始隐藏
-    forceHideDetails();
-    
-    // 使用MutationObserver监听style变化
-    const observer = new MutationObserver((mutations) => {
-      if (signal?.aborted) return;
-      
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
-          if (ingredientFormState.isNewMode()) {
-            forceHideDetails();
-          }
-        }
-      });
-    });
-    
-    observer.observe(detailsSection, {
-      attributes: true,
-      attributeFilter: ['style', 'class'],
-      childList: false,
-      subtree: true
-    });
-    
-    ingredientFormState.registerObserver(observer);
-    
-    // 定期检查并强制隐藏（每100ms检查一次）
-    const hideInterval = setInterval(() => {
-      if (signal?.aborted) {
-        clearInterval(hideInterval);
-        return;
-      }
-      if (ingredientFormState.isNewMode()) {
-        forceHideDetails();
-      }
-    }, 100);
-    
-    ingredientFormState.registerInterval(hideInterval);
+  if (!detailsSection) {
+    detailsSectionState.init();
+    return;
   }
+  
+  // 初始化状态管理器
+  detailsSectionState.init();
+  
+  // 获取当前分类
+  const classificationSelect = $('i-classification');
+  const classification = classificationSelect ? classificationSelect.value : '';
+  
+  // 更新状态（统一入口）
+  detailsSectionState.updateState({
+    classification: classification,
+    isEditMode: isEditMode
+  });
+  
+  // 编辑模式：不需要监听变化，状态由 openIngredientForm 控制
+  // 新增模式：监听分类变化事件（已在 setupIngredientsModule 中设置）
+  // 不再需要定期检查、MutationObserver 等复杂逻辑
 }
 
 // ============================================
@@ -5348,19 +5368,14 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       $('i-description').value = ing.description || '';
       $('i-mainFunction').value = ing.mainFunction || '';
       
-      // 显示详细信息区域
-      if (detailsSection) {
-        detailsSection.style.cssText = 'display:block !important; visibility:visible !important; height:auto !important; overflow:visible !important; margin-top:20px !important; padding-top:20px !important; border-top:1px solid var(--border) !important;';
-        detailsSection.classList.remove('ingredient-details-hidden');
-        detailsSection.classList.add('ingredient-details-visible');
-        const grid = detailsSection.querySelector('.grid');
-        if (grid) {
-          grid.style.cssText = 'display:grid !important;';
-        }
-      }
+      // 显示详细信息区域（编辑模式始终显示）
+      detailsSectionState.init();
+      detailsSectionState.updateState({
+        classification: ing.classification || '',
+        isEditMode: true
+      });
       
-      // 设置详细信息区域的显示/隐藏
-      setupDetailsSectionVisibility(detailsSection, ingredientFormState.isEditMode(), signal);
+      // 详细信息区域的显示/隐藏已由 detailsSectionState 统一管理，无需额外设置
       
       const totalTime = performance.now();
       console.log(`[Performance] Total form open time: ${(totalTime - startTime).toFixed(2)}ms`);
@@ -5388,10 +5403,9 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     
     if (title) title.textContent = '新增原料';
     
-    // 在reset之前再次确保隐藏
-    if (detailsSection) {
-      detailsSection.style.setProperty('display', 'none', 'important');
-    }
+    // 在reset之前，先保存当前的分类状态（如果已选择）
+    const classificationSelect = $('i-classification');
+    const currentClassificationBeforeReset = classificationSelect ? classificationSelect.value : '';
     
     // 重置表单（这会清空所有字段，包括select的options）
     // 在reset之前，确保nameSelect存在且可访问
@@ -5416,9 +5430,18 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     $('i-ediblePortion').value = '100';
     $('i-code').value = '';
     
-    // 清空所有字段
-    const classificationSelect = $('i-classification');
-    if (classificationSelect) {
+    // 恢复分类（如果之前已选择）
+    if (classificationSelect && currentClassificationBeforeReset) {
+      // 恢复分类值
+      classificationSelect.value = currentClassificationBeforeReset;
+      // 更新字段显示/隐藏
+      updateIngredientFieldsVisibility(currentClassificationBeforeReset);
+      // 触发 change 事件以显示 detailsSection 和加载类别
+      setTimeout(() => {
+        classificationSelect.dispatchEvent(new Event('change'));
+      }, 50);
+    } else if (classificationSelect) {
+      // 如果之前没有分类，清空
       classificationSelect.value = '';
       // 触发change事件以重置类别列表
       classificationSelect.dispatchEvent(new Event('change'));
@@ -5441,25 +5464,14 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     populateBrandSelect();
     populateSourceSelect();
     
-    // reset之后立即强制隐藏详细信息区域
-    if (detailsSection) {
-      console.log('Hiding details section after reset');
-      // 使用多种方法确保隐藏 - 完全移除元素
-      detailsSection.style.cssText = 'display:none !important; visibility:hidden !important; height:0 !important; overflow:hidden !important; margin:0 !important; padding:0 !important; border:none !important;';
-      detailsSection.classList.add('ingredient-details-hidden');
-      detailsSection.classList.remove('ingredient-details-visible');
-      // 隐藏内部grid
-      const grid = detailsSection.querySelector('.grid');
-      if (grid) {
-        grid.style.cssText = 'display:none !important;';
-      }
-      // 验证是否成功隐藏
-      const computedDisplay = window.getComputedStyle(detailsSection).display;
-      console.log('Details section display after hide:', computedDisplay);
-      if (computedDisplay !== 'none') {
-        console.warn('Failed to hide details section! Computed display:', computedDisplay);
-      }
-    }
+    // reset之后：使用统一的状态管理器更新显示/隐藏
+    const finalClassification = classificationSelect ? classificationSelect.value : '';
+    const isEditMode = false; // 新增模式
+    detailsSectionState.updateState({
+      classification: finalClassification,
+      isEditMode: isEditMode
+    });
+    console.log('Updated details section state after reset:', { classification: finalClassification, isEditMode: isEditMode });
     
     // 确保包材分类时隐藏食材名称字段
     const nameLabel = $('i-name-label');
@@ -5474,35 +5486,41 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
   
   updateIngredientPriceFields();
   
-  // 在显示表单之前，最后确认隐藏（新增模式）
-  if (!id && detailsSection) {
-    console.log('Final hide check before showing form');
-    // 使用多种方法确保隐藏 - 完全移除元素
-    detailsSection.style.cssText = 'display:none !important; visibility:hidden !important; height:0 !important; overflow:hidden !important; margin:0 !important; padding:0 !important; border:none !important;';
-    detailsSection.classList.add('ingredient-details-hidden');
-    detailsSection.classList.remove('ingredient-details-visible');
-    // 隐藏内部grid
-    const grid = detailsSection.querySelector('.grid');
-    if (grid) {
-      grid.style.cssText = 'display:none !important;';
-    }
-  }
-  
   // 设置表单状态标记（用于CSS选择器）
   if (id) {
     card.setAttribute('data-editing', 'true');
   } else {
     card.removeAttribute('data-editing');
-    // 在新增模式下，显示表单前最后强制隐藏详细信息区域
-    if (detailsSection) {
-      detailsSection.style.cssText = 'display:none !important; visibility:hidden !important; height:0 !important; overflow:hidden !important; margin:0 !important; padding:0 !important; border:none !important;';
-      detailsSection.classList.add('ingredient-details-hidden');
-      detailsSection.classList.remove('ingredient-details-visible');
-      const grid = detailsSection.querySelector('.grid');
-      if (grid) {
-        grid.style.cssText = 'display:none !important;';
-      }
-    }
+  }
+  
+  // 设置详细信息区域的显示/隐藏管理（新增和编辑模式都需要）
+  // 初始化状态管理器
+  detailsSectionState.init();
+  
+  // 获取当前分类和模式
+  const classificationSelect = $('i-classification');
+  const currentClassification = classificationSelect ? classificationSelect.value : '';
+  const isEditMode = ingredientFormState.isEditMode();
+  
+  // 使用统一的状态管理器更新显示/隐藏（单一入口）
+  detailsSectionState.updateState({
+    classification: currentClassification,
+    isEditMode: isEditMode
+  });
+  
+  // 如果分类已选择，更新字段显示/隐藏
+  if (currentClassification && currentClassification.trim() !== '') {
+    updateIngredientFieldsVisibility(currentClassification);
+  }
+  
+  // 新增模式：如果已经有分类被选择（比如通过搜索选择），延迟刷新确保状态同步
+  if (!id && currentClassification && currentClassification.trim() !== '') {
+    setTimeout(() => {
+      detailsSectionState.updateState({
+        classification: currentClassification,
+        isEditMode: false
+      });
+    }, 100);
   }
   
   // 在显示表单之前，再次确认位置（编辑模式）
@@ -5525,7 +5543,7 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
   }
   
   // 注意：表单已经在函数开始处显示，这里不需要重复显示
-  // 注意：详细信息区域的显示/隐藏已经在 setupDetailsSectionVisibility 中处理
+  // 注意：详细信息区域的显示/隐藏已由 detailsSectionState 统一管理
   
   // 滚动到表单位置，让表单可见（异步执行，不阻塞）
   requestAnimationFrame(() => {
@@ -5550,7 +5568,7 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     }
   });
   
-  // 注意：详细信息区域的显示/隐藏已经在 setupDetailsSectionVisibility 中处理
+  // 注意：详细信息区域的显示/隐藏已由 detailsSectionState 统一管理
   // 取消按钮的处理也已经在前面设置
 }
 
@@ -7409,11 +7427,27 @@ function setupIngredientsModule() {
   // 原料分类变化时，动态加载类别列表
   const classificationSelect = $('i-classification');
   if (classificationSelect) {
-    classificationSelect.addEventListener('change', async () => {
-      const classification = classificationSelect.value;
+    // 使用 once: false 确保可以多次触发，但先移除可能存在的旧监听器
+    const handleClassificationChange = async function() {
+      const classification = this.value;
+      
+      console.log('[Classification Change Event] Triggered, classification:', classification);
       
       // 更新字段显示/隐藏
       updateIngredientFieldsVisibility(classification);
+      
+      // 检查是否是编辑模式
+      const card = $('ingredient-form-card');
+      const currentId = $('ingredient-id')?.value;
+      const isEditMode = (card && card.hasAttribute('data-editing')) || (currentId && currentId.trim() !== '');
+      
+      console.log('[Classification Change] classification:', classification, 'isEditMode:', isEditMode);
+      
+      // 使用统一的状态管理器更新显示/隐藏（单一入口）
+      detailsSectionState.updateState({
+        classification: classification,
+        isEditMode: isEditMode
+      });
       
       // 包材分类隐藏食材名称字段
       const nameLabel = $('i-name-label');
@@ -7445,7 +7479,13 @@ function setupIngredientsModule() {
         // 分类为空时，隐藏所有分类特定字段
         updateIngredientFieldsVisibility('');
       }
-    });
+    };
+    
+    // 添加事件监听器（setupIngredientsModule 只在初始化时调用一次，不会重复添加）
+    classificationSelect.addEventListener('change', handleClassificationChange);
+    console.log('[setupIngredientsModule] Classification change event listener registered');
+  } else {
+    console.warn('[setupIngredientsModule] Classification select element not found!');
   }
   
   // 原料搜索输入框事件（第一行的搜索栏）
@@ -7746,30 +7786,16 @@ function setupIngredientsModule() {
         return;
       }
       
-      // 如果选择了食材，显示详细信息区域（如果还没显示）
-      const detailsSection = $('ingredient-details-section');
-      if (name && detailsSection) {
-        // 移除important，恢复正常显示
-        detailsSection.style.removeProperty('display');
-        detailsSection.style.removeProperty('visibility');
-        detailsSection.style.removeProperty('height');
-        detailsSection.style.removeProperty('overflow');
-        detailsSection.style.display = 'block';
-        detailsSection.style.visibility = 'visible';
-        detailsSection.style.height = 'auto';
-        detailsSection.style.overflow = 'visible';
-        detailsSection.style.marginTop = '20px';
-        detailsSection.style.paddingTop = '20px';
-        detailsSection.style.borderTop = '1px solid var(--border)';
-        detailsSection.classList.remove('ingredient-details-hidden');
-        detailsSection.classList.add('ingredient-details-visible');
-        // 显示内部grid
-        const grid = detailsSection.querySelector('.grid');
-        if (grid) {
-          grid.style.removeProperty('display');
-          grid.style.display = 'grid';
-        }
-      }
+      // 确保详细信息区域正确显示（通过状态管理器统一管理）
+      // 如果分类已选择，状态管理器应该已经处理了显示逻辑
+      // 这里只需要确保状态同步即可
+      const currentClassification = $('i-classification') ? $('i-classification').value.trim() : '';
+      const currentId = $('ingredient-id')?.value;
+      const isEditMode = currentId && currentId.trim() !== '';
+      detailsSectionState.updateState({
+        classification: currentClassification,
+        isEditMode: isEditMode
+      });
       
       const cost = Number($('i-cost').value) || 0;
       const quantity = Number($('i-quantity').value) || 0;
