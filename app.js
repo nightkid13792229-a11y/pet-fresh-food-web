@@ -3500,7 +3500,16 @@ function updateIngredientFieldsVisibility(classification) {
   config.show.forEach(fieldId => {
     const field = $(fieldId);
     if (field) {
-      field.style.display = '';
+      // 移除内联样式中的 display 属性
+      field.style.removeProperty('display');
+      // 如果移除后仍然是 none（可能被CSS规则隐藏），强制设置为 block
+      // 使用 requestAnimationFrame 确保在下一帧检查
+      requestAnimationFrame(() => {
+        const computedDisplay = window.getComputedStyle(field).display;
+        if (computedDisplay === 'none') {
+          field.style.setProperty('display', 'block', 'important');
+        }
+      });
     }
   });
   
@@ -4911,11 +4920,39 @@ class DetailsSectionStateManager {
     }
     
     if (this.isVisible) {
+      // 先移除所有可能的内联样式
+      this.detailsSection.style.removeProperty('display');
+      this.detailsSection.style.removeProperty('visibility');
+      this.detailsSection.style.removeProperty('height');
+      this.detailsSection.style.removeProperty('overflow');
+      
+      // 移除隐藏类，添加显示类
       this.detailsSection.classList.remove('ingredient-details-hidden');
       this.detailsSection.classList.add('ingredient-details-visible');
+      
+      // 确保 grid 也显示
+      const grid = this.detailsSection.querySelector('.grid');
+      if (grid) {
+        grid.style.removeProperty('display');
+      }
+      
+      // 验证：如果计算后的样式仍然是 none，强制设置（可能父元素隐藏导致）
+      // 使用 requestAnimationFrame 确保在下一帧检查，此时父元素应该已经显示
+      requestAnimationFrame(() => {
+        const computedDisplay = window.getComputedStyle(this.detailsSection).display;
+        if (computedDisplay === 'none') {
+          console.warn('[DetailsSectionState] Computed display is still none after class application, forcing block');
+          this.detailsSection.style.setProperty('display', 'block', 'important');
+          // 同时确保 grid 也显示
+          if (grid) {
+            grid.style.setProperty('display', 'grid', 'important');
+          }
+        }
+      });
     } else {
-      this.detailsSection.classList.add('ingredient-details-hidden');
+      // 隐藏时，移除显示类，添加隐藏类
       this.detailsSection.classList.remove('ingredient-details-visible');
+      this.detailsSection.classList.add('ingredient-details-hidden');
     }
   }
   
