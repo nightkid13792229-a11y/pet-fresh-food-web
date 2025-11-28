@@ -6040,7 +6040,8 @@ async function importIngredientsFromExcel(file) {
 async function loadCategoriesFromBackend(classification) {
   if (!backendState.token) {
     console.warn('未登录，无法加载分类');
-    return [];
+    // 未登录时，从store.ingredients中提取分类
+    return await extractCategoriesFromIngredients(classification);
   }
   
   try {
@@ -6058,18 +6059,112 @@ async function loadCategoriesFromBackend(classification) {
     const items = Array.isArray(data) ? data : (data.items || []);
     return items;
   } catch (error) {
-    // 404/400/484错误时，静默失败，不显示任何错误（可能是API还未完全实现）
+    // 404/400/484错误时，从现有数据中提取分类作为后备方案
     const errorMessage = error.message || '';
     if (errorMessage.includes('404') || errorMessage.includes('Not Found') || 
         errorMessage.includes('400') || errorMessage.includes('484') ||
         errorMessage.includes('Resource not found')) {
-      // 完全静默，不输出任何日志
-      return [];
+      // 从store.ingredients中提取分类
+      return await extractCategoriesFromIngredients(classification);
     }
     // 其他错误才记录（但不显示给用户）
     console.log('[loadCategoriesFromBackend] 非404错误:', errorMessage);
+    // 其他错误也尝试从现有数据中提取
+    return await extractCategoriesFromIngredients(classification);
+  }
+}
+
+// 从store.ingredients中提取分类数据
+async function extractCategoriesFromIngredients(classification) {
+  console.log('[extractCategoriesFromIngredients] 开始提取分类，classification:', classification, 'store.ingredients.length:', store.ingredients?.length || 0);
+  
+  let allIngredients = [];
+  
+  // 如果store.ingredients为空或数据很少，尝试加载所有原料数据
+  if (!store.ingredients || store.ingredients.length === 0 || store.ingredients.length < 50) {
+    try {
+      console.log('[extractCategoriesFromIngredients] 尝试加载所有原料数据...');
+      // 尝试加载所有原料数据（用于提取分类）
+      const response = await backendRequest('/api/v1/ingredients?pageSize=10000');
+      allIngredients = (response.items || []).map(ing => ({
+        id: ing.id,
+        category: ing.category,
+        classification: ing.classification,
+        name: ing.name
+      }));
+      
+      console.log('[extractCategoriesFromIngredients] 加载了', allIngredients.length, '条原料数据');
+    } catch (error) {
+      // 如果加载失败，使用现有的store.ingredients
+      console.log('[extractCategoriesFromIngredients] 加载所有原料失败，使用现有数据:', error.message);
+      allIngredients = store.ingredients || [];
+    }
+  } else {
+    allIngredients = store.ingredients;
+  }
+  
+  // 提取分类
+  const categories = extractCategoriesFromArray(allIngredients, classification);
+  console.log('[extractCategoriesFromIngredients] 提取到', categories.length, '个分类:', categories.map(c => c.category));
+  
+  if (categories.length === 0) {
+    console.warn('[extractCategoriesFromIngredients] 警告：未提取到任何分类，allIngredients.length:', allIngredients.length, 'classification:', classification);
+    // 调试：查看所有原料的分类分布
+    const classificationMap = {};
+    allIngredients.forEach(ing => {
+      if (ing.classification) {
+        classificationMap[ing.classification] = (classificationMap[ing.classification] || 0) + 1;
+      }
+    });
+    console.log('[extractCategoriesFromIngredients] 所有原料的分类分布:', classificationMap);
+  }
+  
+  return categories;
+}
+
+// 从原料数组中提取分类数据（辅助函数）
+function extractCategoriesFromArray(ingredients, classification) {
+  if (!ingredients || ingredients.length === 0) {
+    console.warn('[extractCategoriesFromArray] 原料数组为空');
     return [];
   }
+  
+  console.log('[extractCategoriesFromArray] 开始提取，ingredients.length:', ingredients.length, 'classification:', classification);
+  
+  // 提取该分类下的所有唯一类别
+  const categorySet = new Set();
+  const categoryMap = new Map(); // 用于存储 category -> { id, category, classification }
+  let processedCount = 0;
+  
+  ingredients.forEach((ing, index) => {
+    // 检查分类是否匹配
+    if (ing.classification === classification) {
+      processedCount++;
+      if (ing.category && ing.category.trim()) {
+        const categoryName = ing.category.trim();
+        if (!categorySet.has(categoryName)) {
+          categorySet.add(categoryName);
+          // 创建一个类似API返回格式的对象（使用负数作为临时ID，因为这是从本地数据提取的）
+          categoryMap.set(categoryName, {
+            id: -(index + 1), // 使用负数ID，避免与真实ID冲突
+            category: categoryName,
+            classification: ing.classification
+          });
+        }
+      } else {
+        console.log('[extractCategoriesFromArray] 原料', ing.id || index, '没有category字段:', ing);
+      }
+    }
+  });
+  
+  console.log('[extractCategoriesFromArray] 处理了', processedCount, '个匹配分类的原料，找到', categoryMap.size, '个唯一分类');
+  
+  // 转换为数组并按类别名称排序
+  const categories = Array.from(categoryMap.values()).sort((a, b) => {
+    return a.category.localeCompare(b.category, 'zh-CN');
+  });
+  
+  return categories;
 }
 
 // 加载分类使用统计
@@ -6089,8 +6184,18 @@ async function loadCategoryUsageStats(classification) {
     const data = response?.data || response;
     return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error('加载分类统计失败:', error);
-    return [];
+    // 404/400/484错误时，静默失败，不显示任何错误（可能是API还未完全实现）
+    const errorMessage = error.message || '';
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || 
+        errorMessage.includes('400') || errorMessage.includes('484') ||
+        errorMessage.includes('Resource not found')) {
+      // 完全静默，不输出任何日志
+      return [];
+    } else {
+      // 其他错误才显示错误信息
+      console.warn('加载分类统计失败:', error);
+      return [];
+    }
   }
 }
 
@@ -6155,7 +6260,24 @@ async function loadAndRenderCategories() {
   
   try {
     // 加载分类列表
-    const categories = await loadCategoriesFromBackend(currentCategoryClassification);
+    console.log('[loadAndRenderCategories] 开始加载分类，classification:', currentCategoryClassification);
+    let categories = [];
+    try {
+      categories = await loadCategoriesFromBackend(currentCategoryClassification);
+      console.log('[loadAndRenderCategories] 加载到', categories.length, '个分类:', categories.map(c => c.category || c));
+    } catch (error) {
+      console.error('[loadAndRenderCategories] 加载分类失败，尝试从store.ingredients提取:', error);
+      // 如果加载失败，直接尝试从store.ingredients提取
+      categories = await extractCategoriesFromIngredients(currentCategoryClassification);
+      console.log('[loadAndRenderCategories] 从store.ingredients提取到', categories.length, '个分类');
+    }
+    
+    // 确保categories是数组
+    if (!Array.isArray(categories)) {
+      console.warn('[loadAndRenderCategories] categories不是数组，转换为数组:', categories);
+      categories = [];
+    }
+    
     categoryManagementData[currentCategoryClassification] = categories;
     
     // 加载使用统计
@@ -6165,6 +6287,38 @@ async function loadAndRenderCategories() {
       statsMap[stat.category] = stat.ingredientCount || 0;
     });
     
+    // 如果统计数据为空，从store.ingredients中计算使用统计
+    if (stats.length === 0) {
+      // 尝试加载所有原料数据来计算统计
+      try {
+        const response = await backendRequest('/api/v1/ingredients?pageSize=10000');
+        const allIngredients = response.items || [];
+        
+        categories.forEach(cat => {
+          if (!statsMap[cat.category]) {
+            const count = allIngredients.filter(ing => 
+              ing.classification === currentCategoryClassification && 
+              ing.category === cat.category
+            ).length;
+            statsMap[cat.category] = count;
+          }
+        });
+      } catch (error) {
+        // 如果加载失败，使用现有的store.ingredients
+        if (store.ingredients && store.ingredients.length > 0) {
+          categories.forEach(cat => {
+            if (!statsMap[cat.category]) {
+              const count = store.ingredients.filter(ing => 
+                ing.classification === currentCategoryClassification && 
+                ing.category === cat.category
+              ).length;
+              statsMap[cat.category] = count;
+            }
+          });
+        }
+      }
+    }
+    
     // 应用搜索过滤
     const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const filtered = categories.filter(cat => {
@@ -6173,7 +6327,9 @@ async function loadAndRenderCategories() {
     });
     
     // 渲染分类列表
+    console.log('[loadAndRenderCategories] 过滤后', filtered.length, '个分类');
     if (filtered.length === 0) {
+      console.warn('[loadAndRenderCategories] 没有分类数据可显示');
       listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无分类数据</div>';
     } else {
       listEl.innerHTML = filtered.map(cat => {
