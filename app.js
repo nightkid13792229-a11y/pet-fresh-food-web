@@ -6086,12 +6086,40 @@ async function extractCategoriesFromIngredients(classification) {
       console.log('[extractCategoriesFromIngredients] 尝试加载所有原料数据...');
       // 尝试加载所有原料数据（用于提取分类）
       const response = await backendRequest('/api/v1/ingredients?pageSize=10000');
-      allIngredients = (response.items || []).map(ing => ({
+      const rawItems = response.items || [];
+      console.log('[extractCategoriesFromIngredients] 后端返回的原始数据数量:', rawItems.length);
+      
+      // 调试：查看前10条数据的完整信息
+      if (rawItems.length > 0) {
+        console.log('[extractCategoriesFromIngredients] 前10条原始数据示例:', rawItems.slice(0, 10).map(ing => ({
+          id: ing.id,
+          name: ing.name,
+          category: ing.category,
+          classification: ing.classification
+        })));
+      }
+      
+      allIngredients = rawItems.map(ing => ({
         id: ing.id,
         category: ing.category,
         classification: ing.classification,
         name: ing.name
       }));
+      
+      // 调试：统计所有分类和类别
+      const allClassificationCount = {};
+      const allCategoryCount = {};
+      allIngredients.forEach(ing => {
+        if (ing.classification) {
+          allClassificationCount[ing.classification] = (allClassificationCount[ing.classification] || 0) + 1;
+        }
+        if (ing.classification === classification && ing.category) {
+          const catName = ing.category.trim();
+          allCategoryCount[catName] = (allCategoryCount[catName] || 0) + 1;
+        }
+      });
+      console.log('[extractCategoriesFromIngredients] 所有原料的分类统计:', allClassificationCount);
+      console.log('[extractCategoriesFromIngredients] 该分类下的所有类别统计:', allCategoryCount);
       
       console.log('[extractCategoriesFromIngredients] 加载了', allIngredients.length, '条原料数据');
     } catch (error) {
