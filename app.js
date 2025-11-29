@@ -4236,19 +4236,16 @@ function renderIngredientsList() {
   }
   
   list.innerHTML = pageItems.map(ing => {
-    const pricePer500 = (Number(ing.pricePer500) || 0).toFixed(2);
     const description = (ing.description || '').substring(0, 40);
-    const mainFunction = (ing.mainFunction || '').substring(0, 40);
     return `
       <div class="list-item" data-id="${ing.id}">
-        <div class="list-item-row" style="grid-template-columns: 1fr 1.2fr 1fr 0.8fr 1fr 1.2fr 1.2fr;">
+        <div class="list-item-row" style="grid-template-columns: 1fr 1.2fr 1fr 1fr 1fr 1.2fr;">
           <div>${ing.category || '-'}</div>
           <div>${ing.classification === '包材' ? '-' : (ing.name || '-')}</div>
           <div>${ing.brand || '-'}</div>
-          <div>${ing.unit || '-'}</div>
-          <div>${pricePer500}</div>
+          <div>${ing.model || '-'}</div>
+          <div>${ing.source || '-'}</div>
           <div style="font-size:13px; color:var(--text-secondary)">${description}${(ing.description || '').length > 40 ? '...' : ''}</div>
-          <div style="font-size:13px; color:var(--text-secondary)">${mainFunction}${(ing.mainFunction || '').length > 40 ? '...' : ''}</div>
         </div>
         <div class="item-actions">
           <button class="btn small" data-detail="${ing.id}">详细信息</button>
