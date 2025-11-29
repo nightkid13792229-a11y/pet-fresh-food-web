@@ -3935,6 +3935,42 @@ function calculatePricePer500(cost, quantity, unit) {
   return (cost / quantityInBaseUnit) * 500;
 }
 
+// 根据单位字段动态更新标签文本
+function updateUnitBasedLabels() {
+  const unitSelect = $('i-unit');
+  const pricePerUnitLabel = $('i-pricePerUnit-label');
+  const weightPerUnitLabel = $('i-weightPerUnit-label');
+  
+  if (!unitSelect) return;
+  
+  const unit = unitSelect.value.trim();
+  const unitDisplay = unit || '-';
+  
+  // 更新"价格/单位"标签
+  if (pricePerUnitLabel) {
+    // 获取input元素（需要保留）
+    const input = $('i-pricePerUnit');
+    // 设置标签文本
+    pricePerUnitLabel.innerHTML = `价格/${unitDisplay}`;
+    // 重新添加input元素
+    if (input) {
+      pricePerUnitLabel.appendChild(input);
+    }
+  }
+  
+  // 更新"重量（g）/单位"标签
+  if (weightPerUnitLabel) {
+    // 获取input元素（需要保留）
+    const input = $('i-weightPerUnit');
+    // 设置标签文本
+    weightPerUnitLabel.innerHTML = `重量（g）/${unitDisplay}`;
+    // 重新添加input元素
+    if (input) {
+      weightPerUnitLabel.appendChild(input);
+    }
+  }
+}
+
 function updateIngredientPriceFields() {
   const cost = Number($('i-cost').value) || 0;
   const quantity = Number($('i-quantity').value) || 0;
@@ -3943,14 +3979,30 @@ function updateIngredientPriceFields() {
   const ediblePortionPercent = Number($('i-ediblePortion').value) || 100;
   const ediblePortion = ediblePortionPercent / 100;
   
+  // 仍然计算 pricePer500 用于后端保存（兼容性）
   const pricePer500 = calculatePricePer500(cost, quantity, unit);
   const ediblePricePer500 = ediblePortion > 0 ? pricePer500 / ediblePortion : 0;
   
+  // 计算每单位价格（新显示字段）
+  let pricePerUnit = 0;
+  if (quantity > 0) {
+    pricePerUnit = cost / quantity;
+  }
+  
+  // 更新隐藏字段（用于后端保存）
   const priceEl = $('i-pricePer500');
   const ediblePriceEl = $('i-ediblePricePer500');
-  
   if (priceEl) priceEl.value = pricePer500.toFixed(4);
   if (ediblePriceEl) ediblePriceEl.value = ediblePricePer500.toFixed(4);
+  
+  // 更新新显示字段
+  const pricePerUnitEl = $('i-pricePerUnit');
+  if (pricePerUnitEl) {
+    pricePerUnitEl.value = pricePerUnit > 0 ? pricePerUnit.toFixed(4) : '';
+  }
+  
+  // 更新标签文本
+  updateUnitBasedLabels();
 }
 // 从后端加载项目并填充到表单下拉框
 async function loadItemsForForm(categoryId, categoryName) {
@@ -4231,27 +4283,29 @@ function formatIngredientDetails(ing) {
   
   // ========== 价格信息组 ==========
   rows.push({ type: 'section', title: '价格信息' });
-  const pricePer500 = ing.pricePer500 != null ? formatNum(ing.pricePer500, 4) : '-';
+  
+  // 计算每单位价格
+  const costValue = ing.cost || 0;
+  const quantityValue = ing.quantity || 0;
+  const unit = ing.unit || '-';
+  const unitDisplay = unit !== '-' ? unit : '-';
+  const pricePerUnit = quantityValue > 0 ? formatNum(costValue / quantityValue, 4) : '-';
+  
   if (ing.classification !== '包材') {
     const ediblePortion = ing.ediblePortion != null 
       ? (Math.round(ing.ediblePortion * 100) !== 100 ? `${Math.round(ing.ediblePortion * 100)}%` : '100%')
       : '-';
     rows.push([
-      { label: '单价/500单位', value: pricePer500 },
+      { label: `价格/${unitDisplay}`, value: pricePerUnit },
       { label: '可食部', value: ediblePortion }
-    ]);
-    
-    const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
-    rows.push([
-      { label: '可食部单价/500单位', value: ediblePricePer500, colspan: 2 }
     ]);
   } else {
     rows.push([
-      { label: '单价/500单位', value: pricePer500, colspan: 2 }
+      { label: `价格/${unitDisplay}`, value: pricePerUnit, colspan: 2 }
     ]);
     const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
     rows.push([
-      { label: '每单位重量', value: weightPerUnit, colspan: 2 }
+      { label: `重量（g）/${unitDisplay}`, value: weightPerUnit, colspan: 2 }
     ]);
   }
   
@@ -5607,6 +5661,10 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       $('i-description').value = ing.description || '';
       $('i-mainFunction').value = ing.mainFunction || '';
       
+      // 更新单位标签和价格字段
+      updateUnitBasedLabels();
+      updateIngredientPriceFields();
+      
       // 显示详细信息区域（编辑模式始终显示）
       detailsSectionState.init();
       detailsSectionState.updateState({
@@ -5716,6 +5774,8 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     }
   }
   
+  // 更新单位标签和价格字段
+  updateUnitBasedLabels();
   updateIngredientPriceFields();
   
   // 设置表单状态标记（用于CSS选择器）
@@ -8132,6 +8192,15 @@ function setupIngredientsModule() {
     const el = $(id);
     if (el) el.addEventListener('input', updateIngredientPriceFields);
   });
+  
+  // 单位字段变化时，更新标签文本
+  const unitSelect = $('i-unit');
+  if (unitSelect) {
+    unitSelect.addEventListener('change', () => {
+      updateUnitBasedLabels();
+      updateIngredientPriceFields(); // 重新计算价格
+    });
+  }
   
   // 表单提交
   const form = $('ingredient-form');

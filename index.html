@@ -448,9 +448,13 @@
                     <button type="button" id="btn-manage-units" class="btn small" style="white-space:nowrap;">管理</button>
                   </div>
                 </label>
-                <label>单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                <!-- 隐藏旧字段，保留用于后端保存 -->
+                <label style="display:none;">单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
                 <label id="i-ediblePortion-label" data-classification="包材" style="display:none;">可食部（%）<input id="i-ediblePortion" type="number" min="0" max="100" step="1" value="100" /></label>
-                <label>可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                <label style="display:none;">可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                
+                <!-- 新增字段：价格/单位（动态显示单位） -->
+                <label id="i-pricePerUnit-label">价格/-<input id="i-pricePerUnit" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
                 
                 <!-- 新增字段：每单位含量（仅营养补充剂） -->
                 <label id="i-unitContent-label" data-classification="营养补充剂" style="display:none;">
@@ -458,7 +462,8 @@
                   <input id="i-unitContent" type="text" placeholder="如：500mg/粒" />
                 </label>
                 
-                <label id="i-weightPerUnit-label">每单位重量(g)<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
+                <!-- 修改：每单位重量标签，动态显示单位 -->
+                <label id="i-weightPerUnit-label">重量（g）/-<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
                 <label>说明<textarea id="i-description" rows="2" placeholder="原料描述、备注"></textarea></label>
                 <label id="i-mainFunction-label" data-classification="包材" style="display:none;">主要营养价值<textarea id="i-mainFunction" rows="2" placeholder="主要营养价值描述"></textarea></label>
               </div>
@@ -1036,7 +1041,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-32"></script>
+  <script src="app.js?v=20241128-33"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
