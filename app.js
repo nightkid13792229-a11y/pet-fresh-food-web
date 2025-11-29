@@ -7508,6 +7508,12 @@ function setupIngredientsModule() {
         // 分类为空时，隐藏所有分类特定字段
         updateIngredientFieldsVisibility('');
       }
+      
+      // 自动生成编号：如果分类和类别都已选择，就生成编号（特别是包材的情况）
+      const category = $('i-category')?.value;
+      if (classification && category) {
+        setTimeout(() => autoGenerateCode(), 200);
+      }
     };
     
     // 添加事件监听器（setupIngredientsModule 只在初始化时调用一次，不会重复添加）
@@ -7564,10 +7570,15 @@ function setupIngredientsModule() {
           nameSelect.innerHTML = '<option value="">请先选择原料分类和类别</option>';
         }
       }
-      // 自动生成编号
-      const nameEl = $('i-name');
-      if (nameEl && nameEl.value) {
+      // 自动生成编号：如果分类和类别都已选择，就生成编号（特别是包材的情况）
+      if (classification && category) {
         setTimeout(() => autoGenerateCode(), 100);
+      } else {
+        // 如果分类或类别为空，检查是否有食材名称，有的话也生成编号
+        const nameEl = $('i-name');
+        if (nameEl && nameEl.value) {
+          setTimeout(() => autoGenerateCode(), 100);
+        }
       }
     });
   }
