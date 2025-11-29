@@ -658,120 +658,43 @@ const PRESET_CATEGORIES = {
     '蛋白质类', '维生素类', '矿物质类', '脂肪酸类', '益生菌/益生元类', '功能性补充剂'
   ],
   '包材': [
-    '包装容器类', '标签类', '外包装类', '辅助材料类'
+    '食品真空袋', '产品说明标签', '泡沫箱', '铝箔保温袋', '地址信息标签', '收纳自封袋'
   ]
 };
 
-// 拼音首字母映射表（常用字）
-// 使用Unicode范围判断拼音首字母（简化版）
-const PINYIN_MAP = {
-  // 类别常用字
-  '种': 'Z', '子': 'Z', '鱼': 'Y', '肉': 'R', '营': 'Y', '养': 'Y', '品': 'P',
-  '香': 'X', '料': 'L', '水': 'S', '果': 'G', '蔬': 'S', '菜': 'C',
-  '谷': 'G', '物': 'W', '禽': 'Q', '内': 'N', '脏': 'Z', '菌': 'J', '菇': 'G',
-  '坚': 'J', '蛋': 'D', '类': 'L', '畜': 'C', '贝': 'B', '包': 'B', '装': 'Z',
-  // 项目常用字
-  '亚': 'Y', '麻': 'M', '籽': 'Z', '奇': 'Q', '芹': 'Q', '南': 'N',
-  '瓜': 'G', '葵': 'K', '花': 'H', '火': 'H', '白': 'B', '芝': 'Z', '鳕': 'X',
-  '三': 'S', '文': 'W', '沙': 'S', '丁': 'D', '青': 'Q', '比': 'B',
-  '目': 'M', '椰': 'Y', '奶': 'N', '油': 'Y', '酪': 'L', '鸡': 'J',
-  '胸': 'X', '腿': 'T', '心': 'X', '肝': 'G', '肾': 'S', '牛': 'N',
-  '羊': 'Y', '猪': 'Z', '鸭': 'Y', '鹅': 'E', '兔': 'T', '虾': 'X',
-  '蟹': 'X', '扇': 'S', '贝': 'B', '生': 'S', '菜': 'C', '菠': 'B',
-  '萝': 'L', '胡': 'H', '萝': 'L', '卜': 'B', '番': 'F', '茄': 'Q',
-  '黄': 'H', '豆': 'D', '绿': 'L', '西': 'X', '蓝': 'L', '莓': 'M',
-  '草': 'C', '苹': 'P', '香': 'X', '蕉': 'J', '橙': 'C', '柚': 'Y',
-  '米': 'M', '面': 'M', '粉': 'F', '玉': 'Y', '小': 'X', '麦': 'M',
-  '燕': 'Y', '麦': 'M', '片': 'P', '糙': 'C', '藜': 'L', '麦': 'M'
+// 类别英文简写映射表
+const CATEGORY_ABBREVIATION_MAP = {
+  // 食材类别
+  '谷类及制品': 'GRAIN',
+  '薯类、淀粉及制品': 'STARCH',
+  '干豆类及制品': 'BEAN',
+  '蔬菜类及制品': 'VEG',
+  '水果类及制品': 'FRUIT',
+  '畜肉类及制品': 'MEAT',
+  '禽肉类及制品': 'POULTRY',
+  '乳类及制品': 'DAIRY',
+  '蛋类及制品': 'EGG',
+  '鱼虾蟹贝类': 'SEAFOOD',
+  '坚果、种子类': 'NUT',
+  '油脂类': 'OIL',
+  '调味品类': 'SPICE',
+  
+  // 营养补充剂类别（使用全称）
+  '蛋白质类': 'PROTEIN',
+  '维生素类': 'VITAMIN',
+  '矿物质类': 'MINERAL',
+  '脂肪酸类': 'FATTYACID',
+  '益生菌/益生元类': 'PROBIOTIC',
+  '功能性补充剂': 'FUNCTIONAL',
+  
+  // 包材类别
+  '食品真空袋': 'VACUUMBAG',
+  '产品说明标签': 'LABEL',
+  '泡沫箱': 'FOAMBOX',
+  '铝箔保温袋': 'FOILBAG',
+  '地址信息标签': 'ADDRESSLABEL',
+  '收纳自封袋': 'ZIPBAG'
 };
-
-// 获取单个字符的拼音首字母
-function getCharPinyinInitial(char) {
-  if (!char || char.length === 0) return '';
-  
-  // 如果是英文字母或数字，直接返回大写
-  if (/[A-Za-z0-9]/.test(char)) {
-    return char.toUpperCase();
-  }
-  
-  // 优先使用 pinyin 库（如果已加载）
-  if (typeof pinyin !== 'undefined' && pinyin && typeof pinyin === 'function') {
-    try {
-      // 使用 pinyin 库获取拼音首字母
-      // STYLE_FIRST_LETTER 表示只返回首字母
-      const pyArray = pinyin(char, {
-        style: pinyin.STYLE_FIRST_LETTER,
-        heteronym: false
-      });
-      if (pyArray && pyArray.length > 0 && pyArray[0] && pyArray[0].length > 0) {
-        const firstLetter = pyArray[0][0].toUpperCase();
-        // 确保返回的是字母
-        if (/[A-Z]/.test(firstLetter)) {
-          return firstLetter;
-        }
-      }
-    } catch (e) {
-      console.warn('[getCharPinyinInitial] pinyin 库转换失败:', e, '字符:', char);
-    }
-  }
-  
-  // 回退到映射表
-  if (PINYIN_MAP[char]) {
-    return PINYIN_MAP[char];
-  }
-  
-  // 如果没有映射，使用Unicode范围粗略判断（基于Unicode范围）
-  const code = char.charCodeAt(0);
-  // 汉字Unicode范围：0x4E00-0x9FFF
-  if (code >= 0x4E00 && code <= 0x9FFF) {
-    // 使用一个简化的拼音首字母映射（基于Unicode范围分段）
-    // 这是一个粗略的近似，不准确但可用
-    const ranges = [
-      { start: 0x4E00, end: 0x4EFF, letter: 'Y' },
-      { start: 0x4F00, end: 0x4FFF, letter: 'D' },
-      { start: 0x5000, end: 0x50FF, letter: 'C' },
-      { start: 0x5100, end: 0x51FF, letter: 'B' },
-      { start: 0x5200, end: 0x52FF, letter: 'G' },
-      { start: 0x5300, end: 0x53FF, letter: 'H' },
-      { start: 0x5400, end: 0x54FF, letter: 'K' },
-      { start: 0x5500, end: 0x55FF, letter: 'L' },
-      { start: 0x5600, end: 0x56FF, letter: 'M' },
-      { start: 0x5700, end: 0x57FF, letter: 'N' },
-      { start: 0x5800, end: 0x58FF, letter: 'P' },
-      { start: 0x5900, end: 0x59FF, letter: 'Q' },
-      { start: 0x5A00, end: 0x5AFF, letter: 'R' },
-      { start: 0x5B00, end: 0x5BFF, letter: 'S' },
-      { start: 0x5C00, end: 0x5CFF, letter: 'T' },
-      { start: 0x5D00, end: 0x5DFF, letter: 'W' },
-      { start: 0x5E00, end: 0x5EFF, letter: 'X' },
-      { start: 0x5F00, end: 0x5FFF, letter: 'Y' },
-      { start: 0x6000, end: 0x60FF, letter: 'Z' }
-    ];
-    for (const range of ranges) {
-      if (code >= range.start && code <= range.end) {
-        return range.letter;
-      }
-    }
-  }
-  
-  // 如果都不匹配，返回默认值
-  return 'X';
-}
-
-// 获取文本所有字的拼音首字母（新规则）
-function getPinyinInitials(text) {
-  if (!text || text.length === 0) return '';
-  let result = '';
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charAt(i);
-    // 只跳过空格和常见标点符号，保留中文字符、英文字母和数字
-    // \s 匹配空格，\p{P} 匹配标点符号（需要Unicode支持）
-    // 如果浏览器不支持 \p{P}，则只跳过空格
-    if (/[\s\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/.test(char)) continue;
-    result += getCharPinyinInitial(char);
-  }
-  return result;
-}
 
 // 获取分类前缀
 function getClassificationPrefix(classification) {
@@ -783,14 +706,18 @@ function getClassificationPrefix(classification) {
   return prefixMap[classification] || '';
 }
 
-// 获取类别缩写（类别名称的拼音首字母，2-5位）
+// 获取类别缩写（使用英文简写映射）
 function getCategoryAbbreviation(category) {
   if (!category) return '';
-  const initials = getPinyinInitials(category);
-  if (!initials) return '';
-  // 限制在2-5位之间，转换为大写
-  const abbr = initials.length > 5 ? initials.substring(0, 5) : initials;
-  return abbr.toUpperCase();
+  
+  // 优先查找映射表
+  if (CATEGORY_ABBREVIATION_MAP[category]) {
+    return CATEGORY_ABBREVIATION_MAP[category];
+  }
+  
+  // 如果映射表中没有，返回空字符串（需要手动添加映射）
+  console.warn('[getCategoryAbbreviation] 类别未找到映射:', category);
+  return '';
 }
 
 // 自动生成编号（新规则：分类前缀-类别缩写-3位序号）
