@@ -8059,19 +8059,27 @@ function setupIngredientsModule() {
   });
   
   const prevBtn = $('ingredients-prev');
-  if (prevBtn) prevBtn.addEventListener('click', () => {
+  if (prevBtn) prevBtn.addEventListener('click', async () => {
     if (store.ingredientPage > 1) {
       store.ingredientPage--;
-      renderIngredientsList();
+      if (backendState.token) {
+        await loadIngredientsFromBackend();  // 使用后端数据时，重新加载
+      } else {
+        renderIngredientsList();  // 本地数据只需要重新渲染
+      }
     }
   });
   
   const nextBtn = $('ingredients-next');
-  if (nextBtn) nextBtn.addEventListener('click', () => {
+  if (nextBtn) nextBtn.addEventListener('click', async () => {
     const { totalPages } = paginatedIngredients();
     if (store.ingredientPage < totalPages) {
       store.ingredientPage++;
-      renderIngredientsList();
+      if (backendState.token) {
+        await loadIngredientsFromBackend();  // 使用后端数据时，重新加载
+      } else {
+        renderIngredientsList();  // 本地数据只需要重新渲染
+      }
     }
   });
   
