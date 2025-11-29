@@ -4210,18 +4210,14 @@ function renderIngredientsList() {
   const formCard = $('ingredient-form-card');
   if (formCard && list.contains(formCard)) {
     console.warn('[renderIngredientsList] Form card is inside list, moving it out');
-    const viewInventory = $('view-inventory');
-    const ingredientsHead = $('ingredients-head');
-    if (viewInventory && ingredientsHead && ingredientsHead.parentNode) {
-      formCard.parentNode?.removeChild(formCard);
-      // 插入到ingredients-head之后，而不是之前
-      const nextSibling = ingredientsHead.nextSibling;
-      if (nextSibling) {
-        ingredientsHead.parentNode.insertBefore(formCard, nextSibling);
-      } else {
-        ingredientsHead.parentNode.appendChild(formCard);
+      const viewInventory = $('view-inventory');
+      const actionsDiv = document.querySelector('#view-inventory .actions');
+      const ingredientsHead = $('ingredients-head');
+      if (viewInventory && actionsDiv && ingredientsHead && ingredientsHead.parentNode) {
+        formCard.parentNode?.removeChild(formCard);
+        // 插入到actions之后、ingredients-head之前
+        ingredientsHead.parentNode.insertBefore(formCard, ingredientsHead);
       }
-    }
   }
   
   const { pageItems, total, totalPages } = paginatedIngredients();
@@ -5111,13 +5107,8 @@ function setFormPosition(card, id, insertAfterElement) {
     const actionsDiv = document.querySelector('#view-inventory .actions');
     const ingredientsHead = $('ingredients-head');
     if (actionsDiv && ingredientsHead && ingredientsHead.parentNode) {
-      // 插入到ingredients-head之后，而不是之前
-      const nextSibling = ingredientsHead.nextSibling;
-      if (nextSibling) {
-        ingredientsHead.parentNode.insertBefore(card, nextSibling);
-      } else {
-        ingredientsHead.parentNode.appendChild(card);
-      }
+      // 插入到actions之后、ingredients-head之前
+      ingredientsHead.parentNode.insertBefore(card, ingredientsHead);
     } else {
       console.error('[setFormPosition] Cannot restore card, required parent elements not found');
       return;
@@ -5151,25 +5142,21 @@ function setFormPosition(card, id, insertAfterElement) {
     }
   }
   
-  // 默认位置：搜索框下方（在ingredients-head之后）
+  // 默认位置：搜索框下方（在actions之后、ingredients-head之前）
   const actionsDiv = document.querySelector('#view-inventory .actions');
   const ingredientsHead = $('ingredients-head');
   if (actionsDiv && ingredientsHead && ingredientsHead.parentNode) {
-    // 如果card已经在正确位置（在ingredients-head之后），不需要移动
+    // 如果card已经在正确位置（在actions之后、ingredients-head之前），不需要移动
     if (card.parentNode === ingredientsHead.parentNode && 
-        card.previousSibling === ingredientsHead) {
+        card.previousSibling === actionsDiv &&
+        card.nextSibling === ingredientsHead) {
       return;
     }
     if (card.parentNode) {
       card.parentNode.removeChild(card);
     }
-    // 插入到ingredients-head之后，而不是之前
-    const nextSibling = ingredientsHead.nextSibling;
-    if (nextSibling) {
-      ingredientsHead.parentNode.insertBefore(card, nextSibling);
-    } else {
-      ingredientsHead.parentNode.appendChild(card);
-    }
+    // 插入到ingredients-head之前（即actions之后）
+    ingredientsHead.parentNode.insertBefore(card, ingredientsHead);
   } else {
     console.error('[setFormPosition] Cannot set default position, required elements not found');
   }
@@ -5231,17 +5218,18 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
         // 使用找到的元素
         const finalCard = foundCard;
         const finalForm = foundForm;
-        // 确保表单在正确的位置（在ingredients-head之后，而不是之前）
+        // 确保表单在正确的位置（在actions之后、ingredients-head之前）
+        const actionsDiv = document.querySelector('#view-inventory .actions');
         const ingredientsHead = $('ingredients-head');
-        if (ingredientsHead && ingredientsHead.parentNode && finalCard.parentNode !== ingredientsHead.parentNode) {
-          if (finalCard.parentNode) {
-            finalCard.parentNode.removeChild(finalCard);
-          }
-          const nextSibling = ingredientsHead.nextSibling;
-          if (nextSibling) {
-            ingredientsHead.parentNode.insertBefore(finalCard, nextSibling);
-          } else {
-            ingredientsHead.parentNode.appendChild(finalCard);
+        if (actionsDiv && ingredientsHead && ingredientsHead.parentNode) {
+          // 如果表单不在正确位置，移动到正确位置
+          if (finalCard.parentNode !== ingredientsHead.parentNode || 
+              finalCard.previousSibling !== actionsDiv ||
+              finalCard.nextSibling !== ingredientsHead) {
+            if (finalCard.parentNode) {
+              finalCard.parentNode.removeChild(finalCard);
+            }
+            ingredientsHead.parentNode.insertBefore(finalCard, ingredientsHead);
           }
         }
         // 继续执行，使用找到的元素
@@ -5576,19 +5564,11 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     $('i-ediblePortion').value = '100';
     $('i-code').value = '';
     
-    // 恢复分类（如果之前已选择）
-    if (classificationSelect && currentClassificationBeforeReset) {
-      // 恢复分类值
-      classificationSelect.value = currentClassificationBeforeReset;
-      // 更新字段显示/隐藏
-      updateIngredientFieldsVisibility(currentClassificationBeforeReset);
-      // 触发 change 事件以显示 detailsSection 和加载类别
-      setTimeout(() => {
-        classificationSelect.dispatchEvent(new Event('change'));
-      }, 50);
-    } else if (classificationSelect) {
-      // 如果之前没有分类，清空
+    // 新增模式：清空分类，确保字段正确隐藏
+    if (classificationSelect) {
       classificationSelect.value = '';
+      // 更新字段显示/隐藏（清空分类会隐藏所有字段）
+      updateIngredientFieldsVisibility('');
       // 触发change事件以重置类别列表
       classificationSelect.dispatchEvent(new Event('change'));
     }
@@ -5611,13 +5591,14 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     populateSourceSelect();
     
     // reset之后：使用统一的状态管理器更新显示/隐藏
-    const finalClassification = classificationSelect ? classificationSelect.value : '';
+    // 新增模式下，确保分类为空，字段正确隐藏
+    const finalClassification = ''; // 新增模式，分类应该为空
     const isEditMode = false; // 新增模式
     detailsSectionState.updateState({
       classification: finalClassification,
       isEditMode: isEditMode
     });
-    console.log('Updated details section state after reset:', { classification: finalClassification, isEditMode: isEditMode });
+    console.log('Updated details section state after reset (new mode):', { classification: finalClassification, isEditMode: isEditMode });
     
     // 确保包材分类时隐藏食材名称字段
     const nameLabel = $('i-name-label');
