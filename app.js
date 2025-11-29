@@ -4071,7 +4071,7 @@ function autoGenerateCode() {
   }
 }
 
-// 格式化原料详细信息（使用表格方式，紧凑排版）
+// 格式化原料详细信息（优化排版，按逻辑分组）
 function formatIngredientDetails(ing) {
   // 辅助函数：格式化数字
   const formatNum = (val, decimals = 2) => {
@@ -4080,15 +4080,16 @@ function formatIngredientDetails(ing) {
     return isNaN(num) ? '-' : num.toFixed(decimals);
   };
   
-  // 构建表格行数据（统一使用两列布局）
+  // 构建表格行数据（按逻辑分组）
   const rows = [];
   
-  // 第一行：原料分类、编号
+  // ========== 基本信息组 ==========
+  rows.push({ type: 'section', title: '基本信息' });
+  // 第一行：编号、原料分类
   rows.push([
-    { label: '原料分类', value: ing.classification || '-' },
-    { label: '编号', value: ing.code || '-' }
+    { label: '编号', value: ing.code || '-' },
+    { label: '原料分类', value: ing.classification || '-' }
   ]);
-  
   // 第二行：类别、食材名称（包材不显示食材名称）
   if (ing.classification === '包材') {
     rows.push([
@@ -4101,9 +4102,10 @@ function formatIngredientDetails(ing) {
     ]);
   }
   
-  // 食材分类特有字段：所属科目、部位、产地类型
+  // ========== 分类特有信息组 ==========
   if (ing.classification === '食材') {
     if (ing.subject || ing.part || ing.originType) {
+      rows.push({ type: 'section', title: '食材信息' });
       const subjectValue = ing.subject || '-';
       const partValue = ing.part || '-';
       const originTypeValue = ing.originType || '-';
@@ -4115,28 +4117,27 @@ function formatIngredientDetails(ing) {
         { label: '产地类型', value: originTypeValue, colspan: 2 }
       ]);
     }
-  }
-  
-  // 营养补充剂特有字段：每单位含量
-  if (ing.classification === '营养补充剂' && ing.unitContent) {
+  } else if (ing.classification === '营养补充剂' && ing.unitContent) {
+    rows.push({ type: 'section', title: '营养补充剂信息' });
     rows.push([
       { label: '每单位含量', value: ing.unitContent || '-', colspan: 2 }
     ]);
   }
   
-  // 第三行：品牌、型号
+  // ========== 产品信息组 ==========
+  rows.push({ type: 'section', title: '产品信息' });
   rows.push([
     { label: '品牌', value: ing.brand || '-' },
     { label: '型号', value: ing.model || '-' }
   ]);
   
-  // 第四行：采购渠道、单位
+  // ========== 采购信息组 ==========
+  rows.push({ type: 'section', title: '采购信息' });
   rows.push([
     { label: '采购渠道', value: ing.source || '-' },
     { label: '单位', value: ing.unit || '-' }
   ]);
   
-  // 第五行：费用、单量
   const cost = ing.cost != null ? formatNum(ing.cost, 2) : '-';
   const quantity = ing.quantity != null ? `${formatNum(ing.quantity, 1)} ${ing.unit || ''}` : '-';
   rows.push([
@@ -4144,7 +4145,8 @@ function formatIngredientDetails(ing) {
     { label: '单量（采购数量）', value: quantity }
   ]);
   
-  // 第六行：单价/500单位、可食部（包材不显示可食部）
+  // ========== 价格信息组 ==========
+  rows.push({ type: 'section', title: '价格信息' });
   const pricePer500 = ing.pricePer500 != null ? formatNum(ing.pricePer500, 4) : '-';
   if (ing.classification !== '包材') {
     const ediblePortion = ing.ediblePortion != null 
@@ -4154,51 +4156,61 @@ function formatIngredientDetails(ing) {
       { label: '单价/500单位', value: pricePer500 },
       { label: '可食部', value: ediblePortion }
     ]);
-  } else {
-    rows.push([
-      { label: '单价/500单位', value: pricePer500, colspan: 2 }
-    ]);
-  }
-  
-  // 第七行：可食部单价/500单位、每单位重量（包材显示每单位重量，食材和营养补充剂不显示每单位重量）
-  if (ing.classification === '包材') {
-    const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
-    rows.push([
-      { label: '每单位重量', value: weightPerUnit, colspan: 2 }
-    ]);
-  } else {
-    // 食材和营养补充剂只显示可食部单价/500单位，不显示每单位重量
+    
     const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
     rows.push([
       { label: '可食部单价/500单位', value: ediblePricePer500, colspan: 2 }
     ]);
-  }
-  
-  // 第八行：说明、主要营养价值（包材不显示主要营养价值）
-  if (ing.classification !== '包材') {
-    rows.push([
-      { label: '说明', value: ing.description || '-' },
-      { label: '主要营养价值', value: ing.mainFunction || '-' }
-    ]);
   } else {
     rows.push([
-      { label: '说明', value: ing.description || '-', colspan: 2 }
+      { label: '单价/500单位', value: pricePer500, colspan: 2 }
     ]);
+    const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
+    rows.push([
+      { label: '每单位重量', value: weightPerUnit, colspan: 2 }
+    ]);
+  }
+  
+  // ========== 其他信息组 ==========
+  if (ing.description || ing.mainFunction) {
+    rows.push({ type: 'section', title: '其他信息' });
+    if (ing.classification !== '包材') {
+      rows.push([
+        { label: '说明', value: ing.description || '-' },
+        { label: '主要营养价值', value: ing.mainFunction || '-' }
+      ]);
+    } else {
+      rows.push([
+        { label: '说明', value: ing.description || '-', colspan: 2 }
+      ]);
+    }
   }
   
   // 生成表格HTML
-  const tableRows = rows.map(row => {
-    const cells = row.map(cell => {
-      const colspan = cell.colspan ? ` colspan="${cell.colspan}"` : '';
-      const width = cell.colspan === 2 ? 'width:100%;' : 'width:50%;';
-      return `<td style="padding:4px 8px; border:1px solid var(--border); ${width}"><strong>${cell.label}：</strong>${cell.value}</td>`;
-    }).join('');
-    return `<tr>${cells}</tr>`;
-  }).join('');
+  const tableRows = [];
+  rows.forEach(row => {
+    if (row.type === 'section') {
+      tableRows.push(`<tr>
+        <td colspan="2" style="padding:8px 12px; background:var(--bg-secondary, #f5f5f5); border:1px solid var(--border); font-weight:600; font-size:13px; color:var(--text-primary, #333);">
+          ${row.title}
+        </td>
+      </tr>`);
+    } else {
+      const cells = row.map(cell => {
+        const colspan = cell.colspan ? ` colspan="${cell.colspan}"` : '';
+        const width = cell.colspan === 2 ? 'width:100%;' : 'width:50%;';
+        return `<td style="padding:6px 12px; border:1px solid var(--border); ${width}; font-size:13px;">
+          <span style="font-weight:500; color:var(--text-secondary, #666);">${cell.label}：</span>
+          <span style="color:var(--text-primary, #333);">${cell.value}</span>
+        </td>`;
+      }).join('');
+      tableRows.push(`<tr>${cells}</tr>`);
+    }
+  });
   
-  return `<div class="item-details" style="margin-top:8px;">
-    <table style="width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed;">
-      ${tableRows}
+  return `<div class="item-details" style="margin-top:12px;">
+    <table style="width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; border:1px solid var(--border); border-radius:4px; overflow:hidden;">
+      ${tableRows.join('')}
     </table>
   </div>`;
 }
