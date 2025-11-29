@@ -5616,8 +5616,18 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
   // 设置表单状态标记（用于CSS选择器）
   if (id) {
     card.setAttribute('data-editing', 'true');
+    // 编辑模式：显示重新生成编号按钮
+    const regenerateBtn = $('btn-regenerate-code');
+    if (regenerateBtn) {
+      regenerateBtn.style.display = 'block';
+    }
   } else {
     card.removeAttribute('data-editing');
+    // 新增模式：隐藏重新生成编号按钮
+    const regenerateBtn = $('btn-regenerate-code');
+    if (regenerateBtn) {
+      regenerateBtn.style.display = 'none';
+    }
   }
   
   // 设置详细信息区域的显示/隐藏管理（新增和编辑模式都需要）
@@ -7912,6 +7922,34 @@ function setupIngredientsModule() {
   populateSubjectSelect();
   populatePartSelect();
   populateOriginTypeSelect();
+  
+  // 重新生成编号按钮
+  const regenerateCodeBtn = $('btn-regenerate-code');
+  if (regenerateCodeBtn) {
+    regenerateCodeBtn.addEventListener('click', () => {
+      const classification = $('i-classification')?.value.trim();
+      const category = $('i-category')?.value.trim();
+      const ingredientId = $('ingredient-id')?.value;
+      
+      if (!classification || !category) {
+        alert('请先选择原料分类和类别');
+        return;
+      }
+      
+      if (!confirm('确定要重新生成编号吗？新编号将按照新的编号规则生成。')) {
+        return;
+      }
+      
+      // 重新生成编号
+      const newCode = generateIngredientCode(classification, category, ingredientId || null);
+      if (newCode) {
+        $('i-code').value = newCode;
+        console.log('[Regenerate Code] 新编号:', newCode);
+      } else {
+        alert('编号生成失败，请检查分类和类别是否正确');
+      }
+    });
+  }
   
   const searchEl = $('ingredient-search');
   if (searchEl) searchEl.addEventListener('input', async () => {
