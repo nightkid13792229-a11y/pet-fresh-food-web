@@ -51,6 +51,8 @@ function initBrandsAndSources() {
   }
 }
 
+const UNITS_STORAGE_KEY = 'pff-units';
+
 // 获取品牌列表
 function getBrands() {
   try {
@@ -233,6 +235,44 @@ function populateOriginTypeSelect() {
     const option = document.createElement('option');
     option.value = type;
     option.textContent = type;
+    select.appendChild(option);
+  });
+}
+
+// 获取单位列表
+function getUnits() {
+  try {
+    const stored = localStorage.getItem(UNITS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('读取单位列表失败:', e);
+  }
+  // 默认单位列表：与原先下拉框保持一致
+  return ['g', 'kg', 'ml', 'L', '个', '包', '盒', '瓶', '袋'];
+}
+
+// 保存单位列表
+function saveUnits(units) {
+  try {
+    localStorage.setItem(UNITS_STORAGE_KEY, JSON.stringify(units));
+  } catch (e) {
+    console.error('保存单位列表失败:', e);
+  }
+}
+
+// 加载单位列表到下拉框
+function populateUnitSelect() {
+  const select = $('i-unit');
+  if (!select) return;
+
+  const units = getUnits();
+  select.innerHTML = '<option value=\"\">请选择单位</option>';
+  units.forEach(unit => {
+    const option = document.createElement('option');
+    option.value = unit;
+    option.textContent = unit;
     select.appendChild(option);
   });
 }
@@ -5288,6 +5328,14 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
   // 设置表单位置（但不显示）
   setFormPosition(card, id, insertAfterElement);
   
+  // 打开前填充下拉选项
+  populateBrandSelect();
+  populateSourceSelect();
+  populateSubjectSelect();
+  populatePartSelect();
+  populateOriginTypeSelect();
+  populateUnitSelect();
+
   if (id) {
     // 编辑模式：先加载数据，再显示表单
     const findStartTime = performance.now();
@@ -7505,6 +7553,7 @@ function addNameToForm() {
 }
 function setupIngredientsModule() {
   populateCategorySelects();
+  populateUnitSelect();
   
   const newBtn = $('btn-new-ingredient');
   if (newBtn) newBtn.addEventListener('click', () => openIngredientForm());
@@ -7572,6 +7621,20 @@ function setupIngredientsModule() {
     itemSearchInput.addEventListener('input', () => {
       loadAndRenderItems();
     });
+  }
+
+  // 单位管理弹窗相关事件
+  const manageUnitsBtn = $('btn-manage-units');
+  if (manageUnitsBtn) {
+    manageUnitsBtn.addEventListener('click', () => openUnitManagement());
+  }
+  const closeUnitManagementBtn = $('btn-close-unit-management');
+  if (closeUnitManagementBtn) {
+    closeUnitManagementBtn.addEventListener('click', () => closeUnitManagement());
+  }
+  const addUnitBtn = $('btn-add-unit');
+  if (addUnitBtn) {
+    addUnitBtn.addEventListener('click', () => addUnit());
   }
   
   // 原料分类变化时，动态加载类别列表
@@ -14091,6 +14154,194 @@ function addBrand() {
   loadAndRenderBrands();
   
   // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+// ========== 单位管理功能 ==========
+
+// 打开单位管理弹窗
+async function openUnitManagement() {
+  const card = $('unit-management-card');
+  if (!card) return;
+
+  card.style.display = 'block';
+  await loadAndRenderUnits();
+}
+
+// 关闭单位管理弹窗
+function closeUnitManagement() {
+  const card = $('unit-management-card');
+  if (card) {
+    card.style.display = 'none';
+  }
+}
+
+// 加载并渲染单位列表
+function loadAndRenderUnits() {
+  const listEl = $('unit-list-manage');
+  const statsEl = $('unit-stats');
+  const searchInput = $('unit-search-input');
+
+  if (!listEl) return;
+
+  const allUnits = getUnits();
+
+  // 统计使用情况
+  const usageMap = {};
+  store.ingredients.forEach(ing => {
+    if (ing.unit) {
+      usageMap[ing.unit] = (usageMap[ing.unit] || 0) + 1;
+    }
+  });
+
+  // 搜索过滤
+  const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const filtered = allUnits.filter(unit => {
+    if (!searchText) return true;
+    return unit.toLowerCase().includes(searchText);
+  });
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无单位数据</div>';
+  } else {
+    listEl.innerHTML = filtered.map(unit => {
+      const usageCount = usageMap[unit] || 0;
+      const usageText = usageCount > 0 ? `（${usageCount}个原料）` : '';
+      return `
+        <div class="unit-item-row" data-unit="${escapeHtml(unit)}" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--border); border-radius:6px; background:white;">
+          <div style="flex:1; display:flex; align-items:center; gap:8px;">
+            <strong class="unit-name-display" style="display:inline-block; min-width:80px;">${escapeHtml(unit)}</strong>
+            <input type="text" class="unit-name-edit" value="${escapeHtml(unit)}" style="display:none; flex:1; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:14px;" />
+            <span style="color:var(--text-secondary); font-size:12px;">${usageText}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn small" data-edit-unit="${escapeHtml(unit)}" data-save-unit="${escapeHtml(unit)}" style="font-size:12px; padding:4px 12px;">编辑</button>
+            <button class="btn small" data-delete-unit="${escapeHtml(unit)}" style="font-size:12px; padding:4px 12px; background:#f44336; color:white;" ${usageCount > 0 ? 'disabled title="该单位正在使用中，无法删除"' : ''}>删除</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 绑定编辑按钮
+    listEl.querySelectorAll('[data-edit-unit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unit = btn.dataset.editUnit;
+        const row = listEl.querySelector(`[data-unit="${CSS.escape(unit)}"]`);
+        if (row) {
+          const displayEl = row.querySelector('.unit-name-display');
+          const editEl = row.querySelector('.unit-name-edit');
+          if (displayEl && editEl) {
+            displayEl.style.display = 'none';
+            editEl.style.display = 'block';
+            editEl.focus();
+            editEl.select();
+            btn.textContent = '保存';
+            btn.dataset.saving = 'true';
+          }
+        }
+      });
+    });
+
+    // 绑定保存按钮
+    listEl.querySelectorAll('[data-save-unit]').forEach(btn => {
+      if (btn.dataset.saving === 'true') {
+        btn.addEventListener('click', () => {
+          const oldUnit = btn.dataset.saveUnit;
+          const row = listEl.querySelector(`[data-unit="${CSS.escape(oldUnit)}"]`);
+          if (row) {
+            const editEl = row.querySelector('.unit-name-edit');
+            const newUnit = editEl ? editEl.value.trim() : '';
+            if (!newUnit) {
+              alert('单位名称不能为空');
+              return;
+            }
+            const unitsArr = getUnits();
+            if (newUnit !== oldUnit && unitsArr.includes(newUnit)) {
+              alert('该单位已存在');
+              return;
+            }
+            const index = unitsArr.indexOf(oldUnit);
+            if (index >= 0) {
+              unitsArr[index] = newUnit;
+              saveUnits(unitsArr);
+              // 更新原料中的单位
+              store.ingredients.forEach(ing => {
+                if (ing.unit === oldUnit) {
+                  ing.unit = newUnit;
+                }
+              });
+              populateUnitSelect();
+              loadAndRenderUnits();
+            }
+          }
+        });
+      }
+    });
+
+    // 绑定删除按钮
+    listEl.querySelectorAll('[data-delete-unit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unit = btn.dataset.deleteUnit;
+        const usageCount = usageMap[unit] || 0;
+        if (usageCount > 0) {
+          alert('该单位正在使用中，无法删除');
+          return;
+        }
+        if (confirm(`确定要删除单位"${unit}"吗？`)) {
+          const unitsArr = getUnits();
+          const index = unitsArr.indexOf(unit);
+          if (index >= 0) {
+            unitsArr.splice(index, 1);
+            saveUnits(unitsArr);
+            populateUnitSelect();
+            loadAndRenderUnits();
+          }
+        }
+      });
+    });
+  }
+
+  // 更新统计信息
+  if (statsEl) {
+    const unitsArr = getUnits();
+    const totalUnits = unitsArr.length;
+    const usedUnits = Object.keys(usageMap).length;
+    statsEl.textContent = `共 ${totalUnits} 个单位，其中 ${usedUnits} 个正在使用`;
+  }
+
+  // 绑定搜索事件（只绑定一次）
+  if (searchInput && !searchInput._unitSearchBound) {
+    searchInput._unitSearchBound = true;
+    searchInput.addEventListener('input', () => {
+      loadAndRenderUnits();
+    });
+  }
+}
+
+// 添加单位
+function addUnit() {
+  const inputEl = $('unit-add-input');
+  if (!inputEl) return;
+
+  const newUnit = inputEl.value.trim();
+  if (!newUnit) {
+    alert('单位名称不能为空');
+    return;
+  }
+
+  const units = getUnits();
+  if (units.includes(newUnit)) {
+    alert('该单位已存在');
+    return;
+  }
+
+  units.push(newUnit);
+  units.sort();
+  saveUnits(units);
+  populateUnitSelect();
+  loadAndRenderUnits();
+
   inputEl.value = '';
   inputEl.focus();
 }
