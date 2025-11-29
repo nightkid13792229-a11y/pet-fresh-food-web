@@ -897,41 +897,55 @@ async function generateIngredientCode(classification, category, excludeId = null
   // 基础前缀：分类前缀-类别缩写-
   const basePrefix = `${prefix}-${categoryAbbr}-`;
   
-  // 从后端加载所有相同分类+类别的原料（不限制分页）
+  // 从后端加载所有原料数据（不限制分页），然后在客户端过滤
+  // 避免使用筛选参数可能导致的 CORS 问题
   let allIngredients = [];
+  let allCodesForDuplicateCheck = [];
+  
   if (backendState.token) {
     try {
-      const params = new URLSearchParams({
-        category: category,
-        classification: classification,
-        page: 1,
-        pageSize: 10000  // 设置一个很大的值，获取所有数据
-      });
+      // 直接获取所有数据，避免使用筛选参数可能导致的 CORS 问题
+      const data = await backendRequest('/api/v1/ingredients?pageSize=10000');
+      const rawItems = data.items || [];
       
-      const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
-      allIngredients = (data.items || []).map(ing => ({
+      // 转换为前端格式，并过滤出相同分类+类别的原料
+      allIngredients = rawItems
+        .filter(ing => ing.classification === classification && ing.category === category)
+        .map(ing => ({
+          id: `ing_${ing.id}`,
+          code: ing.code || '',
+          classification: ing.classification || '',
+          category: ing.category || ''
+        }));
+      
+      // 用于全局查重的所有编号数据
+      allCodesForDuplicateCheck = rawItems.map(ing => ({
         id: `ing_${ing.id}`,
-        code: ing.code || '',
-        classification: ing.classification || '',
-        category: ing.category || ''
+        code: ing.code || ''
       }));
-      console.log(`[generateIngredientCode] 从后端加载了 ${allIngredients.length} 条相同分类+类别的原料`);
+      
+      console.log(`[generateIngredientCode] 从后端加载了 ${rawItems.length} 条原料，其中 ${allIngredients.length} 条符合分类+类别条件`);
     } catch (error) {
       console.warn('[generateIngredientCode] 从后端加载数据失败，使用本地数据:', error);
-      // 如果后端加载失败，回退到使用 store.ingredients
-      allIngredients = store.ingredients;
+      // 如果后端加载失败，回退到使用 store.ingredients，并过滤相同分类+类别
+      allIngredients = store.ingredients.filter(ing => 
+        ing.classification === classification && ing.category === category
+      );
+      allCodesForDuplicateCheck = store.ingredients;
     }
   } else {
-    // 未登录时使用本地数据
-    allIngredients = store.ingredients;
+    // 未登录时使用本地数据，并过滤相同分类+类别
+    allIngredients = store.ingredients.filter(ing => 
+      ing.classification === classification && ing.category === category
+    );
+    allCodesForDuplicateCheck = store.ingredients;
   }
   
-  // 找到相同分类+类别的所有原料，计算下一个序号
-  const sameClassificationCategory = allIngredients
-    .filter(ing => {
-      if (excludeId && ing.id === excludeId) return false;
-      return ing.classification === classification && ing.category === category;
-    });
+  // 找到相同分类+类别的所有原料，计算下一个序号（排除当前编辑的原料）
+  const sameClassificationCategory = allIngredients.filter(ing => {
+    if (excludeId && ing.id === excludeId) return false;
+    return true; // 已经在上一步过滤过了
+  });
   
   // 找到相同分类+类别的最大序号
   let maxNum = 0;
@@ -961,7 +975,7 @@ async function generateIngredientCode(classification, category, excludeId = null
   
   // 检查是否有重复（全局检查，包括不同分类+类别的原料）
   // 使用自动递增序号机制
-  while (allIngredients.some(ing => {
+  while (allCodesForDuplicateCheck.some(ing => {
     if (excludeId && ing.id === excludeId) return false;
     return ing.code && ing.code.trim().toUpperCase() === code.trim().toUpperCase();
   })) {
