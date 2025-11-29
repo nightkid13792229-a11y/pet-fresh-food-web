@@ -834,6 +834,7 @@ const CATEGORY_ABBREVIATION_MAP = {
   '坚果、种子类': 'NUT',
   '油脂类': 'OIL',
   '调味品类': 'SPICE',
+  '菌藻类': 'FUNGI',
   
   // 营养补充剂类别（使用全称）
   '蛋白质类': 'PROTEIN',
