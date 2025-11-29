@@ -3532,7 +3532,8 @@ function updateIngredientFieldsVisibility(classification) {
       'i-subject-label', 'i-part-label', 'i-originType-label', 
       'i-brand-label', 'i-model-label', 'i-source-label', 
       'i-cost-label', 'i-quantity-label', 'i-unit-label',
-      'i-ediblePortion-label', 'i-unitContent-label', 'i-mainFunction-label'
+      'i-ediblePortion-label', 'i-unitContent-label', 'i-mainFunction-label',
+      'i-weightPerUnit-label'
     ];
     allFields.forEach(fieldId => {
       const field = $(fieldId);
@@ -3558,7 +3559,7 @@ function updateIngredientFieldsVisibility(classification) {
         'i-ediblePortion-label', // 可食部
         'i-mainFunction-label'   // 主要营养价值
       ],
-      hide: ['i-unitContent-label']
+      hide: ['i-unitContent-label', 'i-weightPerUnit-label']
     },
     // 营养补充剂分类显示的字段
     '营养补充剂': {
@@ -3573,7 +3574,7 @@ function updateIngredientFieldsVisibility(classification) {
         'i-unitContent-label',   // 每单位含量
         'i-mainFunction-label'   // 主要营养价值
       ],
-      hide: ['i-subject-label', 'i-part-label', 'i-originType-label']
+      hide: ['i-subject-label', 'i-part-label', 'i-originType-label', 'i-weightPerUnit-label']
     },
     // 包材分类显示的字段
     '包材': {
@@ -3583,7 +3584,8 @@ function updateIngredientFieldsVisibility(classification) {
         'i-source-label',       // 采购渠道
         'i-cost-label',         // 费用（采购价格）
         'i-quantity-label',     // 单量（采购数量）
-        'i-unit-label'          // 单位
+        'i-unit-label',         // 单位
+        'i-weightPerUnit-label' // 每单位重量（仅包材显示）
       ],
       hide: [
         'i-subject-label', 

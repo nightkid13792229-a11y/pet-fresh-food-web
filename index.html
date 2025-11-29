@@ -463,7 +463,7 @@
                   <input id="i-unitContent" type="text" placeholder="如：500mg/粒" />
                 </label>
                 
-                <label>每单位重量(g)<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
+                <label id="i-weightPerUnit-label">每单位重量(g)<input id="i-weightPerUnit" type="number" min="0" step="0.01" /></label>
                 <label>说明<textarea id="i-description" rows="2" placeholder="原料描述、备注"></textarea></label>
                 <label id="i-mainFunction-label" data-classification="包材" style="display:none;">主要营养价值<textarea id="i-mainFunction" rows="2" placeholder="主要营养价值描述"></textarea></label>
               </div>
@@ -1018,7 +1018,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-25"></script>
+  <script src="app.js?v=20241128-26"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
