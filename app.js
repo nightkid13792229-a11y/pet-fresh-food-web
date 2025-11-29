@@ -879,7 +879,7 @@ function getCategoryAbbreviation(category) {
 
 // 自动生成编号（新规则：分类前缀-类别缩写-3位序号）
 // 格式：ING-QRL-001, SUP-DBS-001, PKG-BZRQ-001
-function generateIngredientCode(classification, category, excludeId = null) {
+async function generateIngredientCode(classification, category, excludeId = null) {
   if (!classification || !category) {
     console.warn('[generateIngredientCode] 分类或类别为空');
     return '';
@@ -897,8 +897,37 @@ function generateIngredientCode(classification, category, excludeId = null) {
   // 基础前缀：分类前缀-类别缩写-
   const basePrefix = `${prefix}-${categoryAbbr}-`;
   
+  // 从后端加载所有相同分类+类别的原料（不限制分页）
+  let allIngredients = [];
+  if (backendState.token) {
+    try {
+      const params = new URLSearchParams({
+        category: category,
+        classification: classification,
+        page: 1,
+        pageSize: 10000  // 设置一个很大的值，获取所有数据
+      });
+      
+      const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+      allIngredients = (data.items || []).map(ing => ({
+        id: `ing_${ing.id}`,
+        code: ing.code || '',
+        classification: ing.classification || '',
+        category: ing.category || ''
+      }));
+      console.log(`[generateIngredientCode] 从后端加载了 ${allIngredients.length} 条相同分类+类别的原料`);
+    } catch (error) {
+      console.warn('[generateIngredientCode] 从后端加载数据失败，使用本地数据:', error);
+      // 如果后端加载失败，回退到使用 store.ingredients
+      allIngredients = store.ingredients;
+    }
+  } else {
+    // 未登录时使用本地数据
+    allIngredients = store.ingredients;
+  }
+  
   // 找到相同分类+类别的所有原料，计算下一个序号
-  const sameClassificationCategory = store.ingredients
+  const sameClassificationCategory = allIngredients
     .filter(ing => {
       if (excludeId && ing.id === excludeId) return false;
       return ing.classification === classification && ing.category === category;
@@ -932,7 +961,7 @@ function generateIngredientCode(classification, category, excludeId = null) {
   
   // 检查是否有重复（全局检查，包括不同分类+类别的原料）
   // 使用自动递增序号机制
-  while (store.ingredients.some(ing => {
+  while (allIngredients.some(ing => {
     if (excludeId && ing.id === excludeId) return false;
     return ing.code && ing.code.trim().toUpperCase() === code.trim().toUpperCase();
   })) {
@@ -4080,7 +4109,7 @@ async function updateNameSelectByCategory() {
 }
 
 // 自动生成编号（当类别和项目都填写后）
-function autoGenerateCode() {
+async function autoGenerateCode() {
   const category = $('i-category').value.trim();
   const classification = $('i-classification') ? $('i-classification').value.trim() : '';
   const codeEl = $('i-code');
@@ -4101,7 +4130,7 @@ function autoGenerateCode() {
   }
   
   if (codeEl) {
-    const code = generateIngredientCode(classification, category, ingredientId);
+    const code = await generateIngredientCode(classification, category, ingredientId);
     console.log('[autoGenerateCode] 生成的编号:', code);
     if (code) {
       codeEl.value = code;
@@ -5836,7 +5865,7 @@ async function generateMissingCodes() {
   
   for (const ing of validMissing) {
     if (!ing.code || ing.code.trim() === '') {
-      const code = generateIngredientCode(ing.category, ing.name, ing.id);
+      const code = await generateIngredientCode(ing.classification || '食材', ing.category, ing.id);
       if (code && ing._backendId) {
         try {
           await backendRequest(`/api/v1/ingredients/${ing._backendId}`, {
@@ -8003,7 +8032,7 @@ function setupIngredientsModule() {
   // 重新生成编号按钮
   const regenerateCodeBtn = $('btn-regenerate-code');
   if (regenerateCodeBtn) {
-    regenerateCodeBtn.addEventListener('click', () => {
+    regenerateCodeBtn.addEventListener('click', async () => {
       const classification = $('i-classification')?.value.trim();
       const category = $('i-category')?.value.trim();
       const ingredientId = $('ingredient-id')?.value;
@@ -8018,7 +8047,7 @@ function setupIngredientsModule() {
       }
       
       // 重新生成编号
-      const newCode = generateIngredientCode(classification, category, ingredientId || null);
+      const newCode = await generateIngredientCode(classification, category, ingredientId || null);
       if (newCode) {
         $('i-code').value = newCode;
         console.log('[Regenerate Code] 新编号:', newCode);
@@ -8148,7 +8177,7 @@ function setupIngredientsModule() {
         console.log('[Save Ingredient] 编辑模式，保持原有编号:', code);
       } else if (!code) {
         // 新增模式或编辑时编号为空，自动生成（包括包材）
-        code = generateIngredientCode(classification, category, id || null);
+        code = await generateIngredientCode(classification, category, id || null);
         if (code) {
           $('i-code').value = code;
           console.log('[Save Ingredient] 自动生成编号:', code);
