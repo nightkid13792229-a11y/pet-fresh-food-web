@@ -378,19 +378,28 @@
                 
                 <!-- 新增字段：所属科目（仅食材，在食材名称后、部位前） -->
                 <label id="i-subject-label" data-classification="食材" style="display:none;">
-                  所属科目
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <span style="flex:1;">所属科目</span>
+                    <button type="button" id="btn-manage-subjects" class="btn small" style="white-space:nowrap;">管理</button>
+                  </div>
                   <input id="i-subject" type="text" placeholder="如：动物性原料、植物性原料等" />
                 </label>
                 
                 <!-- 新增字段：部位（仅食材） -->
                 <label id="i-part-label" data-classification="食材" style="display:none;">
-                  部位
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <span style="flex:1;">部位</span>
+                    <button type="button" id="btn-manage-parts" class="btn small" style="white-space:nowrap;">管理</button>
+                  </div>
                   <input id="i-part" type="text" placeholder="如：鸡胸、鸡腿等" />
                 </label>
                 
                 <!-- 新增字段：产地类型（仅食材） -->
                 <label id="i-originType-label" data-classification="食材" style="display:none;">
-                  产地类型
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <span style="flex:1;">产地类型</span>
+                    <button type="button" id="btn-manage-origin-types" class="btn small" style="white-space:nowrap;">管理</button>
+                  </div>
                   <select id="i-originType">
                     <option value="">请选择产地类型</option>
                     <option value="国产">国产</option>
@@ -571,6 +580,7 @@
         <!-- 搜索和操作栏 -->
         <div style="display:flex; gap:8px; margin-bottom:12px;">
           <input id="brand-search-input" type="text" placeholder="搜索品牌..." style="flex:1;" />
+          <input id="brand-add-input" type="text" placeholder="输入新品牌名称" style="flex:1;" />
           <button id="btn-add-brand" class="btn small">添加品牌</button>
         </div>
         
@@ -595,6 +605,7 @@
         <!-- 搜索和操作栏 -->
         <div style="display:flex; gap:8px; margin-bottom:12px;">
           <input id="source-search-input" type="text" placeholder="搜索采购渠道..." style="flex:1;" />
+          <input id="source-add-input" type="text" placeholder="输入新采购渠道名称" style="flex:1;" />
           <button id="btn-add-source" class="btn small">添加采购渠道</button>
         </div>
         
@@ -605,6 +616,81 @@
         
         <!-- 统计信息 -->
         <div id="source-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 所属科目管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1003; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="subject-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>所属科目管理</h3>
+          <button id="btn-close-subject-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="subject-search-input" type="text" placeholder="搜索所属科目..." style="flex:1;" />
+          <input id="subject-add-input" type="text" placeholder="输入新所属科目" style="flex:1;" />
+          <button id="btn-add-subject" class="btn small">添加</button>
+        </div>
+        
+        <!-- 所属科目列表 -->
+        <div id="subject-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 所属科目列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="subject-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 部位管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1003; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="part-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>部位管理</h3>
+          <button id="btn-close-part-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="part-search-input" type="text" placeholder="搜索部位..." style="flex:1;" />
+          <input id="part-add-input" type="text" placeholder="输入新部位" style="flex:1;" />
+          <button id="btn-add-part" class="btn small">添加</button>
+        </div>
+        
+        <!-- 部位列表 -->
+        <div id="part-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 部位列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="part-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 产地类型管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1003; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="origin-type-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>产地类型管理</h3>
+          <button id="btn-close-origin-type-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="origin-type-search-input" type="text" placeholder="搜索产地类型..." style="flex:1;" />
+          <input id="origin-type-add-input" type="text" placeholder="输入新产地类型" style="flex:1;" />
+          <button id="btn-add-origin-type" class="btn small">添加</button>
+        </div>
+        
+        <!-- 产地类型列表 -->
+        <div id="origin-type-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 产地类型列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="origin-type-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
           <!-- 统计信息将在这里显示 -->
         </div>
       </div>
@@ -929,7 +1015,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-20"></script>
+  <script src="app.js?v=20241128-21"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

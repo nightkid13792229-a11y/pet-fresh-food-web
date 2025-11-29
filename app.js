@@ -24,6 +24,10 @@ const store = {
 // 品牌和采购渠道数据存储
 const BRANDS_STORAGE_KEY = 'pff-brands-v1';
 const SOURCES_STORAGE_KEY = 'pff-sources-v1';
+// 所属科目、部位、产地类型数据存储
+const SUBJECTS_STORAGE_KEY = 'pff-subjects-v1';
+const PARTS_STORAGE_KEY = 'pff-parts-v1';
+const ORIGIN_TYPES_STORAGE_KEY = 'pff-origin-types-v1';
 
 // 类别数据缓存（避免重复请求）
 const categoriesCache = new Map(); // key: classification, value: { data: [], timestamp: number }
@@ -117,6 +121,88 @@ function populateSourceSelect() {
     const option = document.createElement('option');
     option.value = source;
     option.textContent = source;
+    select.appendChild(option);
+  });
+}
+
+// 获取所属科目列表
+function getSubjects() {
+  try {
+    const stored = localStorage.getItem(SUBJECTS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('读取所属科目列表失败:', e);
+  }
+  return [];
+}
+
+// 保存所属科目列表
+function saveSubjects(subjects) {
+  try {
+    localStorage.setItem(SUBJECTS_STORAGE_KEY, JSON.stringify(subjects));
+  } catch (e) {
+    console.error('保存所属科目列表失败:', e);
+  }
+}
+
+// 获取部位列表
+function getParts() {
+  try {
+    const stored = localStorage.getItem(PARTS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('读取部位列表失败:', e);
+  }
+  return [];
+}
+
+// 保存部位列表
+function saveParts(parts) {
+  try {
+    localStorage.setItem(PARTS_STORAGE_KEY, JSON.stringify(parts));
+  } catch (e) {
+    console.error('保存部位列表失败:', e);
+  }
+}
+
+// 获取产地类型列表
+function getOriginTypes() {
+  try {
+    const stored = localStorage.getItem(ORIGIN_TYPES_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('读取产地类型列表失败:', e);
+  }
+  // 默认值
+  return ['国产', '进口', '有机', '无抗', '其他'];
+}
+
+// 保存产地类型列表
+function saveOriginTypes(originTypes) {
+  try {
+    localStorage.setItem(ORIGIN_TYPES_STORAGE_KEY, JSON.stringify(originTypes));
+  } catch (e) {
+    console.error('保存产地类型列表失败:', e);
+  }
+}
+
+// 加载产地类型列表到下拉框
+function populateOriginTypeSelect() {
+  const select = $('i-originType');
+  if (!select) return;
+  
+  const originTypes = getOriginTypes();
+  select.innerHTML = '<option value="">请选择产地类型</option>';
+  originTypes.forEach(type => {
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
     select.appendChild(option);
   });
 }
@@ -5305,6 +5391,8 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       // 填充品牌和采购渠道下拉框
       populateBrandSelect();
       populateSourceSelect();
+      // 填充产地类型下拉框
+      populateOriginTypeSelect();
       
       // 设置类别值
       const categorySelect = $('i-category');
@@ -7738,8 +7826,80 @@ function setupIngredientsModule() {
     addSourceBtn.addEventListener('click', () => addSource());
   }
   
+  // 所属科目管理按钮
+  const manageSubjectBtn = $('btn-manage-subjects');
+  if (manageSubjectBtn) {
+    manageSubjectBtn.addEventListener('click', () => openSubjectManagement());
+  }
+  
+  const closeSubjectManagementBtn = $('btn-close-subject-management');
+  if (closeSubjectManagementBtn) {
+    closeSubjectManagementBtn.addEventListener('click', () => closeSubjectManagement());
+  }
+  
+  const subjectSearchInput = $('subject-search-input');
+  if (subjectSearchInput) {
+    subjectSearchInput.addEventListener('input', () => {
+      loadAndRenderSubjects();
+    });
+  }
+  
+  const addSubjectBtn = $('btn-add-subject');
+  if (addSubjectBtn) {
+    addSubjectBtn.addEventListener('click', () => addSubject());
+  }
+  
+  // 部位管理按钮
+  const managePartBtn = $('btn-manage-parts');
+  if (managePartBtn) {
+    managePartBtn.addEventListener('click', () => openPartManagement());
+  }
+  
+  const closePartManagementBtn = $('btn-close-part-management');
+  if (closePartManagementBtn) {
+    closePartManagementBtn.addEventListener('click', () => closePartManagement());
+  }
+  
+  const partSearchInput = $('part-search-input');
+  if (partSearchInput) {
+    partSearchInput.addEventListener('input', () => {
+      loadAndRenderParts();
+    });
+  }
+  
+  const addPartBtn = $('btn-add-part');
+  if (addPartBtn) {
+    addPartBtn.addEventListener('click', () => addPart());
+  }
+  
+  // 产地类型管理按钮
+  const manageOriginTypeBtn = $('btn-manage-origin-types');
+  if (manageOriginTypeBtn) {
+    manageOriginTypeBtn.addEventListener('click', () => openOriginTypeManagement());
+  }
+  
+  const closeOriginTypeManagementBtn = $('btn-close-origin-type-management');
+  if (closeOriginTypeManagementBtn) {
+    closeOriginTypeManagementBtn.addEventListener('click', () => closeOriginTypeManagement());
+  }
+  
+  const originTypeSearchInput = $('origin-type-search-input');
+  if (originTypeSearchInput) {
+    originTypeSearchInput.addEventListener('input', () => {
+      loadAndRenderOriginTypes();
+    });
+  }
+  
+  const addOriginTypeBtn = $('btn-add-origin-type');
+  if (addOriginTypeBtn) {
+    addOriginTypeBtn.addEventListener('click', () => addOriginType());
+  }
+  
   // 初始化品牌和采购渠道数据
   initBrandsAndSources();
+  
+  // 初始化产地类型下拉框
+  populateOriginTypeSelect();
   
   const searchEl = $('ingredient-search');
   if (searchEl) searchEl.addEventListener('input', async () => {
@@ -13846,21 +14006,30 @@ function loadAndRenderBrands() {
 
 // 添加品牌
 function addBrand() {
-  const newBrand = prompt('请输入新品牌名称：');
-  if (!newBrand || !newBrand.trim()) {
+  const inputEl = $('brand-add-input');
+  if (!inputEl) return;
+  
+  const newBrand = inputEl.value.trim();
+  if (!newBrand) {
+    alert('品牌名称不能为空');
     return;
   }
-  const brand = newBrand.trim();
+  
   const brands = getBrands();
-  if (brands.includes(brand)) {
+  if (brands.includes(newBrand)) {
     alert('该品牌已存在');
     return;
   }
-  brands.push(brand);
+  
+  brands.push(newBrand);
   brands.sort();
   saveBrands(brands);
   populateBrandSelect();
   loadAndRenderBrands();
+  
+  // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
 }
 
 // 打开采购渠道管理弹窗
@@ -14013,21 +14182,550 @@ function loadAndRenderSources() {
 
 // 添加采购渠道
 function addSource() {
-  const newSource = prompt('请输入新采购渠道名称：');
-  if (!newSource || !newSource.trim()) {
+  const inputEl = $('source-add-input');
+  if (!inputEl) return;
+  
+  const newSource = inputEl.value.trim();
+  if (!newSource) {
+    alert('采购渠道名称不能为空');
     return;
   }
-  const source = newSource.trim();
+  
   const sources = getSources();
-  if (sources.includes(source)) {
+  if (sources.includes(newSource)) {
     alert('该采购渠道已存在');
     return;
   }
-  sources.push(source);
+  
+  sources.push(newSource);
   sources.sort();
   saveSources(sources);
   populateSourceSelect();
   loadAndRenderSources();
+  
+  // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+// ========== 所属科目、部位、产地类型管理功能 ==========
+
+// 打开所属科目管理弹窗
+async function openSubjectManagement() {
+  const card = $('subject-management-card');
+  if (!card) return;
+  
+  card.style.display = 'block';
+  await loadAndRenderSubjects();
+}
+
+// 关闭所属科目管理弹窗
+function closeSubjectManagement() {
+  const card = $('subject-management-card');
+  if (card) {
+    card.style.display = 'none';
+  }
+}
+
+// 加载并渲染所属科目列表
+function loadAndRenderSubjects() {
+  const listEl = $('subject-list-manage');
+  const statsEl = $('subject-stats');
+  const searchInput = $('subject-search-input');
+  
+  if (!listEl) return;
+  
+  const subjects = getSubjects();
+  
+  // 应用搜索过滤
+  const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const filtered = subjects.filter(subject => {
+    if (!searchText) return true;
+    return subject.toLowerCase().includes(searchText);
+  });
+  
+  // 统计使用情况（从后端加载的原料中统计）
+  const usageMap = {};
+  store.ingredients.forEach(ing => {
+    if (ing.subject) {
+      usageMap[ing.subject] = (usageMap[ing.subject] || 0) + 1;
+    }
+  });
+  
+  // 渲染所属科目列表
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无所属科目数据</div>';
+  } else {
+    listEl.innerHTML = filtered.map(subject => {
+      const usageCount = usageMap[subject] || 0;
+      const usageText = usageCount > 0 ? `（${usageCount}个原料）` : '';
+      return `
+        <div class="subject-item-row" data-subject="${escapeHtml(subject)}" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--border); border-radius:6px; background:white;">
+          <div style="flex:1; display:flex; align-items:center; gap:8px;">
+            <strong class="subject-name-display" style="display:inline-block; min-width:100px;">${escapeHtml(subject)}</strong>
+            <input type="text" class="subject-name-edit" value="${escapeHtml(subject)}" style="display:none; flex:1; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:14px;" />
+            <span style="color:var(--text-secondary); font-size:12px;">${usageText}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn small" data-edit-subject="${escapeHtml(subject)}" data-save-subject="${escapeHtml(subject)}" style="font-size:12px; padding:4px 12px;">编辑</button>
+            <button class="btn small" data-delete-subject="${escapeHtml(subject)}" style="font-size:12px; padding:4px 12px; background:#f44336; color:white;" ${usageCount > 0 ? 'disabled title="该所属科目正在使用中，无法删除"' : ''}>删除</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    // 绑定事件
+    listEl.querySelectorAll('[data-edit-subject]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const subject = btn.dataset.editSubject;
+        const row = listEl.querySelector(`[data-subject="${escapeHtml(subject)}"]`);
+        if (row) {
+          const displayEl = row.querySelector('.subject-name-display');
+          const editEl = row.querySelector('.subject-name-edit');
+          if (displayEl && editEl) {
+            displayEl.style.display = 'none';
+            editEl.style.display = 'block';
+            editEl.focus();
+            editEl.select();
+            btn.textContent = '保存';
+            btn.dataset.saving = 'true';
+          }
+        }
+      });
+    });
+    
+    listEl.querySelectorAll('[data-save-subject]').forEach(btn => {
+      if (btn.dataset.saving === 'true') {
+        btn.addEventListener('click', () => {
+          const oldSubject = btn.dataset.saveSubject;
+          const row = listEl.querySelector(`[data-subject="${escapeHtml(oldSubject)}"]`);
+          if (row) {
+            const editEl = row.querySelector('.subject-name-edit');
+            const newSubject = editEl ? editEl.value.trim() : '';
+            if (!newSubject) {
+              alert('所属科目名称不能为空');
+              return;
+            }
+            if (newSubject !== oldSubject && subjects.includes(newSubject)) {
+              alert('该所属科目已存在');
+              return;
+            }
+            // 更新所属科目列表
+            const index = subjects.indexOf(oldSubject);
+            if (index >= 0) {
+              subjects[index] = newSubject;
+              saveSubjects(subjects);
+              // 更新原料中的所属科目
+              store.ingredients.forEach(ing => {
+                if (ing.subject === oldSubject) {
+                  ing.subject = newSubject;
+                }
+              });
+              loadAndRenderSubjects();
+            }
+          }
+        });
+      }
+    });
+    
+    listEl.querySelectorAll('[data-delete-subject]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const subject = btn.dataset.deleteSubject;
+        const usageCount = usageMap[subject] || 0;
+        if (usageCount > 0) {
+          alert('该所属科目正在使用中，无法删除');
+          return;
+        }
+        if (confirm(`确定要删除所属科目"${subject}"吗？`)) {
+          const index = subjects.indexOf(subject);
+          if (index >= 0) {
+            subjects.splice(index, 1);
+            saveSubjects(subjects);
+            loadAndRenderSubjects();
+          }
+        }
+      });
+    });
+  }
+  
+  // 更新统计信息
+  if (statsEl) {
+    const totalSubjects = subjects.length;
+    const usedSubjects = Object.keys(usageMap).length;
+    statsEl.textContent = `共 ${totalSubjects} 个所属科目，其中 ${usedSubjects} 个正在使用`;
+  }
+}
+
+// 添加所属科目
+function addSubject() {
+  const inputEl = $('subject-add-input');
+  if (!inputEl) return;
+  
+  const newSubject = inputEl.value.trim();
+  if (!newSubject) {
+    alert('所属科目名称不能为空');
+    return;
+  }
+  
+  const subjects = getSubjects();
+  if (subjects.includes(newSubject)) {
+    alert('该所属科目已存在');
+    return;
+  }
+  
+  subjects.push(newSubject);
+  subjects.sort();
+  saveSubjects(subjects);
+  loadAndRenderSubjects();
+  
+  // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+// 打开部位管理弹窗
+async function openPartManagement() {
+  const card = $('part-management-card');
+  if (!card) return;
+  
+  card.style.display = 'block';
+  await loadAndRenderParts();
+}
+
+// 关闭部位管理弹窗
+function closePartManagement() {
+  const card = $('part-management-card');
+  if (card) {
+    card.style.display = 'none';
+  }
+}
+
+// 加载并渲染部位列表
+function loadAndRenderParts() {
+  const listEl = $('part-list-manage');
+  const statsEl = $('part-stats');
+  const searchInput = $('part-search-input');
+  
+  if (!listEl) return;
+  
+  const parts = getParts();
+  
+  // 应用搜索过滤
+  const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const filtered = parts.filter(part => {
+    if (!searchText) return true;
+    return part.toLowerCase().includes(searchText);
+  });
+  
+  // 统计使用情况
+  const usageMap = {};
+  store.ingredients.forEach(ing => {
+    if (ing.part) {
+      usageMap[ing.part] = (usageMap[ing.part] || 0) + 1;
+    }
+  });
+  
+  // 渲染部位列表
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无部位数据</div>';
+  } else {
+    listEl.innerHTML = filtered.map(part => {
+      const usageCount = usageMap[part] || 0;
+      const usageText = usageCount > 0 ? `（${usageCount}个原料）` : '';
+      return `
+        <div class="part-item-row" data-part="${escapeHtml(part)}" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--border); border-radius:6px; background:white;">
+          <div style="flex:1; display:flex; align-items:center; gap:8px;">
+            <strong class="part-name-display" style="display:inline-block; min-width:100px;">${escapeHtml(part)}</strong>
+            <input type="text" class="part-name-edit" value="${escapeHtml(part)}" style="display:none; flex:1; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:14px;" />
+            <span style="color:var(--text-secondary); font-size:12px;">${usageText}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn small" data-edit-part="${escapeHtml(part)}" data-save-part="${escapeHtml(part)}" style="font-size:12px; padding:4px 12px;">编辑</button>
+            <button class="btn small" data-delete-part="${escapeHtml(part)}" style="font-size:12px; padding:4px 12px; background:#f44336; color:white;" ${usageCount > 0 ? 'disabled title="该部位正在使用中，无法删除"' : ''}>删除</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    // 绑定事件（类似所属科目的逻辑）
+    listEl.querySelectorAll('[data-edit-part]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const part = btn.dataset.editPart;
+        const row = listEl.querySelector(`[data-part="${escapeHtml(part)}"]`);
+        if (row) {
+          const displayEl = row.querySelector('.part-name-display');
+          const editEl = row.querySelector('.part-name-edit');
+          if (displayEl && editEl) {
+            displayEl.style.display = 'none';
+            editEl.style.display = 'block';
+            editEl.focus();
+            editEl.select();
+            btn.textContent = '保存';
+            btn.dataset.saving = 'true';
+          }
+        }
+      });
+    });
+    
+    listEl.querySelectorAll('[data-save-part]').forEach(btn => {
+      if (btn.dataset.saving === 'true') {
+        btn.addEventListener('click', () => {
+          const oldPart = btn.dataset.savePart;
+          const row = listEl.querySelector(`[data-part="${escapeHtml(oldPart)}"]`);
+          if (row) {
+            const editEl = row.querySelector('.part-name-edit');
+            const newPart = editEl ? editEl.value.trim() : '';
+            if (!newPart) {
+              alert('部位名称不能为空');
+              return;
+            }
+            if (newPart !== oldPart && parts.includes(newPart)) {
+              alert('该部位已存在');
+              return;
+            }
+            const index = parts.indexOf(oldPart);
+            if (index >= 0) {
+              parts[index] = newPart;
+              saveParts(parts);
+              store.ingredients.forEach(ing => {
+                if (ing.part === oldPart) {
+                  ing.part = newPart;
+                }
+              });
+              loadAndRenderParts();
+            }
+          }
+        });
+      }
+    });
+    
+    listEl.querySelectorAll('[data-delete-part]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const part = btn.dataset.deletePart;
+        const usageCount = usageMap[part] || 0;
+        if (usageCount > 0) {
+          alert('该部位正在使用中，无法删除');
+          return;
+        }
+        if (confirm(`确定要删除部位"${part}"吗？`)) {
+          const index = parts.indexOf(part);
+          if (index >= 0) {
+            parts.splice(index, 1);
+            saveParts(parts);
+            loadAndRenderParts();
+          }
+        }
+      });
+    });
+  }
+  
+  // 更新统计信息
+  if (statsEl) {
+    const totalParts = parts.length;
+    const usedParts = Object.keys(usageMap).length;
+    statsEl.textContent = `共 ${totalParts} 个部位，其中 ${usedParts} 个正在使用`;
+  }
+}
+
+// 添加部位
+function addPart() {
+  const inputEl = $('part-add-input');
+  if (!inputEl) return;
+  
+  const newPart = inputEl.value.trim();
+  if (!newPart) {
+    alert('部位名称不能为空');
+    return;
+  }
+  
+  const parts = getParts();
+  if (parts.includes(newPart)) {
+    alert('该部位已存在');
+    return;
+  }
+  
+  parts.push(newPart);
+  parts.sort();
+  saveParts(parts);
+  loadAndRenderParts();
+  
+  // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+// 打开产地类型管理弹窗
+async function openOriginTypeManagement() {
+  const card = $('origin-type-management-card');
+  if (!card) return;
+  
+  card.style.display = 'block';
+  await loadAndRenderOriginTypes();
+}
+
+// 关闭产地类型管理弹窗
+function closeOriginTypeManagement() {
+  const card = $('origin-type-management-card');
+  if (card) {
+    card.style.display = 'none';
+  }
+}
+
+// 加载并渲染产地类型列表
+function loadAndRenderOriginTypes() {
+  const listEl = $('origin-type-list-manage');
+  const statsEl = $('origin-type-stats');
+  const searchInput = $('origin-type-search-input');
+  
+  if (!listEl) return;
+  
+  const originTypes = getOriginTypes();
+  
+  // 应用搜索过滤
+  const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const filtered = originTypes.filter(type => {
+    if (!searchText) return true;
+    return type.toLowerCase().includes(searchText);
+  });
+  
+  // 统计使用情况
+  const usageMap = {};
+  store.ingredients.forEach(ing => {
+    if (ing.originType) {
+      usageMap[ing.originType] = (usageMap[ing.originType] || 0) + 1;
+    }
+  });
+  
+  // 渲染产地类型列表
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-secondary);">暂无产地类型数据</div>';
+  } else {
+    listEl.innerHTML = filtered.map(type => {
+      const usageCount = usageMap[type] || 0;
+      const usageText = usageCount > 0 ? `（${usageCount}个原料）` : '';
+      return `
+        <div class="origin-type-item-row" data-origin-type="${escapeHtml(type)}" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--border); border-radius:6px; background:white;">
+          <div style="flex:1; display:flex; align-items:center; gap:8px;">
+            <strong class="origin-type-name-display" style="display:inline-block; min-width:100px;">${escapeHtml(type)}</strong>
+            <input type="text" class="origin-type-name-edit" value="${escapeHtml(type)}" style="display:none; flex:1; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:14px;" />
+            <span style="color:var(--text-secondary); font-size:12px;">${usageText}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn small" data-edit-origin-type="${escapeHtml(type)}" data-save-origin-type="${escapeHtml(type)}" style="font-size:12px; padding:4px 12px;">编辑</button>
+            <button class="btn small" data-delete-origin-type="${escapeHtml(type)}" style="font-size:12px; padding:4px 12px; background:#f44336; color:white;" ${usageCount > 0 ? 'disabled title="该产地类型正在使用中，无法删除"' : ''}>删除</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    // 绑定事件（类似所属科目的逻辑）
+    listEl.querySelectorAll('[data-edit-origin-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.editOriginType;
+        const row = listEl.querySelector(`[data-origin-type="${escapeHtml(type)}"]`);
+        if (row) {
+          const displayEl = row.querySelector('.origin-type-name-display');
+          const editEl = row.querySelector('.origin-type-name-edit');
+          if (displayEl && editEl) {
+            displayEl.style.display = 'none';
+            editEl.style.display = 'block';
+            editEl.focus();
+            editEl.select();
+            btn.textContent = '保存';
+            btn.dataset.saving = 'true';
+          }
+        }
+      });
+    });
+    
+    listEl.querySelectorAll('[data-save-origin-type]').forEach(btn => {
+      if (btn.dataset.saving === 'true') {
+        btn.addEventListener('click', () => {
+          const oldType = btn.dataset.saveOriginType;
+          const row = listEl.querySelector(`[data-origin-type="${escapeHtml(oldType)}"]`);
+          if (row) {
+            const editEl = row.querySelector('.origin-type-name-edit');
+            const newType = editEl ? editEl.value.trim() : '';
+            if (!newType) {
+              alert('产地类型名称不能为空');
+              return;
+            }
+            if (newType !== oldType && originTypes.includes(newType)) {
+              alert('该产地类型已存在');
+              return;
+            }
+            const index = originTypes.indexOf(oldType);
+            if (index >= 0) {
+              originTypes[index] = newType;
+              saveOriginTypes(originTypes);
+              populateOriginTypeSelect();
+              store.ingredients.forEach(ing => {
+                if (ing.originType === oldType) {
+                  ing.originType = newType;
+                }
+              });
+              loadAndRenderOriginTypes();
+            }
+          }
+        });
+      }
+    });
+    
+    listEl.querySelectorAll('[data-delete-origin-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.deleteOriginType;
+        const usageCount = usageMap[type] || 0;
+        if (usageCount > 0) {
+          alert('该产地类型正在使用中，无法删除');
+          return;
+        }
+        if (confirm(`确定要删除产地类型"${type}"吗？`)) {
+          const index = originTypes.indexOf(type);
+          if (index >= 0) {
+            originTypes.splice(index, 1);
+            saveOriginTypes(originTypes);
+            populateOriginTypeSelect();
+            loadAndRenderOriginTypes();
+          }
+        }
+      });
+    });
+  }
+  
+  // 更新统计信息
+  if (statsEl) {
+    const totalTypes = originTypes.length;
+    const usedTypes = Object.keys(usageMap).length;
+    statsEl.textContent = `共 ${totalTypes} 个产地类型，其中 ${usedTypes} 个正在使用`;
+  }
+}
+
+// 添加产地类型
+function addOriginType() {
+  const inputEl = $('origin-type-add-input');
+  if (!inputEl) return;
+  
+  const newType = inputEl.value.trim();
+  if (!newType) {
+    alert('产地类型名称不能为空');
+    return;
+  }
+  
+  const originTypes = getOriginTypes();
+  if (originTypes.includes(newType)) {
+    alert('该产地类型已存在');
+    return;
+  }
+  
+  originTypes.push(newType);
+  originTypes.sort();
+  saveOriginTypes(originTypes);
+  populateOriginTypeSelect();
+  loadAndRenderOriginTypes();
+  
+  // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
 }
 
 if (document.readyState === 'loading') {
