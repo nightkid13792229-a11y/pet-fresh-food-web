@@ -125,6 +125,36 @@ function populateSourceSelect() {
   });
 }
 
+// 加载所属科目列表到下拉框
+function populateSubjectSelect() {
+  const select = $('i-subject');
+  if (!select) return;
+  
+  const subjects = getSubjects();
+  select.innerHTML = '<option value="">请选择所属科目</option>';
+  subjects.forEach(subject => {
+    const option = document.createElement('option');
+    option.value = subject;
+    option.textContent = subject;
+    select.appendChild(option);
+  });
+}
+
+// 加载部位列表到下拉框
+function populatePartSelect() {
+  const select = $('i-part');
+  if (!select) return;
+  
+  const parts = getParts();
+  select.innerHTML = '<option value="">请选择部位</option>';
+  parts.forEach(part => {
+    const option = document.createElement('option');
+    option.value = part;
+    option.textContent = part;
+    select.appendChild(option);
+  });
+}
+
 // 获取所属科目列表
 function getSubjects() {
   try {
@@ -5391,7 +5421,9 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       // 填充品牌和采购渠道下拉框
       populateBrandSelect();
       populateSourceSelect();
-      // 填充产地类型下拉框
+      // 填充所属科目、部位、产地类型下拉框
+      populateSubjectSelect();
+      populatePartSelect();
       populateOriginTypeSelect();
       
       // 设置类别值
@@ -7898,7 +7930,9 @@ function setupIngredientsModule() {
   // 初始化品牌和采购渠道数据
   initBrandsAndSources();
   
-  // 初始化产地类型下拉框
+  // 初始化所属科目、部位、产地类型下拉框
+  populateSubjectSelect();
+  populatePartSelect();
   populateOriginTypeSelect();
   
   const searchEl = $('ingredient-search');
@@ -14315,6 +14349,7 @@ function loadAndRenderSubjects() {
             if (index >= 0) {
               subjects[index] = newSubject;
               saveSubjects(subjects);
+              populateSubjectSelect();
               // 更新原料中的所属科目
               store.ingredients.forEach(ing => {
                 if (ing.subject === oldSubject) {
@@ -14341,6 +14376,7 @@ function loadAndRenderSubjects() {
           if (index >= 0) {
             subjects.splice(index, 1);
             saveSubjects(subjects);
+            populateSubjectSelect();
             loadAndRenderSubjects();
           }
         }
@@ -14376,6 +14412,7 @@ function addSubject() {
   subjects.push(newSubject);
   subjects.sort();
   saveSubjects(subjects);
+  populateSubjectSelect();
   loadAndRenderSubjects();
   
   // 清空输入框
@@ -14487,6 +14524,7 @@ function loadAndRenderParts() {
             if (index >= 0) {
               parts[index] = newPart;
               saveParts(parts);
+              populatePartSelect();
               store.ingredients.forEach(ing => {
                 if (ing.part === oldPart) {
                   ing.part = newPart;
@@ -14512,6 +14550,7 @@ function loadAndRenderParts() {
           if (index >= 0) {
             parts.splice(index, 1);
             saveParts(parts);
+            populatePartSelect();
             loadAndRenderParts();
           }
         }
@@ -14547,6 +14586,7 @@ function addPart() {
   parts.push(newPart);
   parts.sort();
   saveParts(parts);
+  populatePartSelect();
   loadAndRenderParts();
   
   // 清空输入框

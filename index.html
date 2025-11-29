@@ -378,36 +378,35 @@
                 
                 <!-- 新增字段：所属科目（仅食材，在食材名称后、部位前） -->
                 <label id="i-subject-label" data-classification="食材" style="display:none;">
+                  所属科目
                   <div style="display:flex; gap:8px; align-items:center;">
-                    <span style="flex:1;">所属科目</span>
+                    <select id="i-subject" style="flex:1;">
+                      <option value="">请选择所属科目</option>
+                    </select>
                     <button type="button" id="btn-manage-subjects" class="btn small" style="white-space:nowrap;">管理</button>
                   </div>
-                  <input id="i-subject" type="text" placeholder="如：动物性原料、植物性原料等" />
                 </label>
                 
                 <!-- 新增字段：部位（仅食材） -->
                 <label id="i-part-label" data-classification="食材" style="display:none;">
+                  部位
                   <div style="display:flex; gap:8px; align-items:center;">
-                    <span style="flex:1;">部位</span>
+                    <select id="i-part" style="flex:1;">
+                      <option value="">请选择部位</option>
+                    </select>
                     <button type="button" id="btn-manage-parts" class="btn small" style="white-space:nowrap;">管理</button>
                   </div>
-                  <input id="i-part" type="text" placeholder="如：鸡胸、鸡腿等" />
                 </label>
                 
                 <!-- 新增字段：产地类型（仅食材） -->
                 <label id="i-originType-label" data-classification="食材" style="display:none;">
+                  产地类型
                   <div style="display:flex; gap:8px; align-items:center;">
-                    <span style="flex:1;">产地类型</span>
+                    <select id="i-originType" style="flex:1;">
+                      <option value="">请选择产地类型</option>
+                    </select>
                     <button type="button" id="btn-manage-origin-types" class="btn small" style="white-space:nowrap;">管理</button>
                   </div>
-                  <select id="i-originType">
-                    <option value="">请选择产地类型</option>
-                    <option value="国产">国产</option>
-                    <option value="进口">进口</option>
-                    <option value="有机">有机</option>
-                    <option value="无抗">无抗</option>
-                    <option value="其他">其他</option>
-                  </select>
                 </label>
                 
                 <label id="i-brand-label">品牌
@@ -1015,7 +1014,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-21"></script>
+  <script src="app.js?v=20241128-22"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
