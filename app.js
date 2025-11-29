@@ -4160,18 +4160,17 @@ function formatIngredientDetails(ing) {
     ]);
   }
   
-  // 第七行：可食部单价/500单位、每单位重量（包材不显示可食部单价）
-  if (ing.classification !== '包材') {
-    const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
-    const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
-    rows.push([
-      { label: '可食部单价/500单位', value: ediblePricePer500 },
-      { label: '每单位重量', value: weightPerUnit }
-    ]);
-  } else {
+  // 第七行：可食部单价/500单位、每单位重量（包材显示每单位重量，食材和营养补充剂不显示每单位重量）
+  if (ing.classification === '包材') {
     const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
     rows.push([
       { label: '每单位重量', value: weightPerUnit, colspan: 2 }
+    ]);
+  } else {
+    // 食材和营养补充剂只显示可食部单价/500单位，不显示每单位重量
+    const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
+    rows.push([
+      { label: '可食部单价/500单位', value: ediblePricePer500, colspan: 2 }
     ]);
   }
   
