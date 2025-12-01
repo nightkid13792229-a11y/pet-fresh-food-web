@@ -4033,15 +4033,9 @@ function updateNameFilterSelect() {
 function calculatePricePer500(cost, quantity, unit) {
   if (!cost || !quantity || quantity <= 0) return 0;
   
-  // 将数量转换为g或ml（基础单位）
-  let quantityInBaseUnit = quantity;
-  if (unit === 'kg') quantityInBaseUnit = quantity * 1000;
-  else if (unit === 'L') quantityInBaseUnit = quantity * 1000;
-  else if (unit === 'g' || unit === 'ml') quantityInBaseUnit = quantity;
-  // 其他单位（个、包、盒、瓶、袋）需要知道每单位重量，暂时不转换
-  
-  if (quantityInBaseUnit <= 0) return 0;
-  return (cost / quantityInBaseUnit) * 500;
+  // 直接计算：单价/500单位 = (费用 / 数量) * 500
+  // 不管单位是什么（g、kg、个、包等），都按相同逻辑计算，不做单位转换
+  return (cost / quantity) * 500;
 }
 
 // 计算每100营养素单位价格（仅营养补充剂）
