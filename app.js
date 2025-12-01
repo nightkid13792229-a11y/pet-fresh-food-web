@@ -4676,8 +4676,7 @@ function renderIngredientsList() {
   
   const { pageItems, total, totalPages } = paginatedIngredients();
   
-  // 更新筛选下拉框选项
-  updateIngredientFilterSelects();
+  // 注意：筛选下拉框在 loadIngredientsFromBackend 中更新，这里不需要重复更新
   
   if (pageItems.length === 0) {
     list.innerHTML = '<div class="muted" style="text-align:center; padding:20px">暂无原料数据</div>';
@@ -6215,7 +6214,7 @@ async function deleteIngredient(id) {
     
     alert('删除成功！');
     await loadIngredientsFromBackend();
-    updateIngredientFilterSelects();
+    await loadAllIngredientsForFilters();
   } catch (error) {
     console.error('删除原料失败:', error);
     alert('删除失败：' + error.message);
@@ -6666,7 +6665,7 @@ async function importIngredientsFromExcel(file) {
     
     // 重新加载列表
     await loadIngredientsFromBackend();
-    updateIngredientFilterSelects();
+    await loadAllIngredientsForFilters();
     
   } catch (error) {
     console.error('导入Excel文件失败:', error);
@@ -8764,7 +8763,7 @@ function setupIngredientsModule() {
           console.error('[Save Ingredient] Failed to reload ingredient list:', reloadError);
         }
         
-        updateIngredientFilterSelects();
+        await loadAllIngredientsForFilters();
         
         // 关闭表单（不再自动重新打开）
         const card = $('ingredient-form-card');
@@ -8801,8 +8800,8 @@ function setupIngredientsModule() {
   // 当数据变化时，更新名称筛选下拉框
   const originalSaveApp = saveApp;
   const checkAndUpdate = () => {
-    setTimeout(() => {
-      updateIngredientFilterSelects();
+    setTimeout(async () => {
+      await loadAllIngredientsForFilters();
     }, 100);
   };
   
