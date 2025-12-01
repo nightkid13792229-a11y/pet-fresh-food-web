@@ -1313,11 +1313,13 @@ function switchView(view) {
     if (view === 'inventory' && backendState.token) {
       setTimeout(async () => {
         await loadIngredientsFromBackend();
+        await loadAllIngredientsForFilters(); // 加载所有数据填充筛选下拉框
       }, 100);
     } else if (view === 'inventory') {
       setTimeout(() => {
         store.ingredients = [];
         renderIngredientsList();
+        updateIngredientFilterSelects(); // 未登录时使用本地数据
       }, 100);
     }
     // 如果切换到顾客视图，从后端加载数据
