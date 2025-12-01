@@ -2950,7 +2950,8 @@ async function loadIngredientsFromBackend() {
         part: ing.part || null, // 部位（仅食材）
         originType: ing.originType || null, // 产地类型（仅食材）
         model: ing.model || null, // 型号（所有分类）
-        unitContent: ing.unitContent || null, // 每单位含量（仅营养补充剂）
+        unitContent: ing.unitContent || null, // 每单位营养素含量（仅营养补充剂）
+        nutrientUnit: ing.nutrientUnit || null, // 营养素单位（仅营养补充剂）
         createdAt: ing.createdAt ? new Date(ing.createdAt).getTime() : Date.now(),
         updatedAt: ing.updatedAt ? new Date(ing.updatedAt).getTime() : Date.now(),
         // 保存后端ID用于更新和删除
@@ -3665,9 +3666,10 @@ function updateIngredientFieldsVisibility(classification) {
         'i-source-label',       // 采购渠道
         'i-cost-label',         // 费用（采购价格）
         'i-quantity-label',     // 单量（采购数量）
-        'i-unit-label',         // 单位
+        'i-unit-label',         // 采购单位
         'i-ediblePortion-label', // 可食部
-        'i-unitContent-label',   // 每单位含量
+        'i-unitContent-label',   // 每单位营养素含量
+        'i-nutrientUnit-label',  // 营养素单位（新增）
         'i-pricePer500-label',  // 单价/500单位
         'i-ediblePricePer500-label', // 可食部单价/500单位
         'i-mainFunction-label'   // 主要营养价值
@@ -3978,19 +3980,19 @@ function updateUnitBasedLabels() {
   const unitSelect = $('i-unit');
   const pricePerUnitLabel = $('i-pricePerUnit-label');
   const weightPerUnitLabel = $('i-weightPerUnit-label');
+  const pricePer500Label = $('i-pricePer500-label');
+  const ediblePricePer500Label = $('i-ediblePricePer500-label');
   
   if (!unitSelect) return;
   
+  const classification = $('i-classification') ? $('i-classification').value.trim() : '';
   const unit = unitSelect.value.trim();
   const unitDisplay = unit || '-';
   
-  // 更新"价格/单位"标签
-  if (pricePerUnitLabel) {
-    // 获取input元素（需要保留）
+  // 更新"价格/单位"标签（仅包材）
+  if (pricePerUnitLabel && classification === '包材') {
     const input = $('i-pricePerUnit');
-    // 设置标签文本
     pricePerUnitLabel.innerHTML = `价格/${unitDisplay}`;
-    // 重新添加input元素
     if (input) {
       pricePerUnitLabel.appendChild(input);
     }
@@ -3998,13 +4000,28 @@ function updateUnitBasedLabels() {
   
   // 更新"重量（g）/单位"标签
   if (weightPerUnitLabel) {
-    // 获取input元素（需要保留）
     const input = $('i-weightPerUnit');
-    // 设置标签文本
     weightPerUnitLabel.innerHTML = `重量（g）/${unitDisplay}`;
-    // 重新添加input元素
     if (input) {
       weightPerUnitLabel.appendChild(input);
+    }
+  }
+  
+  // 更新"单价/500单位"和"可食部单价/500单位"标签（食材和营养补充剂）
+  if (classification === '食材' || classification === '营养补充剂') {
+    if (pricePer500Label) {
+      const input = $('i-pricePer500');
+      pricePer500Label.innerHTML = `单价/500${unitDisplay}`;
+      if (input) {
+        pricePer500Label.appendChild(input);
+      }
+    }
+    if (ediblePricePer500Label) {
+      const input = $('i-ediblePricePer500');
+      ediblePricePer500Label.innerHTML = `可食部单价/500${unitDisplay}`;
+      if (input) {
+        ediblePricePer500Label.appendChild(input);
+      }
     }
   }
 }
@@ -4312,10 +4329,11 @@ function formatIngredientDetails(ing) {
         { label: '产地类型', value: originTypeValue, colspan: 2 }
       ]);
     }
-  } else if (ing.classification === '营养补充剂' && ing.unitContent) {
+  } else if (ing.classification === '营养补充剂' && (ing.unitContent || ing.nutrientUnit)) {
     rows.push({ type: 'section', title: '营养补充剂信息' });
     rows.push([
-      { label: '每单位含量', value: ing.unitContent || '-', colspan: 2 }
+      { label: '每单位营养素含量', value: ing.unitContent || '-' },
+      { label: '营养素单位', value: ing.nutrientUnit || '-' }
     ]);
   }
   
@@ -5717,8 +5735,13 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
         if ($('i-originType')) $('i-originType').value = ing.originType || '';
       }
       if ($('i-model')) $('i-model').value = ing.model || '';
-      if (ing.classification === '营养补充剂' && $('i-unitContent')) {
-        $('i-unitContent').value = ing.unitContent || '';
+      if (ing.classification === '营养补充剂') {
+        if ($('i-unitContent')) {
+          $('i-unitContent').value = ing.unitContent || '';
+        }
+        if ($('i-nutrientUnit')) {
+          $('i-nutrientUnit').value = ing.nutrientUnit || '';
+        }
       }
       $('i-pricePer500').value = ing.pricePer500 || '';
       const ediblePortionPercent = ing.ediblePortion !== undefined ? Math.round(ing.ediblePortion * 100) : 100;
@@ -8360,6 +8383,7 @@ function setupIngredientsModule() {
       const originType = classification === '食材' ? ($('i-originType')?.value.trim() || null) : null;
       const model = $('i-model')?.value.trim() || null;
       const unitContent = classification === '营养补充剂' ? ($('i-unitContent')?.value.trim() || null) : null;
+      const nutrientUnit = classification === '营养补充剂' ? ($('i-nutrientUnit')?.value.trim() || null) : null;
       
       const data = {
         code: code || '',
@@ -8382,7 +8406,8 @@ function setupIngredientsModule() {
         part: part, // 部位（仅食材）
         originType: originType, // 产地类型（仅食材）
         model: model, // 型号（所有分类）
-        unitContent: unitContent // 每单位含量（仅营养补充剂）
+        unitContent: unitContent, // 每单位营养素含量（仅营养补充剂）
+        nutrientUnit: nutrientUnit // 营养素单位（仅营养补充剂）
       };
       
       // 检查登录状态

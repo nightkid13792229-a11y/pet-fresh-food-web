@@ -23,6 +23,7 @@ const baseSelect = `
     origin_type AS originType,
     model,
     unit_content AS unitContent,
+    nutrient_unit AS nutrientUnit,
     created_at AS createdAt,
     updated_at AS updatedAt,
     created_by AS createdBy,
@@ -97,9 +98,9 @@ export const createIngredient = async (payload, userId) => {
       code, category, name, brand, source, cost, quantity, unit,
       price_per_500, edible_portion, edible_price_per_500, weight_per_unit,
       classification, description, main_function,
-      subject, part, origin_type, model, unit_content,
+      subject, part, origin_type, model, unit_content, nutrient_unit,
       created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   
   const params = [
@@ -123,6 +124,7 @@ export const createIngredient = async (payload, userId) => {
     payload.originType || null,
     payload.model || null,
     payload.unitContent || null,
+    payload.nutrientUnit || null,
     userId || null
   ];
   
@@ -213,6 +215,10 @@ export const updateIngredient = async (id, payload, userId) => {
   if (payload.unitContent !== undefined) {
     fields.push('unit_content = ?');
     params.push(payload.unitContent || null);
+  }
+  if (payload.nutrientUnit !== undefined) {
+    fields.push('nutrient_unit = ?');
+    params.push(payload.nutrientUnit || null);
   }
   
   if (fields.length === 0) {

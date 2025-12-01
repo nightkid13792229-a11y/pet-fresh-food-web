@@ -30,7 +30,8 @@ export const createIngredientSchema = Joi.object({
   part: Joi.string().max(200).allow('', null), // 部位（仅食材）
   originType: Joi.string().max(200).allow('', null), // 产地类型（仅食材）
   model: Joi.string().max(200).allow('', null), // 型号（所有分类）
-  unitContent: Joi.string().max(200).allow('', null) // 每单位含量（仅营养补充剂）
+  unitContent: Joi.string().max(200).allow('', null), // 每单位营养素含量（仅营养补充剂）
+  nutrientUnit: Joi.string().max(20).allow('', null) // 营养素单位（仅营养补充剂）
 });
 
 export const updateIngredientSchema = Joi.object({
@@ -60,7 +61,8 @@ export const updateIngredientSchema = Joi.object({
   part: Joi.string().max(200).allow('', null), // 部位（仅食材）
   originType: Joi.string().max(200).allow('', null), // 产地类型（仅食材）
   model: Joi.string().max(200).allow('', null), // 型号（所有分类）
-  unitContent: Joi.string().max(200).allow('', null) // 每单位含量（仅营养补充剂）
+  unitContent: Joi.string().max(200).allow('', null), // 每单位营养素含量（仅营养补充剂）
+  nutrientUnit: Joi.string().max(20).allow('', null) // 营养素单位（仅营养补充剂）
 }).min(1).messages({
   'object.min': '至少需要提供一个要更新的字段'
 });
