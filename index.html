@@ -458,15 +458,20 @@
                 <!-- 价格/单位（仅包材显示） -->
                 <label id="i-pricePerUnit-label" style="display:none;">价格/-<input id="i-pricePerUnit" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
                 
-                <!-- 新增：主要营养素（仅营养补充剂） -->
+                <!-- 新增：主要营养素（仅营养补充剂，改为下拉框） -->
                 <label id="i-mainNutrient-label" data-classification="营养补充剂" style="display:none;">
                   主要营养素
-                  <input id="i-mainNutrient" type="text" placeholder="如：维生素D3" />
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="i-mainNutrient" style="flex:1;">
+                      <!-- 选项由 JS populateMainNutrientSelect 动态填充 -->
+                    </select>
+                    <button type="button" id="btn-manage-main-nutrients" class="btn small" style="white-space:nowrap;">管理</button>
+                  </div>
                 </label>
                 
-                <!-- 修改：营养素含量/单位（仅营养补充剂，标签动态显示采购单位） -->
+                <!-- 修改：营养素含量/单位（仅营养补充剂，标签动态显示采购单位，改为number类型） -->
                 <label id="i-unitContent-label" data-classification="营养补充剂" style="display:none;">
-                  营养素含量/-<input id="i-unitContent" type="text" placeholder="如：500" />
+                  <span id="i-unitContent-label-text">营养素含量/-</span> <input id="i-unitContent" type="number" min="0" step="0.01" placeholder="如：500" style="width:100%;" />
                 </label>
                 
                 <!-- 营养素单位（仅营养补充剂） -->
@@ -485,7 +490,7 @@
                 
                 <!-- 新增：每100营养素单位价格（仅营养补充剂） -->
                 <label id="i-pricePer100NutrientUnit-label" data-classification="营养补充剂" style="display:none;">
-                  价格/100营养素单位<input id="i-pricePer100NutrientUnit" type="number" min="0" step="0.01" placeholder="自动计算" readonly />
+                  <span id="i-pricePer100NutrientUnit-label-text">价格/100营养素单位</span><input id="i-pricePer100NutrientUnit" type="number" min="0" step="0.01" placeholder="自动计算" readonly />
                 </label>
                 
                 <!-- 修改：每单位重量标签，动态显示单位 -->
@@ -747,6 +752,31 @@
         
         <!-- 统计信息 -->
         <div id="origin-type-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
+          <!-- 统计信息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 主要营养素管理弹窗 -->
+      <div class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; z-index:1003; background:white; box-shadow:0 4px 20px rgba(0,0,0,0.3);" id="main-nutrient-management-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>主要营养素管理</h3>
+          <button id="btn-close-main-nutrient-management" class="btn ghost" style="padding:4px 12px;">关闭</button>
+        </div>
+        
+        <!-- 搜索和操作栏 -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input id="main-nutrient-search-input" type="text" placeholder="搜索主要营养素..." style="flex:1;" />
+          <input id="main-nutrient-add-input" type="text" placeholder="输入新主要营养素" style="flex:1;" />
+          <button id="btn-add-main-nutrient" class="btn small">添加</button>
+        </div>
+        
+        <!-- 主要营养素列表 -->
+        <div id="main-nutrient-list-manage" style="display:grid; gap:8px; margin-bottom:12px; max-height:400px; overflow-y:auto;">
+          <!-- 主要营养素列表将在这里显示 -->
+        </div>
+        
+        <!-- 统计信息 -->
+        <div id="main-nutrient-stats" style="margin-top:12px; padding:8px; background:var(--bg-secondary); border-radius:4px; font-size:13px; color:var(--text-secondary);">
           <!-- 统计信息将在这里显示 -->
         </div>
       </div>
@@ -1071,7 +1101,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-39"></script>
+  <script src="app.js?v=20241128-41"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -28,6 +28,8 @@ const SOURCES_STORAGE_KEY = 'pff-sources-v1';
 const SUBJECTS_STORAGE_KEY = 'pff-subjects-v1';
 const PARTS_STORAGE_KEY = 'pff-parts-v1';
 const ORIGIN_TYPES_STORAGE_KEY = 'pff-origin-types-v1';
+// 主要营养素数据存储
+const MAIN_NUTRIENTS_STORAGE_KEY = 'pff-main-nutrients-v1';
 
 // 类别数据缓存（避免重复请求）
 const categoriesCache = new Map(); // key: classification, value: { data: [], timestamp: number }
@@ -48,6 +50,14 @@ function initBrandsAndSources() {
   if (!localStorage.getItem(SOURCES_STORAGE_KEY)) {
     // 只有在完全没有数据时才初始化空数组，不设置默认值
     localStorage.setItem(SOURCES_STORAGE_KEY, JSON.stringify([]));
+  }
+}
+
+// 初始化主要营养素数据
+function initMainNutrients() {
+  if (!localStorage.getItem(MAIN_NUTRIENTS_STORAGE_KEY)) {
+    // 初始化空数组，让用户自己管理
+    localStorage.setItem(MAIN_NUTRIENTS_STORAGE_KEY, JSON.stringify([]));
   }
 }
 
@@ -153,6 +163,43 @@ function populatePartSelect() {
     const option = document.createElement('option');
     option.value = part;
     option.textContent = part;
+    select.appendChild(option);
+  });
+}
+
+// 获取主要营养素列表
+function getMainNutrients() {
+  try {
+    const stored = localStorage.getItem(MAIN_NUTRIENTS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('读取主要营养素列表失败:', e);
+  }
+  return [];
+}
+
+// 保存主要营养素列表
+function saveMainNutrients(mainNutrients) {
+  try {
+    localStorage.setItem(MAIN_NUTRIENTS_STORAGE_KEY, JSON.stringify(mainNutrients));
+  } catch (e) {
+    console.error('保存主要营养素列表失败:', e);
+  }
+}
+
+// 加载主要营养素列表到下拉框
+function populateMainNutrientSelect() {
+  const select = $('i-mainNutrient');
+  if (!select) return;
+  
+  const mainNutrients = getMainNutrients();
+  select.innerHTML = '<option value="">请选择主要营养素</option>';
+  mainNutrients.forEach(nutrient => {
+    const option = document.createElement('option');
+    option.value = nutrient;
+    option.textContent = nutrient;
     select.appendChild(option);
   });
 }
@@ -4064,29 +4111,20 @@ function updateUnitBasedLabels() {
   
   // 更新"营养素含量/单位"标签（仅营养补充剂）
   if (classification === '营养补充剂') {
-    const unitContentLabel = $('i-unitContent-label');
-    if (unitContentLabel) {
-      const input = $('i-unitContent');
-      unitContentLabel.innerHTML = `营养素含量/${unitDisplay}`;
-      if (input) {
-        unitContentLabel.appendChild(input);
-      }
+    const unitContentLabelText = $('i-unitContent-label-text');
+    if (unitContentLabelText) {
+      unitContentLabelText.textContent = `营养素含量/${unitDisplay}`;
     }
     
     // 更新"价格/100营养素单位"标签，动态显示营养素单位和主要营养素
-    const pricePer100NutrientUnitLabel = $('i-pricePer100NutrientUnit-label');
-    if (pricePer100NutrientUnitLabel) {
+    const pricePer100NutrientUnitLabelText = $('i-pricePer100NutrientUnit-label-text');
+    if (pricePer100NutrientUnitLabelText) {
       const nutrientUnit = $('i-nutrientUnit')?.value || '';
       const mainNutrient = $('i-mainNutrient')?.value || '';
       const nutrientUnitDisplay = nutrientUnit || '-';
       const mainNutrientDisplay = mainNutrient || '-';
       const labelText = `价格/100${nutrientUnitDisplay}${mainNutrientDisplay}`;
-      
-      const input = $('i-pricePer100NutrientUnit');
-      pricePer100NutrientUnitLabel.innerHTML = labelText;
-      if (input) {
-        pricePer100NutrientUnitLabel.appendChild(input);
-      }
+      pricePer100NutrientUnitLabelText.textContent = labelText;
     }
   }
 }
@@ -5600,6 +5638,7 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
   populatePartSelect();
   populateOriginTypeSelect();
   populateUnitSelect();
+  populateMainNutrientSelect();
 
   if (id) {
     // 编辑模式：先加载数据，再显示表单
@@ -5732,10 +5771,11 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       // 填充品牌和采购渠道下拉框
       populateBrandSelect();
       populateSourceSelect();
-      // 填充所属科目、部位、产地类型下拉框
+      // 填充所属科目、部位、产地类型、主要营养素下拉框
       populateSubjectSelect();
       populatePartSelect();
       populateOriginTypeSelect();
+      populateMainNutrientSelect();
       
       // 设置类别值
       const categorySelect = $('i-category');
@@ -5930,6 +5970,7 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     // 加载品牌和采购渠道下拉框
     populateBrandSelect();
     populateSourceSelect();
+    populateMainNutrientSelect();
     
     // reset之后：使用统一的状态管理器更新显示/隐藏
     // 新增模式下，确保分类为空，字段正确隐藏
@@ -8273,13 +8314,39 @@ function setupIngredientsModule() {
     addOriginTypeBtn.addEventListener('click', () => addOriginType());
   }
   
+  // 主要营养素管理按钮
+  const manageMainNutrientsBtn = $('btn-manage-main-nutrients');
+  if (manageMainNutrientsBtn) {
+    manageMainNutrientsBtn.addEventListener('click', () => openMainNutrientManagement());
+  }
+  
+  const closeMainNutrientManagementBtn = $('btn-close-main-nutrient-management');
+  if (closeMainNutrientManagementBtn) {
+    closeMainNutrientManagementBtn.addEventListener('click', () => closeMainNutrientManagement());
+  }
+  
+  const mainNutrientSearchInput = $('main-nutrient-search-input');
+  if (mainNutrientSearchInput) {
+    mainNutrientSearchInput.addEventListener('input', () => {
+      loadAndRenderMainNutrients();
+    });
+  }
+  
+  const addMainNutrientBtn = $('btn-add-main-nutrient');
+  if (addMainNutrientBtn) {
+    addMainNutrientBtn.addEventListener('click', () => addMainNutrient());
+  }
+  
   // 初始化品牌和采购渠道数据
   initBrandsAndSources();
+  // 初始化主要营养素数据
+  initMainNutrients();
   
-  // 初始化所属科目、部位、产地类型下拉框
+  // 初始化所属科目、部位、产地类型、主要营养素下拉框
   populateSubjectSelect();
   populatePartSelect();
   populateOriginTypeSelect();
+  populateMainNutrientSelect();
   
   // 重新生成编号按钮
   const regenerateCodeBtn = $('btn-regenerate-code');
@@ -8380,10 +8447,10 @@ function setupIngredientsModule() {
     });
   }
   
-  // 主要营养素字段变化时，更新标签文本（仅营养补充剂）
+  // 主要营养素字段变化时，更新标签文本（仅营养补充剂，改为 change 事件因为现在是 select）
   const mainNutrientEl = $('i-mainNutrient');
   if (mainNutrientEl) {
-    mainNutrientEl.addEventListener('input', () => {
+    mainNutrientEl.addEventListener('change', () => {
       updateUnitBasedLabels();
       updateIngredientPriceFields();
     });
@@ -15375,6 +15442,98 @@ function addOriginType() {
   saveOriginTypes(originTypes);
   populateOriginTypeSelect();
   loadAndRenderOriginTypes();
+  
+  // 清空输入框
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+// ========== 主要营养素管理功能 ==========
+
+// 打开主要营养素管理弹窗
+async function openMainNutrientManagement() {
+  const card = $('main-nutrient-management-card');
+  if (!card) return;
+  
+  card.style.display = 'block';
+  await loadAndRenderMainNutrients();
+}
+
+// 关闭主要营养素管理弹窗
+function closeMainNutrientManagement() {
+  const card = $('main-nutrient-management-card');
+  if (card) card.style.display = 'none';
+}
+
+// 加载并渲染主要营养素列表
+async function loadAndRenderMainNutrients() {
+  const listEl = $('main-nutrient-list-manage');
+  const statsEl = $('main-nutrient-stats');
+  const searchInput = $('main-nutrient-search-input');
+  
+  if (!listEl) return;
+  
+  const mainNutrients = getMainNutrients();
+  
+  // 应用搜索过滤
+  const searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const filtered = searchText 
+    ? mainNutrients.filter(n => n.toLowerCase().includes(searchText))
+    : mainNutrients;
+  
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div class="muted" style="padding:16px; text-align:center;">暂无主要营养素</div>';
+  } else {
+    listEl.innerHTML = filtered.map(nutrient => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-secondary); border-radius:4px;">
+        <span>${escapeHtml(nutrient)}</span>
+        <button type="button" class="btn small ghost" data-delete-main-nutrient="${escapeHtml(nutrient)}">删除</button>
+      </div>
+    `).join('');
+    
+    // 绑定删除按钮事件
+    listEl.querySelectorAll('[data-delete-main-nutrient]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nutrient = btn.dataset.deleteMainNutrient;
+        if (confirm(`确定要删除"${nutrient}"吗？`)) {
+          const nutrients = getMainNutrients();
+          const updated = nutrients.filter(n => n !== nutrient);
+          saveMainNutrients(updated);
+          populateMainNutrientSelect();
+          loadAndRenderMainNutrients();
+        }
+      });
+    });
+  }
+  
+  // 更新统计信息
+  if (statsEl) {
+    const total = mainNutrients.length;
+    statsEl.textContent = `共 ${total} 个主要营养素`;
+  }
+}
+
+// 添加主要营养素
+function addMainNutrient() {
+  const inputEl = $('main-nutrient-add-input');
+  if (!inputEl) return;
+  
+  const newNutrient = inputEl.value.trim();
+  if (!newNutrient) {
+    alert('请输入主要营养素名称');
+    return;
+  }
+  
+  const nutrients = getMainNutrients();
+  if (nutrients.includes(newNutrient)) {
+    alert('该主要营养素已存在');
+    return;
+  }
+  
+  nutrients.push(newNutrient);
+  saveMainNutrients(nutrients);
+  populateMainNutrientSelect();
+  loadAndRenderMainNutrients();
   
   // 清空输入框
   inputEl.value = '';
