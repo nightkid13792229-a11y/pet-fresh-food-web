@@ -448,13 +448,14 @@
                     <button type="button" id="btn-manage-units" class="btn small" style="white-space:nowrap;">管理</button>
                   </div>
                 </label>
-                <!-- 隐藏旧字段，保留用于后端保存 -->
-                <label style="display:none;">单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                <!-- 单价/500单位（食材和营养补充剂显示） -->
+                <label id="i-pricePer500-label" style="display:none;">单价/500单位<input id="i-pricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
                 <label id="i-ediblePortion-label" data-classification="包材" style="display:none;">可食部（%）<input id="i-ediblePortion" type="number" min="0" max="100" step="1" value="100" /></label>
-                <label style="display:none;">可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                <!-- 可食部单价/500单位（食材和营养补充剂显示） -->
+                <label id="i-ediblePricePer500-label" style="display:none;">可食部单价/500单位<input id="i-ediblePricePer500" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
                 
-                <!-- 新增字段：价格/单位（动态显示单位） -->
-                <label id="i-pricePerUnit-label">价格/-<input id="i-pricePerUnit" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
+                <!-- 价格/单位（仅包材显示） -->
+                <label id="i-pricePerUnit-label" style="display:none;">价格/-<input id="i-pricePerUnit" type="number" min="0" step="0.01" placeholder="自动计算" readonly /></label>
                 
                 <!-- 新增字段：每单位含量（仅营养补充剂） -->
                 <label id="i-unitContent-label" data-classification="营养补充剂" style="display:none;">
@@ -1041,7 +1042,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-34"></script>
+  <script src="app.js?v=20241128-35"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

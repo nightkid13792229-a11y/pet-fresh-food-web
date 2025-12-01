@@ -3651,9 +3651,11 @@ function updateIngredientFieldsVisibility(classification) {
         'i-quantity-label',     // 单量（采购数量）
         'i-unit-label',         // 单位
         'i-ediblePortion-label', // 可食部
+        'i-pricePer500-label',  // 单价/500单位
+        'i-ediblePricePer500-label', // 可食部单价/500单位
         'i-mainFunction-label'   // 主要营养价值
       ],
-      hide: ['i-unitContent-label', 'i-weightPerUnit-label']
+      hide: ['i-unitContent-label', 'i-weightPerUnit-label', 'i-pricePerUnit-label']
     },
     // 营养补充剂分类显示的字段
     '营养补充剂': {
@@ -3666,9 +3668,11 @@ function updateIngredientFieldsVisibility(classification) {
         'i-unit-label',         // 单位
         'i-ediblePortion-label', // 可食部
         'i-unitContent-label',   // 每单位含量
+        'i-pricePer500-label',  // 单价/500单位
+        'i-ediblePricePer500-label', // 可食部单价/500单位
         'i-mainFunction-label'   // 主要营养价值
       ],
-      hide: ['i-subject-label', 'i-part-label', 'i-originType-label', 'i-weightPerUnit-label']
+      hide: ['i-subject-label', 'i-part-label', 'i-originType-label', 'i-weightPerUnit-label', 'i-pricePerUnit-label']
     },
     // 包材分类显示的字段
     '包材': {
@@ -3679,7 +3683,8 @@ function updateIngredientFieldsVisibility(classification) {
         'i-cost-label',         // 费用（采购价格）
         'i-quantity-label',     // 单量（采购数量）
         'i-unit-label',         // 单位
-        'i-weightPerUnit-label' // 每单位重量（仅包材显示）
+        'i-weightPerUnit-label', // 每单位重量（仅包材显示）
+        'i-pricePerUnit-label'  // 价格/单位（仅包材显示）
       ],
       hide: [
         'i-subject-label', 
@@ -3687,7 +3692,9 @@ function updateIngredientFieldsVisibility(classification) {
         'i-originType-label', 
         'i-ediblePortion-label', 
         'i-unitContent-label', 
-        'i-mainFunction-label'
+        'i-mainFunction-label',
+        'i-pricePer500-label',
+        'i-ediblePricePer500-label'
       ]
     }
   };
@@ -4010,15 +4017,12 @@ function updateIngredientPriceFields() {
   const ediblePortionPercent = Number($('i-ediblePortion').value) || 100;
   const ediblePortion = ediblePortionPercent / 100;
   
+  // 获取当前分类
+  const classification = $('i-classification') ? $('i-classification').value.trim() : '';
+  
   // 仍然计算 pricePer500 用于后端保存（兼容性）
   const pricePer500 = calculatePricePer500(cost, quantity, unit);
   const ediblePricePer500 = ediblePortion > 0 ? pricePer500 / ediblePortion : 0;
-  
-  // 计算每单位价格（新显示字段）
-  let pricePerUnit = 0;
-  if (quantity > 0) {
-    pricePerUnit = cost / quantity;
-  }
   
   // 更新隐藏字段（用于后端保存）
   const priceEl = $('i-pricePer500');
@@ -4026,14 +4030,38 @@ function updateIngredientPriceFields() {
   if (priceEl) priceEl.value = pricePer500.toFixed(4);
   if (ediblePriceEl) ediblePriceEl.value = ediblePricePer500.toFixed(4);
   
-  // 更新新显示字段
-  const pricePerUnitEl = $('i-pricePerUnit');
-  if (pricePerUnitEl) {
-    pricePerUnitEl.value = pricePerUnit > 0 ? pricePerUnit.toFixed(4) : '';
+  // 根据分类更新显示字段
+  if (classification === '包材') {
+    // 包材：显示价格/单位
+    let pricePerUnit = 0;
+    if (quantity > 0) {
+      pricePerUnit = cost / quantity;
+    }
+    const pricePerUnitEl = $('i-pricePerUnit');
+    if (pricePerUnitEl) {
+      pricePerUnitEl.value = pricePerUnit > 0 ? pricePerUnit.toFixed(4) : '';
+    }
+    // 更新标签文本
+    updateUnitBasedLabels();
+  } else {
+    // 食材和营养补充剂：显示单价/500单位和可食部单价/500单位
+    // 这些字段的显示/隐藏由 updateIngredientFieldsVisibility 控制
+    // 这里只需要确保值已更新（上面已经更新了）
+    const pricePer500Label = $('i-pricePer500-label');
+    const ediblePricePer500Label = $('i-ediblePricePer500-label');
+    if (pricePer500Label) {
+      const pricePer500Input = $('i-pricePer500');
+      if (pricePer500Input) {
+        pricePer500Input.value = pricePer500.toFixed(4);
+      }
+    }
+    if (ediblePricePer500Label) {
+      const ediblePricePer500Input = $('i-ediblePricePer500');
+      if (ediblePricePer500Input) {
+        ediblePricePer500Input.value = ediblePricePer500.toFixed(4);
+      }
+    }
   }
-  
-  // 更新标签文本
-  updateUnitBasedLabels();
 }
 // 从后端加载项目并填充到表单下拉框
 async function loadItemsForForm(categoryId, categoryName) {
@@ -4315,28 +4343,36 @@ function formatIngredientDetails(ing) {
   // ========== 价格信息组 ==========
   rows.push({ type: 'section', title: '价格信息' });
   
-  // 计算每单位价格
-  const costValue = ing.cost || 0;
-  const quantityValue = ing.quantity || 0;
-  const unit = ing.unit || '-';
-  const unitDisplay = unit !== '-' ? unit : '-';
-  const pricePerUnit = quantityValue > 0 ? formatNum(costValue / quantityValue, 4) : '-';
-  
-  if (ing.classification !== '包材') {
+  if (ing.classification === '包材') {
+    // 包材：显示价格/单位
+    const costValue = ing.cost || 0;
+    const quantityValue = ing.quantity || 0;
+    const unit = ing.unit || '-';
+    const unitDisplay = unit !== '-' ? unit : '-';
+    const pricePerUnit = quantityValue > 0 ? formatNum(costValue / quantityValue, 4) : '-';
+    
+    rows.push([
+      { label: `价格/${unitDisplay}`, value: pricePerUnit, colspan: 2 }
+    ]);
+    
+    const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
+    rows.push([
+      { label: `重量（g）/${unitDisplay}`, value: weightPerUnit, colspan: 2 }
+    ]);
+  } else {
+    // 食材和营养补充剂：显示单价/500单位和可食部单价/500单位
+    const pricePer500 = ing.pricePer500 != null ? formatNum(ing.pricePer500, 4) : '-';
     const ediblePortion = ing.ediblePortion != null 
       ? (Math.round(ing.ediblePortion * 100) !== 100 ? `${Math.round(ing.ediblePortion * 100)}%` : '100%')
       : '-';
     rows.push([
-      { label: `价格/${unitDisplay}`, value: pricePerUnit },
+      { label: '单价/500单位', value: pricePer500 },
       { label: '可食部', value: ediblePortion }
     ]);
-  } else {
+    
+    const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
     rows.push([
-      { label: `价格/${unitDisplay}`, value: pricePerUnit, colspan: 2 }
-    ]);
-    const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
-    rows.push([
-      { label: `重量（g）/${unitDisplay}`, value: weightPerUnit, colspan: 2 }
+      { label: '可食部单价/500单位', value: ediblePricePer500, colspan: 2 }
     ]);
   }
   
