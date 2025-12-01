@@ -1,6 +1,9 @@
 -- Ingredients table for PetFresh backend
 -- 原料表
 
+-- 使用数据库（根据实际情况修改数据库名）
+USE petfresh;
+
 CREATE TABLE IF NOT EXISTS ingredients (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   code VARCHAR(50) NOT NULL UNIQUE COMMENT '编号',

@@ -325,10 +325,16 @@
         <div class="actions">
           <input id="ingredient-search" type="text" placeholder="搜索：名称/品牌..." style="flex:1" />
           <select id="ingredient-category-filter" style="width:120px">
-            <option value="">全部类别</option>
+            <option value="">类别</option>
           </select>
-          <select id="ingredient-name-filter" style="width:150px">
-            <option value="">全部食材名称</option>
+          <select id="ingredient-subject-filter" style="width:120px">
+            <option value="">所属科目</option>
+          </select>
+          <select id="ingredient-part-filter" style="width:120px">
+            <option value="">部位</option>
+          </select>
+          <select id="ingredient-origin-type-filter" style="width:120px">
+            <option value="">产地类型</option>
           </select>
           <button id="btn-new-ingredient" class="btn">新增</button>
           <button id="btn-manage-categories" class="btn">管理分类</button>
@@ -1101,7 +1107,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=20241128-45"></script>
+  <script src="app.js?v=20241128-47"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

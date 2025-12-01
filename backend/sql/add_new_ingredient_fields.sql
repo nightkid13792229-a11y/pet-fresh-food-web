@@ -21,3 +21,4 @@ ADD COLUMN model VARCHAR(200) NULL COMMENT '型号（所有分类）';
 ALTER TABLE ingredients 
 ADD COLUMN unit_content VARCHAR(200) NULL COMMENT '每单位含量（仅营养补充剂）';
 
+

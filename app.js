@@ -2939,6 +2939,9 @@ async function loadIngredientsFromBackend() {
   try {
     const search = $('ingredient-search')?.value || '';
     const category = $('ingredient-category-filter')?.value || '';
+    const subject = $('ingredient-subject-filter')?.value || '';
+    const part = $('ingredient-part-filter')?.value || '';
+    const originType = $('ingredient-origin-type-filter')?.value || '';
     const classification = ''; // 预留，暂时不使用
     
     const params = new URLSearchParams({
@@ -2948,6 +2951,9 @@ async function loadIngredientsFromBackend() {
     
     if (search) params.append('search', search);
     if (category) params.append('category', category);
+    if (subject) params.append('subject', subject);
+    if (part) params.append('part', part);
+    if (originType) params.append('originType', originType);
     if (classification) params.append('classification', classification);
     
     const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
@@ -3036,7 +3042,7 @@ async function loadIngredientsFromBackend() {
     console.log(`✓ 从后端加载了 ${ingredients.length} 条原料记录（共 ${data.total} 条）`);
     
     renderIngredientsList();
-    updateNameFilterSelect();
+    updateIngredientFilterSelects();
     
     // 后台预加载常用分类数据（不阻塞列表显示）
     setTimeout(() => {
@@ -3959,7 +3965,6 @@ async function loadCategoriesForForm(classification, useCache = true) {
 function populateCategorySelects() {
   const categorySelect = $('i-category');
   const categoryFilterSelect = $('ingredient-category-filter');
-  const nameFilterSelect = $('ingredient-name-filter');
   
   // 如果原料分类已选择，从后端加载对应的类别
   const classificationSelect = $('i-classification');
@@ -3997,10 +4002,24 @@ function populateCategorySelects() {
     }
   }
   
+  // 类别筛选下拉框由updateIngredientFilterSelects统一管理
+  // 这里不再单独填充，避免与动态数据冲突
+}
+
+// 更新筛选下拉框的选项（从当前数据中提取唯一值）
+function updateIngredientFilterSelects() {
+  // 确保 store.ingredients 存在且是数组
+  if (!store.ingredients || !Array.isArray(store.ingredients)) {
+    console.warn('[updateIngredientFilterSelects] store.ingredients is not available');
+    return;
+  }
+  
+  // 类别筛选
+  const categoryFilterSelect = $('ingredient-category-filter');
   if (categoryFilterSelect) {
-    categoryFilterSelect.innerHTML = '<option value="">全部类别</option>';
-    // 筛选下拉框暂时使用静态列表，后续可以优化为从后端加载
-    INGREDIENT_CATEGORIES.forEach(cat => {
+    const uniqueCategories = [...new Set(store.ingredients.map(ing => ing.category).filter(Boolean))].sort();
+    categoryFilterSelect.innerHTML = '<option value="">类别</option>';
+    uniqueCategories.forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
       opt.textContent = cat;
@@ -4008,27 +4027,44 @@ function populateCategorySelects() {
     });
   }
   
-  // 填充项目名称筛选下拉框
-  if (nameFilterSelect) {
-    updateNameFilterSelect();
+  // 所属科目筛选
+  const subjectFilterSelect = $('ingredient-subject-filter');
+  if (subjectFilterSelect) {
+    const uniqueSubjects = [...new Set(store.ingredients.map(ing => ing.subject).filter(Boolean))].sort();
+    subjectFilterSelect.innerHTML = '<option value="">所属科目</option>';
+    uniqueSubjects.forEach(subject => {
+      const opt = document.createElement('option');
+      opt.value = subject;
+      opt.textContent = subject;
+      subjectFilterSelect.appendChild(opt);
+    });
   }
-}
-
-// 更新项目名称筛选下拉框
-function updateNameFilterSelect() {
-  const nameFilterSelect = $('ingredient-name-filter');
-  if (!nameFilterSelect) return;
   
-  // 获取所有唯一的项目名称
-  const uniqueNames = [...new Set(store.ingredients.map(ing => ing.name).filter(Boolean))].sort();
+  // 部位筛选
+  const partFilterSelect = $('ingredient-part-filter');
+  if (partFilterSelect) {
+    const uniqueParts = [...new Set(store.ingredients.map(ing => ing.part).filter(Boolean))].sort();
+    partFilterSelect.innerHTML = '<option value="">部位</option>';
+    uniqueParts.forEach(part => {
+      const opt = document.createElement('option');
+      opt.value = part;
+      opt.textContent = part;
+      partFilterSelect.appendChild(opt);
+    });
+  }
   
-  nameFilterSelect.innerHTML = '<option value="">全部食材名称</option>';
-  uniqueNames.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    nameFilterSelect.appendChild(opt);
-  });
+  // 产地类型筛选
+  const originTypeFilterSelect = $('ingredient-origin-type-filter');
+  if (originTypeFilterSelect) {
+    const uniqueOriginTypes = [...new Set(store.ingredients.map(ing => ing.originType).filter(Boolean))].sort();
+    originTypeFilterSelect.innerHTML = '<option value="">产地类型</option>';
+    uniqueOriginTypes.forEach(type => {
+      const opt = document.createElement('option');
+      opt.value = type;
+      opt.textContent = type;
+      originTypeFilterSelect.appendChild(opt);
+    });
+  }
 }
 
 function calculatePricePer500(cost, quantity, unit) {
@@ -4573,6 +4609,9 @@ function renderIngredientsList() {
   }
   
   const { pageItems, total, totalPages } = paginatedIngredients();
+  
+  // 更新筛选下拉框选项
+  updateIngredientFilterSelects();
   
   if (pageItems.length === 0) {
     list.innerHTML = '<div class="muted" style="text-align:center; padding:20px">暂无原料数据</div>';
@@ -6110,7 +6149,7 @@ async function deleteIngredient(id) {
     
     alert('删除成功！');
     await loadIngredientsFromBackend();
-    updateNameFilterSelect();
+    updateIngredientFilterSelects();
   } catch (error) {
     console.error('删除原料失败:', error);
     alert('删除失败：' + error.message);
@@ -6561,7 +6600,7 @@ async function importIngredientsFromExcel(file) {
     
     // 重新加载列表
     await loadIngredientsFromBackend();
-    updateNameFilterSelect();
+    updateIngredientFilterSelects();
     
   } catch (error) {
     console.error('导入Excel文件失败:', error);
@@ -8382,6 +8421,7 @@ function setupIngredientsModule() {
     }
   });
   
+  // 类别筛选
   const categoryFilterEl = $('ingredient-category-filter');
   if (categoryFilterEl) categoryFilterEl.addEventListener('change', async () => {
     store.ingredientPage = 1;
@@ -8392,8 +8432,31 @@ function setupIngredientsModule() {
     }
   });
   
-  const nameFilterEl = $('ingredient-name-filter');
-  if (nameFilterEl) nameFilterEl.addEventListener('change', async () => {
+  // 所属科目筛选
+  const subjectFilterEl = $('ingredient-subject-filter');
+  if (subjectFilterEl) subjectFilterEl.addEventListener('change', async () => {
+    store.ingredientPage = 1;
+    if (backendState.token) {
+      await loadIngredientsFromBackend();
+    } else {
+      renderIngredientsList();
+    }
+  });
+  
+  // 部位筛选
+  const partFilterEl = $('ingredient-part-filter');
+  if (partFilterEl) partFilterEl.addEventListener('change', async () => {
+    store.ingredientPage = 1;
+    if (backendState.token) {
+      await loadIngredientsFromBackend();
+    } else {
+      renderIngredientsList();
+    }
+  });
+  
+  // 产地类型筛选
+  const originTypeFilterEl = $('ingredient-origin-type-filter');
+  if (originTypeFilterEl) originTypeFilterEl.addEventListener('change', async () => {
     store.ingredientPage = 1;
     if (backendState.token) {
       await loadIngredientsFromBackend();
@@ -8635,7 +8698,7 @@ function setupIngredientsModule() {
           console.error('[Save Ingredient] Failed to reload ingredient list:', reloadError);
         }
         
-        updateNameFilterSelect();
+        updateIngredientFilterSelects();
         
         // 关闭表单（不再自动重新打开）
         const card = $('ingredient-form-card');
@@ -8673,7 +8736,7 @@ function setupIngredientsModule() {
   const originalSaveApp = saveApp;
   const checkAndUpdate = () => {
     setTimeout(() => {
-      updateNameFilterSelect();
+      updateIngredientFilterSelects();
     }, 100);
   };
   
