@@ -3042,7 +3042,8 @@ async function loadIngredientsFromBackend() {
     console.log(`✓ 从后端加载了 ${ingredients.length} 条原料记录（共 ${data.total} 条）`);
     
     renderIngredientsList();
-    updateIngredientFilterSelects();
+    // 加载所有数据来填充筛选下拉框
+    await loadAllIngredientsForFilters();
     
     // 后台预加载常用分类数据（不阻塞列表显示）
     setTimeout(() => {
@@ -4006,18 +4007,18 @@ function populateCategorySelects() {
   // 这里不再单独填充，避免与动态数据冲突
 }
 
-// 更新筛选下拉框的选项（从当前数据中提取唯一值）
-function updateIngredientFilterSelects() {
-  // 确保 store.ingredients 存在且是数组
-  if (!store.ingredients || !Array.isArray(store.ingredients)) {
-    console.warn('[updateIngredientFilterSelects] store.ingredients is not available');
+// 从数据中提取唯一值并更新筛选下拉框
+function updateFilterSelectsFromData(ingredients) {
+  if (!ingredients || !Array.isArray(ingredients)) {
+    console.warn('[updateFilterSelectsFromData] ingredients is not available');
     return;
   }
   
   // 类别筛选
   const categoryFilterSelect = $('ingredient-category-filter');
   if (categoryFilterSelect) {
-    const uniqueCategories = [...new Set(store.ingredients.map(ing => ing.category).filter(Boolean))].sort();
+    const uniqueCategories = [...new Set(ingredients.map(ing => ing.category).filter(Boolean))].sort();
+    const currentValue = categoryFilterSelect.value; // 保存当前选中的值
     categoryFilterSelect.innerHTML = '<option value="">类别</option>';
     uniqueCategories.forEach(cat => {
       const opt = document.createElement('option');
@@ -4025,12 +4026,17 @@ function updateIngredientFilterSelects() {
       opt.textContent = cat;
       categoryFilterSelect.appendChild(opt);
     });
+    // 恢复之前选中的值
+    if (currentValue) {
+      categoryFilterSelect.value = currentValue;
+    }
   }
   
   // 所属科目筛选
   const subjectFilterSelect = $('ingredient-subject-filter');
   if (subjectFilterSelect) {
-    const uniqueSubjects = [...new Set(store.ingredients.map(ing => ing.subject).filter(Boolean))].sort();
+    const uniqueSubjects = [...new Set(ingredients.map(ing => ing.subject).filter(Boolean))].sort();
+    const currentValue = subjectFilterSelect.value; // 保存当前选中的值
     subjectFilterSelect.innerHTML = '<option value="">所属科目</option>';
     uniqueSubjects.forEach(subject => {
       const opt = document.createElement('option');
@@ -4038,12 +4044,17 @@ function updateIngredientFilterSelects() {
       opt.textContent = subject;
       subjectFilterSelect.appendChild(opt);
     });
+    // 恢复之前选中的值
+    if (currentValue) {
+      subjectFilterSelect.value = currentValue;
+    }
   }
   
   // 部位筛选
   const partFilterSelect = $('ingredient-part-filter');
   if (partFilterSelect) {
-    const uniqueParts = [...new Set(store.ingredients.map(ing => ing.part).filter(Boolean))].sort();
+    const uniqueParts = [...new Set(ingredients.map(ing => ing.part).filter(Boolean))].sort();
+    const currentValue = partFilterSelect.value; // 保存当前选中的值
     partFilterSelect.innerHTML = '<option value="">部位</option>';
     uniqueParts.forEach(part => {
       const opt = document.createElement('option');
@@ -4051,12 +4062,17 @@ function updateIngredientFilterSelects() {
       opt.textContent = part;
       partFilterSelect.appendChild(opt);
     });
+    // 恢复之前选中的值
+    if (currentValue) {
+      partFilterSelect.value = currentValue;
+    }
   }
   
   // 产地类型筛选
   const originTypeFilterSelect = $('ingredient-origin-type-filter');
   if (originTypeFilterSelect) {
-    const uniqueOriginTypes = [...new Set(store.ingredients.map(ing => ing.originType).filter(Boolean))].sort();
+    const uniqueOriginTypes = [...new Set(ingredients.map(ing => ing.originType).filter(Boolean))].sort();
+    const currentValue = originTypeFilterSelect.value; // 保存当前选中的值
     originTypeFilterSelect.innerHTML = '<option value="">产地类型</option>';
     uniqueOriginTypes.forEach(type => {
       const opt = document.createElement('option');
@@ -4064,7 +4080,57 @@ function updateIngredientFilterSelects() {
       opt.textContent = type;
       originTypeFilterSelect.appendChild(opt);
     });
+    // 恢复之前选中的值
+    if (currentValue) {
+      originTypeFilterSelect.value = currentValue;
+    }
   }
+}
+
+// 从后端加载所有数据用于填充筛选下拉框（不更新store.ingredients）
+async function loadAllIngredientsForFilters() {
+  if (!backendState.token) {
+    // 未登录时使用本地数据
+    updateIngredientFilterSelects();
+    return;
+  }
+  
+  try {
+    // 获取所有数据（不应用筛选条件，使用大pageSize）
+    const data = await backendRequest('/api/v1/ingredients?pageSize=10000');
+    const allIngredients = (data.items || []).map(ing => ({
+      category: ing.category || null,
+      subject: ing.subject || null,
+      part: ing.part || null,
+      originType: ing.originType || null
+    }));
+    
+    // 更新筛选下拉框
+    updateFilterSelectsFromData(allIngredients);
+  } catch (error) {
+    console.error('[loadAllIngredientsForFilters] 加载筛选选项失败:', error);
+    // 失败时使用当前页数据
+    updateIngredientFilterSelects();
+  }
+}
+
+// 更新筛选下拉框的选项（从当前数据中提取唯一值）- 保留作为降级方案
+function updateIngredientFilterSelects() {
+  // 确保 store.ingredients 存在且是数组
+  if (!store.ingredients || !Array.isArray(store.ingredients)) {
+    console.warn('[updateIngredientFilterSelects] store.ingredients is not available');
+    return;
+  }
+  
+  // 转换为相同格式
+  const ingredients = store.ingredients.map(ing => ({
+    category: ing.category || null,
+    subject: ing.subject || null,
+    part: ing.part || null,
+    originType: ing.originType || null
+  }));
+  
+  updateFilterSelectsFromData(ingredients);
 }
 
 function calculatePricePer500(cost, quantity, unit) {
