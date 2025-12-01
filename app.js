@@ -898,7 +898,8 @@ const CATEGORY_ABBREVIATION_MAP = {
   '泡沫箱': 'FOAMBOX',
   '铝箔保温袋': 'FOILBAG',
   '地址信息标签': 'ADDRESSLABEL',
-  '收纳自封袋': 'ZIPBAG'
+  '收纳自封袋': 'ZIPBAG',
+  '冰袋': 'ICEBAG'  // 新增映射
 };
 
 // 获取分类前缀
