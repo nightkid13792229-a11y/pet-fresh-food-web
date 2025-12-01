@@ -3623,6 +3623,16 @@ function updateIngredientFieldsVisibility(classification) {
       const field = $(fieldId);
       if (field) field.style.display = 'none';
     });
+    
+    // 隐藏 i-name 字段并移除 required 属性
+    const nameLabel = $('i-name-label');
+    const nameSelect = $('i-name');
+    if (nameLabel) nameLabel.style.display = 'none';
+    if (nameSelect) {
+      nameSelect.required = false;
+      nameSelect.removeAttribute('required');
+    }
+    
     return;
   }
   
@@ -3718,6 +3728,27 @@ function updateIngredientFieldsVisibility(classification) {
       }
     }
   });
+  
+  // 根据分类处理 i-name 字段的显示和 required 属性
+  const nameLabel = $('i-name-label');
+  const nameSelect = $('i-name');
+  
+  if (classification === '包材') {
+    // 包材分类：隐藏食材名称字段并移除 required 属性
+    if (nameLabel) nameLabel.style.display = 'none';
+    if (nameSelect) {
+      nameSelect.required = false;
+      nameSelect.removeAttribute('required');
+      nameSelect.value = ''; // 清空值
+    }
+  } else {
+    // 非包材分类：显示食材名称字段并设置 required 属性
+    if (nameLabel) nameLabel.style.display = '';
+    if (nameSelect) {
+      nameSelect.required = true;
+      nameSelect.setAttribute('required', 'required');
+    }
+  }
 }
 
 // ============================================
@@ -8212,6 +8243,16 @@ function setupIngredientsModule() {
         alert('请先登录');
         return;
       }
+      
+      // 移除所有隐藏字段的 required 属性，避免表单验证错误
+      const allRequiredFields = form.querySelectorAll('[required]');
+      allRequiredFields.forEach(field => {
+        const label = field.closest('label');
+        if (label && label.style.display === 'none') {
+          field.removeAttribute('required');
+          field.required = false;
+        }
+      });
       
       const id = $('ingredient-id').value;
       const classification = $('i-classification') ? $('i-classification').value.trim() : '';
