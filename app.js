@@ -3658,7 +3658,14 @@ function updateIngredientFieldsVisibility(classification) {
         'i-ediblePricePer500-label', // 可食部单价/500单位
         'i-mainFunction-label'   // 主要营养价值
       ],
-      hide: ['i-unitContent-label', 'i-weightPerUnit-label', 'i-pricePerUnit-label']
+      hide: [
+        'i-unitContent-label', 
+        'i-weightPerUnit-label', 
+        'i-pricePerUnit-label',
+        'i-mainNutrient-label',      // 不显示主要营养素
+        'i-nutrientUnit-label',      // 不显示营养素单位
+        'i-pricePer100NutrientUnit-label' // 不显示价格/100营养素单位
+      ]
     },
     // 营养补充剂分类显示的字段
     '营养补充剂': {
@@ -3707,7 +3714,10 @@ function updateIngredientFieldsVisibility(classification) {
         'i-unitContent-label', 
         'i-mainFunction-label',
         'i-pricePer500-label',
-        'i-ediblePricePer500-label'
+        'i-ediblePricePer500-label',
+        'i-mainNutrient-label',      // 不显示主要营养素
+        'i-nutrientUnit-label',      // 不显示营养素单位
+        'i-pricePer100NutrientUnit-label' // 不显示价格/100营养素单位
       ]
     }
   };
@@ -4060,6 +4070,22 @@ function updateUnitBasedLabels() {
       unitContentLabel.innerHTML = `营养素含量/${unitDisplay}`;
       if (input) {
         unitContentLabel.appendChild(input);
+      }
+    }
+    
+    // 更新"价格/100营养素单位"标签，动态显示营养素单位和主要营养素
+    const pricePer100NutrientUnitLabel = $('i-pricePer100NutrientUnit-label');
+    if (pricePer100NutrientUnitLabel) {
+      const nutrientUnit = $('i-nutrientUnit')?.value || '';
+      const mainNutrient = $('i-mainNutrient')?.value || '';
+      const nutrientUnitDisplay = nutrientUnit || '-';
+      const mainNutrientDisplay = mainNutrient || '-';
+      const labelText = `价格/100${nutrientUnitDisplay}${mainNutrientDisplay}`;
+      
+      const input = $('i-pricePer100NutrientUnit');
+      pricePer100NutrientUnitLabel.innerHTML = labelText;
+      if (input) {
+        pricePer100NutrientUnitLabel.appendChild(input);
       }
     }
   }
@@ -8351,6 +8377,24 @@ function setupIngredientsModule() {
     unitSelect.addEventListener('change', () => {
       updateUnitBasedLabels();
       updateIngredientPriceFields(); // 重新计算价格
+    });
+  }
+  
+  // 主要营养素字段变化时，更新标签文本（仅营养补充剂）
+  const mainNutrientEl = $('i-mainNutrient');
+  if (mainNutrientEl) {
+    mainNutrientEl.addEventListener('input', () => {
+      updateUnitBasedLabels();
+      updateIngredientPriceFields();
+    });
+  }
+  
+  // 营养素单位字段变化时，更新标签文本（仅营养补充剂）
+  const nutrientUnitEl = $('i-nutrientUnit');
+  if (nutrientUnitEl) {
+    nutrientUnitEl.addEventListener('change', () => {
+      updateUnitBasedLabels();
+      updateIngredientPriceFields();
     });
   }
   
