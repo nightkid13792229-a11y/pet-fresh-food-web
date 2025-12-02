@@ -9790,12 +9790,21 @@ function openRecipeForm(id = null) {
   
   if (!card || !form) return;
   
-  if (id) {
-    const recipe = store.recipes.find(x => x.id === id);
+  // 如果提供了recipeData（复制场景），使用它；否则根据id查找
+  let recipe = null;
+  if (recipeData) {
+    recipe = recipeData;
+  } else if (id) {
+    recipe = store.recipes.find(x => x.id === id);
     if (!recipe) return;
-    
-    if (title) title.textContent = '编辑食谱';
-    $('recipe-id').value = recipe.id;
+  }
+  
+  if (recipe) {
+    // 如果是复制场景（没有id或id为空），显示"新增食谱"；否则显示"编辑食谱"
+    if (title) {
+      title.textContent = (recipe.id && recipe.id.trim()) ? '编辑食谱' : '新增食谱（复制）';
+    }
+    $('recipe-id').value = recipe.id || '';
     $('r-name').value = recipe.name || '';
     $('r-lifeStage').value = recipe.lifeStage || recipe.targetGroup || 'adult';
     $('r-nutritionStandard').value = recipe.nutritionStandard || 'FEDIAF';
