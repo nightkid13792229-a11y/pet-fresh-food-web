@@ -9782,7 +9782,8 @@ function openRecipeForm(id = null) {
     $('r-fiber').value = recipe.fiber != null ? recipe.fiber : '';
     $('r-ash').value = recipe.ash != null ? recipe.ash : '';
     $('r-moisture').value = recipe.moisture != null ? recipe.moisture : '';
-    $('r-caPratio').value = recipe.caPratio != null ? recipe.caPratio : '';
+    // 兼容 caRatio（后端）和 caPratio（旧数据）
+    $('r-caPratio').value = (recipe.caRatio || recipe.caPratio) != null ? (recipe.caRatio || recipe.caPratio) : '';
     $('r-totalKcal').value = recipe.totalKcal != null ? recipe.totalKcal : '';
     $('r-totalWeight').value = recipe.totalWeight != null ? recipe.totalWeight.toFixed(2) : '';
     $('r-kcalDensity').value = recipe.kcalDensity != null ? recipe.kcalDensity.toFixed(2) : '';
