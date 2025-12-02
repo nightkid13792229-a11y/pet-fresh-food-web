@@ -9603,6 +9603,7 @@ function formatRecipeDetails(recipe) {
   const lifeStageMap = { puppy: '幼犬', adult: '成犬', senior: '老年犬', pregnancy: '妊娠期', lactation: '哺乳期' };
   const recipeTypeMap = { standard: '通用食谱', custom: '定制食谱' };
   
+  // 基本信息
   parts.push(`食谱编号：${recipe.code || '-'}`);
   parts.push(`食谱名称：${recipe.name || '-'}`);
   parts.push(`适用生命阶段：${lifeStageMap[recipe.lifeStage] || recipe.lifeStage || '-'}`);
@@ -9613,6 +9614,24 @@ function formatRecipeDetails(recipe) {
   }
   
   parts.push(`食谱类型：${recipeTypeMap[recipe.recipeType] || (recipe.isCustom ? '定制食谱' : '通用食谱')}`);
+  
+  if (recipe.description) {
+    parts.push(`食谱描述：${recipe.description}`);
+  }
+  
+  // 制作信息
+  if (recipe.cookingLoss != null) {
+    parts.push(`制作损耗：${recipe.cookingLoss}%`);
+  }
+  if (recipe.sellingPrice != null) {
+    parts.push(`食谱售价：${recipe.sellingPrice} 元`);
+  }
+  if (recipe.basePrice != null) {
+    parts.push(`基础价格：${recipe.basePrice} 元`);
+  }
+  if (recipe.defaultServings != null) {
+    parts.push(`默认份数：${recipe.defaultServings}`);
+  }
   
   // 食材列表
   if (recipe.ingredients && recipe.ingredients.length > 0) {
@@ -9633,6 +9652,8 @@ function formatRecipeDetails(recipe) {
         parts.push(`  - ${displayText}: ${item.weight} ${item.unit || ing.unit || 'g'}`);
       }
     });
+  } else {
+    parts.push(`食材列表：暂无`);
   }
   
   // 营养数据
@@ -9649,6 +9670,17 @@ function formatRecipeDetails(recipe) {
   if (recipe.totalKcal != null) parts.push(`  总热量：${recipe.totalKcal} kcal`);
   if (recipe.totalWeight != null) parts.push(`  总重量：${recipe.totalWeight} g`);
   if (recipe.kcalDensity != null) parts.push(`  热量密度：${recipe.kcalDensity} kcal/kg`);
+  
+  // 制作步骤
+  if (recipe.cookingSteps && recipe.cookingSteps.length > 0) {
+    parts.push(`制作步骤：`);
+    recipe.cookingSteps.forEach((step, index) => {
+      const stepDesc = typeof step === 'object' ? step.description : step;
+      if (stepDesc) {
+        parts.push(`  ${index + 1}. ${stepDesc}`);
+      }
+    });
+  }
   
   return `<div class="item-details">${parts.map(t => `<div>${t}</div>`).join('')}</div>`;
 }
@@ -10116,6 +10148,12 @@ function setupRecipesModule() {
       
       if (!name) {
         alert('请填写食谱名称');
+        return;
+      }
+      
+      // 验证食材列表不能为空
+      if (!currentRecipeIngredients || currentRecipeIngredients.length === 0) {
+        alert('请至少添加一个食材');
         return;
       }
       
