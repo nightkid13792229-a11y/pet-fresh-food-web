@@ -9508,8 +9508,12 @@ function renderRecipeCookingSteps() {
   stepsEl.innerHTML = currentRecipeCookingSteps.map((step, idx) => `
     <div style="display:flex; gap:8px; align-items:start; padding:8px; border:0.5px solid var(--border); border-radius:6px; background:var(--bg-secondary); margin-bottom:6px;">
       <div style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:var(--bg-tertiary); border-radius:4px; font-weight:600; font-size:13px; color:var(--text-primary); flex-shrink:0; margin-top:2px;">${idx + 1}</div>
-      <textarea data-step-index="${idx}" style="flex:1; min-height:60px; padding:8px; font-size:13px; border:0.5px solid var(--border); border-radius:4px; resize:vertical;" placeholder="请输入制作步骤...">${step || ''}</textarea>
-      <button type="button" class="btn small" data-remove-step="${idx}" style="font-size:12px; flex-shrink:0; margin-top:2px;">删除</button>
+      <textarea data-step-index="${idx}" style="flex:1; min-height:60px; padding:8px; font-size:13px; border:0.5px solid var(--border); border-radius:4px; resize:vertical;" placeholder="请输入制作步骤...">${step.description || step || ''}</textarea>
+      <div style="display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
+        ${idx > 0 ? `<button type="button" class="btn small" data-move-step-up="${idx}" style="font-size:11px; padding:4px 8px;">↑</button>` : '<div style="height:28px;"></div>'}
+        ${idx < currentRecipeCookingSteps.length - 1 ? `<button type="button" class="btn small" data-move-step-down="${idx}" style="font-size:11px; padding:4px 8px;">↓</button>` : '<div style="height:28px;"></div>'}
+        <button type="button" class="btn small" data-remove-step="${idx}" style="font-size:11px; padding:4px 8px;">删除</button>
+      </div>
     </div>
   `).join('');
   
@@ -9519,6 +9523,29 @@ function renderRecipeCookingSteps() {
       const idx = parseInt(btn.dataset.removeStep, 10);
       currentRecipeCookingSteps.splice(idx, 1);
       renderRecipeCookingSteps();
+    });
+  });
+  
+  // 绑定步骤顺序调整按钮（上移/下移）
+  stepsEl.querySelectorAll('[data-move-step-up]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.moveStepUp, 10);
+      if (idx > 0) {
+        [currentRecipeCookingSteps[idx], currentRecipeCookingSteps[idx - 1]] = 
+          [currentRecipeCookingSteps[idx - 1], currentRecipeCookingSteps[idx]];
+        renderRecipeCookingSteps();
+      }
+    });
+  });
+  
+  stepsEl.querySelectorAll('[data-move-step-down]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.moveStepDown, 10);
+      if (idx < currentRecipeCookingSteps.length - 1) {
+        [currentRecipeCookingSteps[idx], currentRecipeCookingSteps[idx + 1]] = 
+          [currentRecipeCookingSteps[idx + 1], currentRecipeCookingSteps[idx]];
+        renderRecipeCookingSteps();
+      }
     });
   });
   
