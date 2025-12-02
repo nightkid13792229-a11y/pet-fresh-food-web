@@ -10262,7 +10262,7 @@ function setupRecipesModule() {
         }
       }
       
-      // 获取提交按钮，添加加载状态
+      // 获取提交按钮，添加加载状态（在验证通过后）
       const submitBtn = form.querySelector('button[type="submit"]');
       const originalBtnText = submitBtn ? submitBtn.textContent : '';
       if (submitBtn) {
