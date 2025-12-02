@@ -9,12 +9,12 @@ import {
 
 export const listIngredientsController = async (req, res) => {
   const options = {
-    search: req.query.search || undefined,
-    category: req.query.category || undefined,
-    classification: req.query.classification || undefined,
-    subject: req.query.subject || undefined,
-    part: req.query.part || undefined,
-    originType: req.query.originType || undefined,
+    search: req.query.search && req.query.search.trim() ? req.query.search.trim() : undefined,
+    category: req.query.category && req.query.category.trim() ? req.query.category.trim() : undefined,
+    classification: req.query.classification && req.query.classification.trim() ? req.query.classification.trim() : undefined,
+    subject: req.query.subject && req.query.subject.trim() ? req.query.subject.trim() : undefined,
+    part: req.query.part && req.query.part.trim() ? req.query.part.trim() : undefined,
+    originType: req.query.originType && req.query.originType.trim() ? req.query.originType.trim() : undefined,
     page: parseInt(req.query.page, 10) || 1,
     pageSize: parseInt(req.query.pageSize, 10) || 20
   };

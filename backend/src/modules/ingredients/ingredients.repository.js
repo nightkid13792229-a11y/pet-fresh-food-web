@@ -40,35 +40,35 @@ export const findAllIngredients = async (options = {}) => {
   const params = [];
   const conditions = [];
 
-  if (search) {
+  if (search && search.trim()) {
     conditions.push('(name LIKE ? OR brand LIKE ? OR code LIKE ?)');
-    const searchPattern = `%${search}%`;
+    const searchPattern = `%${search.trim()}%`;
     params.push(searchPattern, searchPattern, searchPattern);
   }
 
-  if (category) {
+  if (category && category.trim()) {
     conditions.push('category = ?');
-    params.push(category);
+    params.push(category.trim());
   }
 
-  if (classification) {
+  if (classification && classification.trim()) {
     conditions.push('classification = ?');
-    params.push(classification);
+    params.push(classification.trim());
   }
 
-  if (subject) {
+  if (subject && subject.trim()) {
     conditions.push('subject = ?');
-    params.push(subject);
+    params.push(subject.trim());
   }
 
-  if (part) {
+  if (part && part.trim()) {
     conditions.push('part = ?');
-    params.push(part);
+    params.push(part.trim());
   }
 
-  if (originType) {
+  if (originType && originType.trim()) {
     conditions.push('origin_type = ?');
-    params.push(originType);
+    params.push(originType.trim());
   }
 
   const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
