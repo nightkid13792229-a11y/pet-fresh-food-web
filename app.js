@@ -9297,7 +9297,7 @@ function updateIndicesAfterDrag(fromIndex, toIndex) {
 // 生命阶段：成犬="C", 幼犬="Y", 老年犬="L", 哺乳期="B", 妊娠期="R"
 // 营养参考标准：AAFCO="A", FEDIAF="F", NRC="N"
 // 食谱类型：通用="T", 定制="D"
-function generateRecipeCode(lifeStage, nutritionStandard, recipeType, excludeId = null) {
+async function generateRecipeCode(lifeStage, nutritionStandard, recipeType, excludeId = null) {
   const lifeStageMap = {
     'adult': 'C',
     'puppy': 'Y',
@@ -9321,8 +9321,26 @@ function generateRecipeCode(lifeStage, nutritionStandard, recipeType, excludeId 
                  (standardMap[nutritionStandard] || 'F') + 
                  (typeMap[recipeType] || 'T');
   
+  let recipes = [];
+  
+  // 如果已登录，从后端获取所有食谱以确保全局唯一性
+  if (backendState.token) {
+    try {
+      const data = await backendRequest('/api/v1/recipes?pageSize=10000');
+      recipes = (data.items || []).map(recipe => ({
+        id: `recipe_${recipe.id}`,
+        code: recipe.code || ''
+      }));
+    } catch (error) {
+      console.warn('[generateRecipeCode] 从后端加载失败，使用本地数据:', error);
+      recipes = store.recipes;
+    }
+  } else {
+    recipes = store.recipes;
+  }
+  
   // 找到相同前缀的所有食谱，计算下一个编号
-  const samePrefix = store.recipes
+  const samePrefix = recipes
     .filter(recipe => {
       if (excludeId && recipe.id === excludeId) return false;
       if (!recipe.code) return false;
@@ -9349,13 +9367,13 @@ function generateRecipeCode(lifeStage, nutritionStandard, recipeType, excludeId 
 }
 
 // 自动生成食谱编号
-function autoGenerateRecipeCode() {
+async function autoGenerateRecipeCode() {
   const lifeStage = $('r-lifeStage').value || 'adult';
   const nutritionStandard = $('r-nutritionStandard').value || 'FEDIAF';
   const recipeType = $('r-recipeType').value || 'standard';
   const recipeId = $('recipe-id').value || null;
   
-  const code = generateRecipeCode(lifeStage, nutritionStandard, recipeType, recipeId);
+  const code = await generateRecipeCode(lifeStage, nutritionStandard, recipeType, recipeId);
   const codeEl = $('r-code');
   if (codeEl) {
     codeEl.value = code;
@@ -9761,9 +9779,17 @@ function openRecipeForm(id = null) {
       autoGenerateRecipeCode();
     }
     
-    // 设置制作损耗、售价
+    // 设置制作损耗、售价、基础价格、默认份数
     $('r-cookingLoss').value = recipe.cookingLoss != null ? recipe.cookingLoss : 7;
     $('r-sellingPrice').value = recipe.sellingPrice != null ? recipe.sellingPrice : '';
+    $('r-basePrice').value = recipe.basePrice != null ? recipe.basePrice : '';
+    $('r-defaultServings').value = recipe.defaultServings != null ? recipe.defaultServings : '';
+    
+    // 设置描述
+    const descEl = $('r-description');
+    if (descEl) {
+      descEl.value = recipe.description || '';
+    }
     
     // 设置制作流程
     currentRecipeCookingSteps = Array.isArray(recipe.cookingSteps) ? [...recipe.cookingSteps] : [];
@@ -9801,6 +9827,12 @@ function openRecipeForm(id = null) {
     $('r-recipeType').value = 'standard';
     $('r-cookingLoss').value = 7;
     $('r-sellingPrice').value = '';
+    $('r-basePrice').value = '';
+    $('r-defaultServings').value = '';
+    const descEl = $('r-description');
+    if (descEl) {
+      descEl.value = '';
+    }
     selectedIngredientId = null;
     editingIngredientIndex = null;
     const searchInput = $('r-ingredient-search');
@@ -10061,6 +10093,8 @@ function setupRecipesModule() {
         kcalDensity: kcalDensity > 0 ? kcalDensity : null,
         cookingLoss: parseInt($('r-cookingLoss').value) || 7,
         sellingPrice: $('r-sellingPrice').value ? parseFloat($('r-sellingPrice').value) : null,
+        basePrice: $('r-basePrice').value ? parseFloat($('r-basePrice').value) : null,
+        defaultServings: $('r-defaultServings').value ? parseInt($('r-defaultServings').value, 10) : null,
         cookingSteps: currentRecipeCookingSteps.map((step, index) => ({
           stepOrder: step.stepOrder || (index + 1),
           description: step.description || ''
