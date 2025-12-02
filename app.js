@@ -9731,6 +9731,7 @@ function renderRecipesList() {
         <div class="item-actions">
           <button class="btn small" data-detail="${recipe.id}">详细信息</button>
           <button class="btn small" data-edit="${recipe.id}">编辑</button>
+          <button class="btn small" data-copy="${recipe.id}">复制</button>
           <button class="btn small" data-del="${recipe.id}">删除</button>
         </div>
       </div>
@@ -9759,6 +9760,14 @@ function renderRecipesList() {
       openRecipeForm(btn.dataset.edit);
       const formCard = $('recipe-form-card');
       if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  
+  // 绑定复制按钮
+  list.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.copy;
+      copyRecipe(id);
     });
   });
   
