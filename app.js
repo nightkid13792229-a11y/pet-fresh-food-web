@@ -2179,7 +2179,7 @@ function generateQuoteComparison() {
       { label: '膳食纤维（干物质占比）', value: recipe.fiber != null ? formatPercentInteger(recipe.fiber) : '-' },
       { label: '灰分（干物质占比）', value: recipe.ash != null ? formatPercentInteger(recipe.ash) : '-' },
       { label: '水分', value: recipe.moisture != null ? formatPercentInteger(recipe.moisture) : '-' },
-      { label: '钙磷比', value: recipe.caPratio || '-' },
+      { label: '钙磷比', value: (recipe.caRatio || recipe.caPratio) || '-' },
       { label: '热量密度', value: recipe.kcalDensity != null ? `${Math.round(recipe.kcalDensity)} kcal/kg` : '-' }
     ];
     items.push({
@@ -2990,7 +2990,7 @@ async function loadRecipesFromBackend() {
         fiber: recipe.fiber || null,
         ash: recipe.ash || null,
         moisture: recipe.moisture || null,
-        caRatio: recipe.caRatio || null,
+        caRatio: recipe.caRatio || recipe.caPratio || null, // 兼容旧字段名
         totalKcal: recipe.totalKcal || null,
         totalWeight: recipe.totalWeight || null,
         kcalDensity: recipe.kcalDensity || null,
@@ -9598,7 +9598,9 @@ function formatRecipeDetails(recipe) {
   if (recipe.fiber != null) parts.push(`  膳食纤维：${recipe.fiber}%`);
   if (recipe.ash != null) parts.push(`  灰分：${recipe.ash}%`);
   if (recipe.moisture != null) parts.push(`  水分：${recipe.moisture}%`);
-  if (recipe.caPratio != null) parts.push(`  钙磷比：${recipe.caPratio}`);
+  // 兼容 caRatio（后端）和 caPratio（旧数据）
+  const caRatio = recipe.caRatio || recipe.caPratio;
+  if (caRatio != null) parts.push(`  钙磷比：${caRatio}`);
   if (recipe.totalKcal != null) parts.push(`  总热量：${recipe.totalKcal} kcal`);
   if (recipe.totalWeight != null) parts.push(`  总重量：${recipe.totalWeight} g`);
   if (recipe.kcalDensity != null) parts.push(`  热量密度：${recipe.kcalDensity} kcal/kg`);
