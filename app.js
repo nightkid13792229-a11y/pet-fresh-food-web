@@ -9645,7 +9645,15 @@ function calculateRecipeKcalDensity() {
 // 格式化食谱详细信息
 function formatRecipeDetails(recipe) {
   const parts = [];
-  const lifeStageMap = { puppy: '幼犬', adult: '成犬', senior: '老年犬', pregnancy: '妊娠期', lactation: '哺乳期' };
+  // 生命阶段映射（统一为幼年期/成年期，兼容旧数据）
+  const lifeStageMap = { 
+    puppy: '幼年期', 
+    adult: '成年期',
+    // 兼容旧数据，但显示时统一归类
+    senior: '成年期', 
+    pregnancy: '成年期', 
+    lactation: '成年期' 
+  };
   const recipeTypeMap = { standard: '通用食谱', custom: '定制食谱' };
   
   // 基本信息
@@ -9787,7 +9795,15 @@ function renderRecipesList() {
     return;
   }
   
-  const lifeStageMap = { puppy: '幼犬', adult: '成犬', senior: '老年犬', pregnancy: '妊娠期', lactation: '哺乳期' };
+  // 生命阶段映射（统一为幼年期/成年期，兼容旧数据）
+  const lifeStageMap = { 
+    puppy: '幼年期', 
+    adult: '成年期',
+    // 兼容旧数据，但显示时统一归类
+    senior: '成年期', 
+    pregnancy: '成年期', 
+    lactation: '成年期' 
+  };
   const recipeTypeMap = { standard: '通用食谱', custom: '定制食谱' };
   
   list.innerHTML = pageItems.map(recipe => {

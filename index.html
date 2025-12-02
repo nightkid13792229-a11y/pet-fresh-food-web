@@ -161,11 +161,8 @@
           <input id="quote-recipe-search" type="text" placeholder="搜索：食谱名称/编号..." style="flex:1; min-width:220px;" />
           <select id="quote-lifeStage-filter" style="width:180px; min-width:160px;">
             <option value="">全部生命阶段</option>
-            <option value="puppy">幼犬</option>
-            <option value="adult">成犬</option>
-            <option value="senior">老年犬</option>
-            <option value="pregnancy">妊娠期</option>
-            <option value="lactation">哺乳期</option>
+            <option value="puppy">幼年期</option>
+            <option value="adult">成年期</option>
           </select>
         </div>
         <div id="quote-selected-info" class="muted" style="margin-bottom:8px; font-size:12px;">已选择 0 个食谱</div>
@@ -194,11 +191,8 @@
           <input id="recipe-search" type="text" placeholder="搜索：食谱名称..." style="flex:1" />
           <select id="recipe-lifeStage-filter" style="width:150px">
             <option value="">全部生命阶段</option>
-            <option value="puppy">幼犬</option>
-            <option value="adult">成犬</option>
-            <option value="senior">老年犬</option>
-            <option value="pregnancy">妊娠期</option>
-            <option value="lactation">哺乳期</option>
+            <option value="puppy">幼年期</option>
+            <option value="adult">成年期</option>
           </select>
           <select id="recipe-custom-filter" style="width:120px">
             <option value="">全部</option>
@@ -235,11 +229,8 @@
             <label>食谱名称<input id="r-name" type="text" required /></label>
             <label>适用生命阶段
               <select id="r-lifeStage">
-                <option value="puppy">幼犬</option>
-                <option value="adult" selected>成犬</option>
-                <option value="senior">老年犬</option>
-                <option value="pregnancy">妊娠期</option>
-                <option value="lactation">哺乳期</option>
+                <option value="puppy">幼年期</option>
+                <option value="adult" selected>成年期</option>
               </select>
             </label>
             <label>营养参考标准
@@ -908,11 +899,8 @@
               <label>食谱名称<input id="or-name" type="text" required /></label>
               <label>适用生命阶段
                 <select id="or-lifeStage">
-                  <option value="puppy">幼犬</option>
-                  <option value="adult" selected>成犬</option>
-                  <option value="senior">老年犬</option>
-                  <option value="pregnancy">妊娠期</option>
-                  <option value="lactation">哺乳期</option>
+                  <option value="puppy">幼年期</option>
+                  <option value="adult" selected>成年期</option>
                 </select>
               </label>
               <label>营养参考标准
@@ -1123,7 +1111,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="app.js?v=20241202-5"></script>
+    <script src="app.js?v=20241202-6"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
