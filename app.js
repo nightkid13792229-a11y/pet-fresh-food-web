@@ -17,6 +17,8 @@ const store = {
   ingredientPageSize: 10,
   recipePage: 1,
   recipePageSize: 10,
+  totalRecipes: 0, // 后端返回的总数
+  recipeTotalPages: 1, // 后端返回的总页数
   orderPage: 1,
   orderPageSize: 10
 };
@@ -1314,6 +1316,13 @@ function switchView(view) {
       setTimeout(async () => {
         await loadIngredientsFromBackend();
         await loadAllIngredientsForFilters(); // 加载所有数据填充筛选下拉框
+      }, 100);
+    }
+    
+    // 如果切换到食谱视图，从后端加载数据
+    if (view === 'recipes' && backendState.token) {
+      setTimeout(async () => {
+        await loadRecipesFromBackend();
       }, 100);
     } else if (view === 'inventory') {
       setTimeout(() => {
@@ -2924,6 +2933,113 @@ async function deleteCustomer(id) {
     store.customers = store.customers.filter(c => c.id !== id);
     saveApp();
     renderCustomersList();
+  }
+}
+
+// 从后端加载食谱数据
+async function loadRecipesFromBackend() {
+  if (!backendState.token) {
+    console.warn('未登录，无法加载食谱数据');
+    store.recipes = [];
+    store.totalRecipes = 0;
+    store.recipeTotalPages = 1;
+    renderRecipesList();
+    return;
+  }
+  
+  try {
+    const search = $('recipe-search')?.value || '';
+    const lifeStage = $('recipe-lifeStage-filter')?.value || '';
+    const customFilter = $('recipe-custom-filter')?.value || '';
+    let recipeType = undefined;
+    
+    // 将customFilter转换为recipeType
+    if (customFilter === 'true') {
+      recipeType = 'custom';
+    } else if (customFilter === 'false') {
+      recipeType = 'standard';
+    }
+    
+    const params = new URLSearchParams({
+      page: store.recipePage || 1,
+      pageSize: store.recipePageSize || 10
+    });
+    
+    if (search && search.trim()) params.append('search', search.trim());
+    if (lifeStage && lifeStage.trim()) params.append('lifeStage', lifeStage.trim());
+    if (recipeType) params.append('recipeType', recipeType);
+    
+    const data = await backendRequest(`/api/v1/recipes?${params.toString()}`);
+    
+    // 转换数据格式（将后端返回的数据转换为前端格式）
+    const recipes = (data.items || []).map(recipe => {
+      return {
+        id: `recipe_${recipe.id}`, // 使用recipe_前缀避免ID冲突
+        code: recipe.code || '',
+        name: recipe.name || '',
+        description: recipe.description || '',
+        lifeStage: recipe.lifeStage || null,
+        recipeType: recipe.recipeType || 'standard',
+        software: recipe.software || 'ADF',
+        nutritionStandard: recipe.nutritionStandard || 'FEDIAF',
+        cookingLoss: recipe.cookingLoss !== undefined ? recipe.cookingLoss : 7,
+        sellingPrice: recipe.sellingPrice || null,
+        protein: recipe.protein || null,
+        fat: recipe.fat || null,
+        carb: recipe.carb || null,
+        fiber: recipe.fiber || null,
+        ash: recipe.ash || null,
+        moisture: recipe.moisture || null,
+        caRatio: recipe.caRatio || null,
+        totalKcal: recipe.totalKcal || null,
+        totalWeight: recipe.totalWeight || null,
+        kcalDensity: recipe.kcalDensity || null,
+        basePrice: recipe.basePrice || null,
+        defaultServings: recipe.defaultServings || null,
+        ingredients: (recipe.ingredients || []).map(ing => ({
+          ingredientId: ing.ingredientId,
+          weight: ing.weight,
+          unit: ing.unit || 'g',
+          ingredientName: ing.ingredientName,
+          ingredientCategory: ing.ingredientCategory,
+          ingredientCode: ing.ingredientCode
+        })),
+        cookingSteps: (recipe.cookingSteps || []).map(step => ({
+          stepOrder: step.stepOrder,
+          description: step.description
+        })),
+        createdAt: recipe.createdAt ? new Date(recipe.createdAt).getTime() : Date.now(),
+        updatedAt: recipe.updatedAt ? new Date(recipe.updatedAt).getTime() : Date.now(),
+        // 保存后端ID用于更新和删除
+        _backendId: recipe.id
+      };
+    });
+    
+    // 更新store
+    store.recipes = recipes;
+    store.totalRecipes = data.total || 0;
+    store.recipeTotalPages = data.totalPages || 1;
+    
+    console.log(`✓ 从后端加载了 ${recipes.length} 条食谱记录（共 ${data.total} 条）`);
+    
+    renderRecipesList();
+  } catch (error) {
+    console.error('加载食谱列表失败:', error);
+    // 如果是401错误，不显示alert，只显示空列表
+    if (error.message && error.message.includes('401')) {
+      console.warn('未登录或token过期，请重新登录');
+      store.recipes = [];
+      store.totalRecipes = 0;
+      store.recipeTotalPages = 1;
+      renderRecipesList();
+    } else {
+      // 其他错误才显示alert
+      alert('加载食谱列表失败: ' + (error.message || '未知错误'));
+      store.recipes = [];
+      store.totalRecipes = 0;
+      store.recipeTotalPages = 1;
+      renderRecipesList();
+    }
   }
 }
 
@@ -9492,6 +9608,16 @@ function formatRecipeDetails(recipe) {
 
 // 分页食谱
 function paginatedRecipes() {
+  // 如果使用后端数据，直接返回当前页数据（后端已处理分页和搜索）
+  if (backendState.token && store.totalRecipes !== undefined) {
+    return {
+      pageItems: store.recipes,
+      total: store.totalRecipes || store.recipes.length,
+      totalPages: store.recipeTotalPages || 1
+    };
+  }
+  
+  // 本地数据：客户端分页和搜索（仅用于未登录时的降级方案）
   const searchQ = ($('recipe-search').value || '').trim().toLowerCase();
   const lifeStageFilter = ($('recipe-lifeStage-filter').value || '').trim();
   const customFilter = ($('recipe-custom-filter').value || '').trim();
@@ -9692,13 +9818,33 @@ function openRecipeForm(id = null) {
 }
 
 // 删除食谱
-function deleteRecipe(id) {
+async function deleteRecipe(id) {
   if (!confirm('确定要删除这个食谱吗？')) return;
-  const idx = store.recipes.findIndex(x => x.id === id);
-  if (idx >= 0) {
-    store.recipes.splice(idx, 1);
-    saveApp();
-    renderRecipesList();
+  
+  const recipe = store.recipes.find(x => x.id === id);
+  if (!recipe) return;
+  
+  // 如果有后端ID，调用后端API删除
+  if (backendState.token && recipe._backendId) {
+    try {
+      await backendRequest(`/api/v1/recipes/${recipe._backendId}`, {
+        method: 'DELETE'
+      });
+      console.log('✓ 食谱已从后端删除');
+      await loadRecipesFromBackend();
+    } catch (error) {
+      console.error('删除食谱失败:', error);
+      alert('删除食谱失败: ' + (error.message || '未知错误'));
+      return;
+    }
+  } else {
+    // 本地数据：从store中删除
+    const idx = store.recipes.findIndex(x => x.id === id);
+    if (idx >= 0) {
+      store.recipes.splice(idx, 1);
+      saveApp();
+      renderRecipesList();
+    }
   }
 }
 // 设置食谱模块
@@ -9780,7 +9926,11 @@ function setupRecipesModule() {
   if (searchEl) {
     searchEl.addEventListener('input', () => {
       store.recipePage = 1;
-      renderRecipesList();
+      if (backendState.token) {
+        loadRecipesFromBackend();
+      } else {
+        renderRecipesList();
+      }
     });
   }
   
@@ -9788,7 +9938,11 @@ function setupRecipesModule() {
   if (lifeStageFilterEl) {
     lifeStageFilterEl.addEventListener('change', () => {
       store.recipePage = 1;
-      renderRecipesList();
+      if (backendState.token) {
+        loadRecipesFromBackend();
+      } else {
+        renderRecipesList();
+      }
     });
   }
   
@@ -9796,28 +9950,40 @@ function setupRecipesModule() {
   if (customFilterEl) {
     customFilterEl.addEventListener('change', () => {
       store.recipePage = 1;
-      renderRecipesList();
+      if (backendState.token) {
+        loadRecipesFromBackend();
+      } else {
+        renderRecipesList();
+      }
     });
   }
   
   // 分页
   const prevBtn = $('recipes-prev');
   if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
+    prevBtn.addEventListener('click', async () => {
       if (store.recipePage > 1) {
         store.recipePage--;
-        renderRecipesList();
+        if (backendState.token) {
+          await loadRecipesFromBackend();
+        } else {
+          renderRecipesList();
+        }
       }
     });
   }
   
   const nextBtn = $('recipes-next');
   if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
+    nextBtn.addEventListener('click', async () => {
       const { totalPages } = paginatedRecipes();
       if (store.recipePage < totalPages) {
         store.recipePage++;
-        renderRecipesList();
+        if (backendState.token) {
+          await loadRecipesFromBackend();
+        } else {
+          renderRecipesList();
+        }
       }
     });
   }
@@ -9831,10 +9997,10 @@ function setupRecipesModule() {
   // 表单提交
   const form = $('recipe-form');
   if (form) {
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      const id = $('recipe-id').value || genId();
+      const id = $('recipe-id').value;
       const name = $('r-name').value.trim();
       
       if (!name) {
@@ -9844,7 +10010,7 @@ function setupRecipesModule() {
       
       // 验证钙磷比格式
       const caPratioInput = $('r-caPratio').value.trim();
-      let caPratio = null;
+      let caRatio = null;
       if (caPratioInput) {
         // 验证格式：数字:数字，如 1.2:1
         const ratioPattern = /^[0-9]+(\.[0-9]+)?:[0-9]+(\.[0-9]+)?$/;
@@ -9852,7 +10018,7 @@ function setupRecipesModule() {
           alert('钙磷比格式不正确，请输入如 1.2:1 的格式');
           return;
         }
-        caPratio = caPratioInput;
+        caRatio = caPratioInput;
       }
       
       // 计算总重量
@@ -9867,10 +10033,10 @@ function setupRecipesModule() {
       autoGenerateRecipeCode();
       const code = $('r-code').value.trim();
       
-      const record = {
-        id,
-        code: code,
+      const payload = {
+        code: code || null,
         name: name,
+        description: $('r-description')?.value?.trim() || null,
         lifeStage: $('r-lifeStage').value || 'adult',
         nutritionStandard: $('r-nutritionStandard').value || 'FEDIAF',
         software: $('r-software').value || 'ADF',
@@ -9878,7 +10044,7 @@ function setupRecipesModule() {
         ingredients: currentRecipeIngredients.map(item => ({
           ingredientId: item.ingredientId,
           weight: item.weight,
-          unit: item.unit
+          unit: item.unit || 'g'
         })),
         protein: $('r-protein').value ? parseFloat($('r-protein').value) : null,
         fat: $('r-fat').value ? parseFloat($('r-fat').value) : null,
@@ -9886,34 +10052,82 @@ function setupRecipesModule() {
         fiber: $('r-fiber').value ? parseFloat($('r-fiber').value) : null,
         ash: $('r-ash').value ? parseFloat($('r-ash').value) : null,
         moisture: $('r-moisture').value ? parseFloat($('r-moisture').value) : null,
-        caPratio: caPratio,
+        caRatio: caRatio,
         totalKcal: $('r-totalKcal').value ? parseFloat($('r-totalKcal').value) : null,
         totalWeight: totalWeight > 0 ? totalWeight : null,
         kcalDensity: kcalDensity > 0 ? kcalDensity : null,
         cookingLoss: parseInt($('r-cookingLoss').value) || 7,
         sellingPrice: $('r-sellingPrice').value ? parseFloat($('r-sellingPrice').value) : null,
-        cookingSteps: currentRecipeCookingSteps.length > 0 ? [...currentRecipeCookingSteps] : [],
-        updatedAt: Date.now()
+        cookingSteps: currentRecipeCookingSteps.map((step, index) => ({
+          stepOrder: step.stepOrder || (index + 1),
+          description: step.description || ''
+        }))
       };
       
-      const existsIdx = store.recipes.findIndex(x => x.id === id);
-      if (existsIdx >= 0) {
-        record.createdAt = store.recipes[existsIdx].createdAt;
-        store.recipes.splice(existsIdx, 1, record);
+      // 如果有后端ID，调用更新API；否则调用创建API
+      if (backendState.token) {
+        try {
+          const recipe = id ? store.recipes.find(x => x.id === id) : null;
+          const backendId = recipe?._backendId;
+          
+          if (backendId) {
+            // 更新
+            await backendRequest(`/api/v1/recipes/${backendId}`, {
+              method: 'PUT',
+              body: JSON.stringify(payload)
+            });
+            console.log('✓ 食谱已更新到后端');
+          } else {
+            // 创建
+            await backendRequest('/api/v1/recipes', {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+            console.log('✓ 食谱已保存到后端');
+          }
+          
+          // 重新加载列表
+          await loadRecipesFromBackend();
+          
+          // 关闭表单
+          const card = $('recipe-form-card');
+          if (card) card.style.display = 'none';
+        } catch (error) {
+          console.error('保存食谱失败:', error);
+          alert('保存食谱失败: ' + (error.message || '未知错误'));
+        }
       } else {
-        record.createdAt = Date.now();
-        store.recipes.unshift(record);
+        // 本地数据：保存到store
+        const record = {
+          id: id || genId(),
+          ...payload,
+          caPratio: caRatio, // 兼容旧字段名
+          updatedAt: Date.now()
+        };
+        
+        const existsIdx = store.recipes.findIndex(x => x.id === record.id);
+        if (existsIdx >= 0) {
+          record.createdAt = store.recipes[existsIdx].createdAt;
+          store.recipes.splice(existsIdx, 1, record);
+        } else {
+          record.createdAt = Date.now();
+          store.recipes.unshift(record);
+        }
+        
+        saveApp();
+        const card = $('recipe-form-card');
+        if (card) card.style.display = 'none';
+        renderRecipesList();
       }
-      
-      saveApp();
-      const card = $('recipe-form-card');
-      if (card) card.style.display = 'none';
-      renderRecipesList();
     });
   }
   
-  // 初始渲染
-  renderRecipesList();
+  // 初始渲染：如果已登录，从后端加载；否则使用本地数据
+  if (backendState.token) {
+    loadRecipesFromBackend();
+  } else {
+    renderRecipesList();
+  }
 }
 
 // 暴露给全局
