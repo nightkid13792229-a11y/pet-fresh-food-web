@@ -9782,8 +9782,37 @@ function renderRecipesList() {
   $('recipes-next').disabled = store.recipePage >= totalPages;
 }
 
+// 复制食谱
+function copyRecipe(id) {
+  const recipe = store.recipes.find(x => x.id === id);
+  if (!recipe) {
+    alert('食谱不存在');
+    return;
+  }
+  
+  // 创建副本数据
+  const copiedRecipe = {
+    ...recipe,
+    id: '', // 清空ID，作为新食谱
+    name: (recipe.name || '') + '（副本）',
+    code: '', // 清空编号，会自动生成新编号
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    _backendId: undefined // 清空后端ID
+  };
+  
+  // 打开表单并填充副本数据
+  openRecipeForm(null, copiedRecipe);
+  
+  // 滚动到表单
+  const formCard = $('recipe-form-card');
+  if (formCard) {
+    formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 // 打开食谱表单
-function openRecipeForm(id = null) {
+function openRecipeForm(id = null, recipeData = null) {
   const card = $('recipe-form-card');
   const title = $('recipe-form-title');
   const form = $('recipe-form');
