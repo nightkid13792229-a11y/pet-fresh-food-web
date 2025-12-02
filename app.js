@@ -8943,11 +8943,11 @@ let currentRecipeCookingSteps = [];
 let selectedIngredientId = null;
 
 // 搜索原料并显示结果
-function searchIngredients(query) {
+async function searchIngredients(query) {
   const resultsEl = $('r-ingredient-search-results');
   if (!resultsEl) return;
   
-  const q = (query || '').trim().toLowerCase();
+  const q = (query || '').trim();
   
   if (!q) {
     resultsEl.style.display = 'none';
@@ -8955,14 +8955,48 @@ function searchIngredients(query) {
     return;
   }
   
-  // 搜索原料（按名称、类别、品牌）
-  const matches = store.ingredients.filter(ing => {
-    if (!ing.category || !ing.name) return false;
-    const name = (ing.name || '').toLowerCase();
-    const category = (ing.category || '').toLowerCase();
-    const brand = (ing.brand || '').toLowerCase();
-    return name.includes(q) || category.includes(q) || brand.includes(q);
-  }).slice(0, 10); // 最多显示10个结果
+  let matches = [];
+  
+  // 优先从后端搜索
+  if (backendState.token) {
+    try {
+      const params = new URLSearchParams({
+        search: q,
+        pageSize: 10 // 最多显示10个结果
+      });
+      const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+      matches = (data.items || []).map(ing => ({
+        id: `ingredient_${ing.id}`,
+        _backendId: ing.id,
+        name: ing.name,
+        description: ing.description,
+        brand: ing.brand,
+        category: ing.category,
+        unit: ing.unit || 'g'
+      }));
+    } catch (error) {
+      console.warn('[searchIngredients] 后端搜索失败，使用本地数据:', error);
+      // 后端搜索失败时，回退到本地搜索
+      const qLower = q.toLowerCase();
+      matches = store.ingredients.filter(ing => {
+        if (!ing.category || !ing.name) return false;
+        const name = (ing.name || '').toLowerCase();
+        const category = (ing.category || '').toLowerCase();
+        const brand = (ing.brand || '').toLowerCase();
+        return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower);
+      }).slice(0, 10);
+    }
+  } else {
+    // 本地数据搜索
+    const qLower = q.toLowerCase();
+    matches = store.ingredients.filter(ing => {
+      if (!ing.category || !ing.name) return false;
+      const name = (ing.name || '').toLowerCase();
+      const category = (ing.category || '').toLowerCase();
+      const brand = (ing.brand || '').toLowerCase();
+      return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower);
+    }).slice(0, 10);
+  }
   
   if (matches.length === 0) {
     resultsEl.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-secondary);">未找到匹配的原料</div>';
@@ -8973,7 +9007,7 @@ function searchIngredients(query) {
   resultsEl.innerHTML = matches.map(ing => {
     const unit = ing.unit || 'g';
     return `
-      <div class="ingredient-search-item" data-id="${ing.id}" style="padding:8px 12px; cursor:pointer; border-bottom:0.5px solid var(--border); transition:background 0.2s;"
+      <div class="ingredient-search-item" data-id="${ing.id}" data-backend-id="${ing._backendId || ''}" style="padding:8px 12px; cursor:pointer; border-bottom:0.5px solid var(--border); transition:background 0.2s;"
            onmouseover="this.style.background='var(--bg-secondary)'"
            onmouseout="this.style.background=''">
         <div style="font-weight:500;">${ing.name || ''}${ing.description ? '-' + ing.description : ''}${ing.brand ? '（' + ing.brand + '）' : ''}</div>
@@ -8986,7 +9020,18 @@ function searchIngredients(query) {
   resultsEl.querySelectorAll('.ingredient-search-item').forEach(item => {
     item.addEventListener('click', () => {
       const id = item.dataset.id;
-      const ing = store.ingredients.find(i => i.id === id);
+      const backendId = item.dataset.backendId;
+      // 尝试从store中找到，如果找不到，使用后端ID
+      let ing = store.ingredients.find(i => i.id === id);
+      if (!ing && backendId) {
+        // 如果本地找不到，创建一个临时对象
+        ing = {
+          id: id,
+          _backendId: parseInt(backendId, 10),
+          name: item.querySelector('div').textContent.split('（')[0].split('-')[0].trim(),
+          unit: item.querySelector('div:last-child').textContent.replace('单位: ', '').trim()
+        };
+      }
       if (ing) {
         selectedIngredientId = id;
         const searchInput = $('r-ingredient-search');
@@ -9967,6 +10012,14 @@ async function deleteRecipe(id) {
   const recipe = store.recipes.find(x => x.id === id);
   if (!recipe) return;
   
+  // 获取删除按钮，添加加载状态
+  const deleteBtn = document.querySelector(`[data-del="${id}"]`);
+  const originalBtnText = deleteBtn ? deleteBtn.textContent : '';
+  if (deleteBtn) {
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = '删除中...';
+  }
+  
   // 如果有后端ID，调用后端API删除
   if (backendState.token && recipe._backendId) {
     try {
@@ -9975,9 +10028,21 @@ async function deleteRecipe(id) {
       });
       console.log('✓ 食谱已从后端删除');
       await loadRecipesFromBackend();
+      
+      // 恢复按钮状态
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = originalBtnText;
+      }
     } catch (error) {
       console.error('删除食谱失败:', error);
       alert('删除食谱失败: ' + (error.message || '未知错误'));
+      
+      // 恢复按钮状态
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = originalBtnText;
+      }
       return;
     }
   } else {
@@ -9987,6 +10052,12 @@ async function deleteRecipe(id) {
       store.recipes.splice(idx, 1);
       saveApp();
       renderRecipesList();
+    }
+    
+    // 恢复按钮状态
+    if (deleteBtn) {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = originalBtnText;
     }
   }
 }
@@ -10014,8 +10085,12 @@ function setupRecipesModule() {
   // 原料搜索功能
   const searchInput = $('r-ingredient-search');
   if (searchInput) {
+    let searchTimeout;
     searchInput.addEventListener('input', (e) => {
-      searchIngredients(e.target.value);
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchIngredients(e.target.value);
+      }, 300); // 防抖，300ms后执行
     });
     
     // 点击外部关闭搜索结果
@@ -10157,6 +10232,44 @@ function setupRecipesModule() {
         return;
       }
       
+      // 验证食材ID有效性（如果有后端连接）
+      if (backendState.token) {
+        const invalidIngredients = [];
+        for (const item of currentRecipeIngredients) {
+          if (!item.ingredientId) {
+            invalidIngredients.push('存在无效的食材ID');
+            break;
+          }
+          // 检查本地store中是否存在，如果不存在，尝试从后端验证
+          const localIng = store.ingredients.find(i => i.id === item.ingredientId);
+          if (!localIng) {
+            // 如果本地找不到，尝试从后端获取（使用_backendId）
+            const backendId = item._backendId || (item.ingredientId.toString().startsWith('ingredient_') ? parseInt(item.ingredientId.replace('ingredient_', ''), 10) : null);
+            if (backendId) {
+              try {
+                await backendRequest(`/api/v1/ingredients/${backendId}`);
+              } catch (error) {
+                invalidIngredients.push(`食材ID ${backendId} 不存在`);
+              }
+            } else {
+              invalidIngredients.push('存在无效的食材ID');
+            }
+          }
+        }
+        if (invalidIngredients.length > 0) {
+          alert('食材验证失败：' + invalidIngredients.join('、'));
+          return;
+        }
+      }
+      
+      // 获取提交按钮，添加加载状态
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn ? submitBtn.textContent : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '保存中...';
+      }
+      
       // 验证钙磷比格式
       const caPratioInput = $('r-caPratio').value.trim();
       let caRatio = null;
@@ -10190,11 +10303,18 @@ function setupRecipesModule() {
         nutritionStandard: $('r-nutritionStandard').value || 'FEDIAF',
         software: $('r-software').value || 'ADF',
         recipeType: $('r-recipeType').value || 'standard',
-        ingredients: currentRecipeIngredients.map(item => ({
-          ingredientId: item.ingredientId,
-          weight: item.weight,
-          unit: item.unit || 'g'
-        })),
+        ingredients: currentRecipeIngredients.map(item => {
+          // 提取后端ID（如果存在）
+          const backendId = item._backendId || (item.ingredientId && item.ingredientId.toString().startsWith('ingredient_') 
+            ? parseInt(item.ingredientId.replace('ingredient_', ''), 10) 
+            : (typeof item.ingredientId === 'number' ? item.ingredientId : null));
+          
+          return {
+            ingredientId: backendId || item.ingredientId,
+            weight: item.weight,
+            unit: item.unit || 'g'
+          };
+        }),
         protein: $('r-protein').value ? parseFloat($('r-protein').value) : null,
         fat: $('r-fat').value ? parseFloat($('r-fat').value) : null,
         carb: $('r-carb').value ? parseFloat($('r-carb').value) : null,
@@ -10209,10 +10329,16 @@ function setupRecipesModule() {
         sellingPrice: $('r-sellingPrice').value ? parseFloat($('r-sellingPrice').value) : null,
         basePrice: $('r-basePrice').value ? parseFloat($('r-basePrice').value) : null,
         defaultServings: $('r-defaultServings').value ? parseInt($('r-defaultServings').value, 10) : null,
-        cookingSteps: currentRecipeCookingSteps.map((step, index) => ({
-          stepOrder: step.stepOrder || (index + 1),
-          description: step.description || ''
-        }))
+        cookingSteps: currentRecipeCookingSteps
+          .map((step, index) => {
+            // 处理不同格式的步骤数据
+            const description = typeof step === 'string' ? step : (step.description || '');
+            return {
+              stepOrder: (typeof step === 'object' && step.stepOrder) ? step.stepOrder : (index + 1),
+              description: description
+            };
+          })
+          .filter(step => step.description && step.description.trim()) // 过滤掉空的步骤描述
       };
       
       // 如果有后端ID，调用更新API；否则调用创建API
@@ -10243,9 +10369,21 @@ function setupRecipesModule() {
           // 关闭表单
           const card = $('recipe-form-card');
           if (card) card.style.display = 'none';
+          
+          // 恢复按钮状态
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          }
         } catch (error) {
           console.error('保存食谱失败:', error);
           alert('保存食谱失败: ' + (error.message || '未知错误'));
+          
+          // 恢复按钮状态
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          }
         }
       } else {
         // 本地数据：保存到store
@@ -10269,6 +10407,12 @@ function setupRecipesModule() {
         const card = $('recipe-form-card');
         if (card) card.style.display = 'none';
         renderRecipesList();
+        
+        // 恢复按钮状态
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+        }
       }
     });
   }
