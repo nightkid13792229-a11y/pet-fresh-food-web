@@ -34,7 +34,7 @@ const baseSelect = `
 `;
 
 export const findAllIngredients = async (options = {}) => {
-  const { search, category, classification, page = 1, pageSize = 20 } = options;
+  const { search, category, classification, subject, part, originType, page = 1, pageSize = 20 } = options;
   let sql = baseSelect;
   const countSql = 'SELECT COUNT(*) as total FROM ingredients';
   const params = [];
@@ -54,6 +54,21 @@ export const findAllIngredients = async (options = {}) => {
   if (classification) {
     conditions.push('classification = ?');
     params.push(classification);
+  }
+
+  if (subject) {
+    conditions.push('subject = ?');
+    params.push(subject);
+  }
+
+  if (part) {
+    conditions.push('part = ?');
+    params.push(part);
+  }
+
+  if (originType) {
+    conditions.push('origin_type = ?');
+    params.push(originType);
   }
 
   const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';

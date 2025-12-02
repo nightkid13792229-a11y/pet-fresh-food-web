@@ -12,6 +12,9 @@ export const listIngredientsController = async (req, res) => {
     search: req.query.search || undefined,
     category: req.query.category || undefined,
     classification: req.query.classification || undefined,
+    subject: req.query.subject || undefined,
+    part: req.query.part || undefined,
+    originType: req.query.originType || undefined,
     page: parseInt(req.query.page, 10) || 1,
     pageSize: parseInt(req.query.pageSize, 10) || 20
   };

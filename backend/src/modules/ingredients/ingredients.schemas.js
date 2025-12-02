@@ -75,6 +75,9 @@ export const listIngredientsQuerySchema = Joi.object({
   search: Joi.string().max(200).allow(''),
   category: Joi.string().max(100).allow(''),
   classification: Joi.string().max(100).allow(''),
+  subject: Joi.string().max(200).allow(''),
+  part: Joi.string().max(200).allow(''),
+  originType: Joi.string().max(200).allow(''),
   page: Joi.number().integer().min(1).default(1),
   pageSize: Joi.number().integer().min(1).max(1000).default(20)
 });
