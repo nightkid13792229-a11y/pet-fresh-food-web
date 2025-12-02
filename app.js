@@ -9846,10 +9846,12 @@ function openRecipeForm(id = null, recipeData = null) {
       $('r-recipeType').value = recipe.isCustom === true ? 'custom' : 'standard';
     }
     
-    // 设置编号（如果已有则显示，否则自动生成）
-    if (recipe.code) {
+    // 设置编号（复制场景或没有编号时自动生成）
+    if (recipe.code && recipe.id && recipe.id.trim()) {
+      // 编辑现有食谱且有编号，显示原编号
       $('r-code').value = recipe.code;
     } else {
+      // 复制场景或新食谱，自动生成编号
       autoGenerateRecipeCode();
     }
     
