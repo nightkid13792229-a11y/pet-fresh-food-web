@@ -71,6 +71,41 @@ export const listRecipes = async (options = {}) => {
 
   const items = await query(sql, params);
 
+  // 为每个食谱加载关联的食材数据
+  for (const recipe of items) {
+    const ingredients = await query(`
+      SELECT 
+        ri.id,
+        ri.ingredient_name AS ingredientName,
+        ri.weight,
+        ri.unit
+      FROM recipe_ingredients ri
+      WHERE ri.recipe_id = ?
+      ORDER BY ri.id ASC
+    `, [recipe.id]);
+    
+    recipe.ingredients = ingredients.map(ing => ({
+      id: ing.id,
+      ingredientName: ing.ingredientName || '',
+      weight: ing.weight,
+      unit: ing.unit || 'g'
+    }));
+
+    // 加载制作步骤
+    const steps = await query(`
+      SELECT id, step_order AS stepOrder, description
+      FROM recipe_cooking_steps
+      WHERE recipe_id = ?
+      ORDER BY step_order ASC
+    `, [recipe.id]);
+    
+    recipe.cookingSteps = steps.map(step => ({
+      id: step.id,
+      stepOrder: step.stepOrder,
+      description: step.description
+    }));
+  }
+
   return {
     items,
     total,
