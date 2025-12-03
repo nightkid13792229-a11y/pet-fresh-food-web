@@ -10500,6 +10500,8 @@ function setupRecipesModule() {
           .filter(step => step.description && step.description.trim()) // 过滤掉空的步骤描述
       };
       
+      console.log('[saveRecipe] 完整的 payload:', JSON.stringify(payload, null, 2));
+      
       // 如果有后端ID，调用更新API；否则调用创建API
       if (backendState.token) {
         try {
