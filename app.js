@@ -4719,39 +4719,42 @@ function formatIngredientDetails(ing) {
   ]);
   
   // ========== 价格信息组 ==========
-  rows.push({ type: 'section', title: '价格信息' });
-  
-  if (ing.classification === '包材') {
-    // 包材：显示价格/单位
-    const costValue = ing.cost || 0;
-    const quantityValue = ing.quantity || 0;
-    const unit = ing.unit || '-';
-    const unitDisplay = unit !== '-' ? unit : '-';
-    const pricePerUnit = quantityValue > 0 ? formatNum(costValue / quantityValue, 4) : '-';
+  // 营养补充剂不显示价格信息（价格/100营养素单位已在"营养补充剂信息"组中显示）
+  if (ing.classification !== '营养补充剂') {
+    rows.push({ type: 'section', title: '价格信息' });
     
-    rows.push([
-      { label: `价格/${unitDisplay}`, value: pricePerUnit, colspan: 2 }
-    ]);
-    
-    const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
-    rows.push([
-      { label: `重量（g）/${unitDisplay}`, value: weightPerUnit, colspan: 2 }
-    ]);
-  } else {
-    // 食材和营养补充剂：显示单价/500单位和可食部单价/500单位
-    const pricePer500 = ing.pricePer500 != null ? formatNum(ing.pricePer500, 4) : '-';
-    const ediblePortion = ing.ediblePortion != null 
-      ? (Math.round(ing.ediblePortion * 100) !== 100 ? `${Math.round(ing.ediblePortion * 100)}%` : '100%')
-      : '-';
-    rows.push([
-      { label: '单价/500单位', value: pricePer500 },
-      { label: '可食部', value: ediblePortion }
-    ]);
-    
-    const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
-    rows.push([
-      { label: '可食部单价/500单位', value: ediblePricePer500, colspan: 2 }
-    ]);
+    if (ing.classification === '包材') {
+      // 包材：显示价格/单位
+      const costValue = ing.cost || 0;
+      const quantityValue = ing.quantity || 0;
+      const unit = ing.unit || '-';
+      const unitDisplay = unit !== '-' ? unit : '-';
+      const pricePerUnit = quantityValue > 0 ? formatNum(costValue / quantityValue, 4) : '-';
+      
+      rows.push([
+        { label: `价格/${unitDisplay}`, value: pricePerUnit, colspan: 2 }
+      ]);
+      
+      const weightPerUnit = ing.weightPerUnit != null ? `${formatNum(ing.weightPerUnit, 2)} g` : '-';
+      rows.push([
+        { label: `重量（g）/${unitDisplay}`, value: weightPerUnit, colspan: 2 }
+      ]);
+    } else {
+      // 食材：显示单价/500单位和可食部单价/500单位
+      const pricePer500 = ing.pricePer500 != null ? formatNum(ing.pricePer500, 4) : '-';
+      const ediblePortion = ing.ediblePortion != null 
+        ? (Math.round(ing.ediblePortion * 100) !== 100 ? `${Math.round(ing.ediblePortion * 100)}%` : '100%')
+        : '-';
+      rows.push([
+        { label: '单价/500单位', value: pricePer500 },
+        { label: '可食部', value: ediblePortion }
+      ]);
+      
+      const ediblePricePer500 = ing.ediblePricePer500 != null ? formatNum(ing.ediblePricePer500, 4) : '-';
+      rows.push([
+        { label: '可食部单价/500单位', value: ediblePricePer500, colspan: 2 }
+      ]);
+    }
   }
   
   // ========== 其他信息组 ==========
@@ -8821,10 +8824,36 @@ function setupIngredientsModule() {
       const part = classification === '食材' ? ($('i-part')?.value.trim() || null) : null;
       const originType = classification === '食材' ? ($('i-originType')?.value.trim() || null) : null;
       const model = $('i-model')?.value.trim() || null;
-      const mainNutrient = classification === '营养补充剂' ? ($('i-mainNutrient')?.value.trim() || null) : null;
-      const unitContent = classification === '营养补充剂' ? ($('i-unitContent')?.value.trim() || null) : null;
-      const nutrientUnit = classification === '营养补充剂' ? ($('i-nutrientUnit')?.value.trim() || null) : null;
-      const pricePer100NutrientUnit = classification === '营养补充剂' ? (Number($('i-pricePer100NutrientUnit')?.value) || null) : null;
+      
+      // 安全获取营养补充剂字段（避免 undefined.trim() 错误）
+      let mainNutrient = null;
+      let unitContent = null;
+      let nutrientUnit = null;
+      let pricePer100NutrientUnit = null;
+      
+      if (classification === '营养补充剂') {
+        const mainNutrientEl = $('i-mainNutrient');
+        const unitContentEl = $('i-unitContent');
+        const nutrientUnitEl = $('i-nutrientUnit');
+        const pricePer100NutrientUnitEl = $('i-pricePer100NutrientUnit');
+        
+        mainNutrient = mainNutrientEl && mainNutrientEl.value ? mainNutrientEl.value.trim() || null : null;
+        unitContent = unitContentEl && unitContentEl.value ? unitContentEl.value.trim() || null : null;
+        nutrientUnit = nutrientUnitEl && nutrientUnitEl.value ? nutrientUnitEl.value.trim() || null : null;
+        pricePer100NutrientUnit = pricePer100NutrientUnitEl && pricePer100NutrientUnitEl.value 
+          ? (Number(pricePer100NutrientUnitEl.value) || null) 
+          : null;
+        
+        // 调试日志
+        console.log('[Save Ingredient] 营养补充剂字段值:', {
+          mainNutrient,
+          unitContent,
+          nutrientUnit,
+          pricePer100NutrientUnit,
+          mainNutrientElExists: !!mainNutrientEl,
+          nutrientUnitElExists: !!nutrientUnitEl
+        });
+      }
       
       const data = {
         code: code || '',
@@ -8865,6 +8894,13 @@ function setupIngredientsModule() {
       
       try {
         console.log('[Save Ingredient] Saving data with source:', data.source, 'token exists:', !!backendState.token);
+        console.log('[Save Ingredient] 营养补充剂相关字段:', {
+          classification: data.classification,
+          mainNutrient: data.mainNutrient,
+          nutrientUnit: data.nutrientUnit,
+          unitContent: data.unitContent,
+          pricePer100NutrientUnit: data.pricePer100NutrientUnit
+        });
         if (id && id.startsWith('ing_')) {
           // 编辑：使用后端ID
           const backendId = store.ingredients.find(x => x.id === id)?._backendId;
