@@ -78,7 +78,7 @@ export const listRecipes = async (options = {}) => {
     try {
       logger.info(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
       // 尝试查询 weight 字段，如果不存在则查询 default_amount 字段（兼容旧表结构）
-      let ingredients;
+      let ingredients = [];
       try {
         ingredients = await query(`
           SELECT 
@@ -100,46 +100,79 @@ export const listRecipes = async (options = {}) => {
         // 如果 weight 字段不存在，尝试使用 default_amount 字段
         if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
           logger.info(`[listRecipes] weight 字段不存在，使用 default_amount 字段查询`);
-          ingredients = await query(`
-            SELECT 
-              ri.id,
-              ri.ingredient_name AS ingredientName,
-              ri.default_amount AS weight,
-              ri.unit
-            FROM recipe_ingredients ri
-            WHERE ri.recipe_id = ?
-            ORDER BY ri.id ASC
-          `, [recipe.id]);
-          logger.info(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
+          try {
+            ingredients = await query(`
+              SELECT 
+                ri.id,
+                ri.ingredient_name AS ingredientName,
+                ri.default_amount AS weight,
+                ri.unit
+              FROM recipe_ingredients ri
+              WHERE ri.recipe_id = ?
+              ORDER BY ri.id ASC
+            `, [recipe.id]);
+            logger.info(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
+          } catch (error2) {
+            logger.error(`[listRecipes] 使用 default_amount 字段查询也失败:`, error2);
+            ingredients = [];
+          }
         } else {
           logger.error(`[listRecipes] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
-          throw error;
+          ingredients = [];
         }
       }
+      
+      // 确保 ingredients 是数组
+      if (!Array.isArray(ingredients)) {
+        logger.warn(`[listRecipes] ingredients 不是数组，重置为空数组`);
+        ingredients = [];
+      }
+      
       recipe.ingredients = ingredients.map(ing => ({
         id: ing.id,
         ingredientName: ing.ingredientName || '',
         weight: ing.weight,
         unit: ing.unit || 'g'
       }));
+      
+      logger.info(`[listRecipes] 食谱 ${recipe.id} 最终 ingredients 数量: ${recipe.ingredients.length}`);
 
       // 加载制作步骤
-      const steps = await query(`
-        SELECT id, step_order AS stepOrder, description
-        FROM recipe_cooking_steps
-        WHERE recipe_id = ?
-        ORDER BY step_order ASC
-      `, [recipe.id]);
+      let steps = [];
+      try {
+        steps = await query(`
+          SELECT id, step_order AS stepOrder, description
+          FROM recipe_cooking_steps
+          WHERE recipe_id = ?
+          ORDER BY step_order ASC
+        `, [recipe.id]);
+      } catch (error) {
+        logger.error(`[listRecipes] 查询制作步骤失败:`, error);
+        steps = [];
+      }
       
-      recipe.cookingSteps = steps.map(step => ({
+      recipe.cookingSteps = (Array.isArray(steps) ? steps : []).map(step => ({
         id: step.id,
         stepOrder: step.stepOrder,
         description: step.description
       }));
+      
+      logger.info(`[listRecipes] 食谱 ${recipe.id} 最终 cookingSteps 数量: ${recipe.cookingSteps.length}`);
     } catch (error) {
       logger.error(`[listRecipes] 加载食谱 ${recipe.id} (${recipe.name}) 的关联数据失败:`, error);
+      logger.error(`[listRecipes] 错误堆栈:`, error.stack);
       // 确保即使出错也有默认值
+      recipe.ingredients = recipe.ingredients || [];
+      recipe.cookingSteps = recipe.cookingSteps || [];
+    }
+    
+    // 最终验证：确保 ingredients 和 cookingSteps 都存在
+    if (!recipe.ingredients) {
+      logger.warn(`[listRecipes] 食谱 ${recipe.id} ingredients 为 undefined，设置为空数组`);
       recipe.ingredients = [];
+    }
+    if (!recipe.cookingSteps) {
+      logger.warn(`[listRecipes] 食谱 ${recipe.id} cookingSteps 为 undefined，设置为空数组`);
       recipe.cookingSteps = [];
     }
   }
@@ -519,6 +552,7 @@ export const deleteRecipe = async (id) => {
   // 对于 DELETE，query 返回的是 ResultSetHeader 对象
   return result.affectedRows > 0;
 };
+
 
 
 
