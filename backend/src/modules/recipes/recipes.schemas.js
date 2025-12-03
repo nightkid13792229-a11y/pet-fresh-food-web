@@ -1,8 +1,12 @@
 import Joi from 'joi';
 
 // 食材项验证
+// 注意：现在只保存 ingredientName，不保存 ingredientId
 const ingredientItemSchema = Joi.object({
-  ingredientId: Joi.number().integer().positive().required(),
+  ingredientName: Joi.string().max(120).required().messages({
+    'string.empty': '食材名称不能为空',
+    'any.required': '食材名称为必填项'
+  }),
   weight: Joi.number().min(0).required(),
   unit: Joi.string().max(12).default('g')
 });

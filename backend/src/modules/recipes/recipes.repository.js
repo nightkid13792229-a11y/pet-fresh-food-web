@@ -87,29 +87,23 @@ export const getRecipeById = async (id) => {
   const recipe = rows[0];
   
   // 加载关联的食材
+  // 注意：现在只保存 ingredientName，不保存 ingredientId
   const ingredients = await query(`
     SELECT 
       ri.id,
-      ri.ingredient_id AS ingredientId,
+      ri.ingredient_name AS ingredientName,
       ri.weight,
-      ri.unit,
-      i.name AS ingredientName,
-      i.category AS ingredientCategory,
-      i.code AS ingredientCode
+      ri.unit
     FROM recipe_ingredients ri
-    LEFT JOIN ingredients i ON ri.ingredient_id = i.id
     WHERE ri.recipe_id = ?
     ORDER BY ri.id ASC
   `, [id]);
   
   recipe.ingredients = ingredients.map(ing => ({
     id: ing.id,
-    ingredientId: ing.ingredientId,
+    ingredientName: ing.ingredientName || '',
     weight: ing.weight,
-    unit: ing.unit || 'g',
-    ingredientName: ing.ingredientName,
-    ingredientCategory: ing.ingredientCategory,
-    ingredientCode: ing.ingredientCode
+    unit: ing.unit || 'g'
   }));
   
   // 加载制作步骤
@@ -175,14 +169,15 @@ export const createRecipe = async (payload, userId) => {
     const recipeId = recipeResult.insertId;
     
     // 插入食材关联
+    // 注意：现在只保存 ingredientName，不保存 ingredientId
     if (payload.ingredients && Array.isArray(payload.ingredients) && payload.ingredients.length > 0) {
       const ingredientSql = `
-        INSERT INTO recipe_ingredients (recipe_id, ingredient_id, weight, unit)
+        INSERT INTO recipe_ingredients (recipe_id, ingredient_name, weight, unit)
         VALUES ?
       `;
       const ingredientValues = payload.ingredients.map(ing => [
         recipeId,
-        ing.ingredientId || null,
+        ing.ingredientName || '',
         ing.weight || null,
         ing.unit || 'g'
       ]);
@@ -313,12 +308,12 @@ export const updateRecipe = async (id, payload, userId) => {
       
       if (Array.isArray(payload.ingredients) && payload.ingredients.length > 0) {
         const ingredientSql = `
-          INSERT INTO recipe_ingredients (recipe_id, ingredient_id, weight, unit)
+          INSERT INTO recipe_ingredients (recipe_id, ingredient_name, weight, unit)
           VALUES ?
         `;
         const ingredientValues = payload.ingredients.map(ing => [
           id,
-          ing.ingredientId || null,
+          ing.ingredientName || '',
           ing.weight || null,
           ing.unit || 'g'
         ]);
