@@ -2019,14 +2019,41 @@ function calculateQuoteIngredientDetails(recipe, ratio, mealsPerDay, totalWeight
   const details = [];
   const ingredientsList = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
   ingredientsList.forEach((item, idx) => {
-    const ingredient = store.ingredients.find(i => i.id === item.ingredientId);
-    const category = ingredient ? (ingredient.category || '-') : '-';
-    const project = ingredient ? (ingredient.name || '-') : '-';
-    const description = ingredient ? (ingredient.description || '') : '';
-    const ingredientName = description ? `${project}-${description}` : project;
-    const brand = ingredient ? (ingredient.brand || ingredient.source || '-') : '-';
-    const mainFunction = ingredient ? (ingredient.mainFunction || '-') : '-';
-    const unit = item.unit || (ingredient ? ingredient.unit : 'g');
+    // 使用保存的食材名称（新格式）或从ingredientId查找（兼容旧格式）
+    let ingredientName = item.ingredientName || '';
+    let category = '-';
+    let brand = '-';
+    let mainFunction = '-';
+    let unit = item.unit || 'g';
+    
+    // 如果使用旧格式（有ingredientId），尝试从store中查找
+    if (!ingredientName && item.ingredientId) {
+      const ingredient = store.ingredients.find(i => {
+        if (typeof item.ingredientId === 'number') {
+          return i._backendId === item.ingredientId;
+        } else if (typeof item.ingredientId === 'string') {
+          return i.id === item.ingredientId || i._backendId === parseInt(item.ingredientId.replace('ing_', ''), 10);
+        }
+        return false;
+      });
+      if (ingredient) {
+        ingredientName = ingredient.name || '';
+        category = ingredient.category || '-';
+        brand = ingredient.brand || ingredient.source || '-';
+        mainFunction = ingredient.mainFunction || '-';
+        unit = item.unit || ingredient.unit || 'g';
+      }
+    } else if (ingredientName) {
+      // 新格式：只有名称，尝试从store中查找匹配的食材（用于获取其他信息）
+      // 注意：可能有多个同名食材，这里只取第一个匹配的
+      const ingredient = store.ingredients.find(i => i.name === ingredientName && i.classification === '食材');
+      if (ingredient) {
+        category = ingredient.category || '-';
+        brand = ingredient.brand || ingredient.source || '-';
+        mainFunction = ingredient.mainFunction || '-';
+        unit = item.unit || ingredient.unit || 'g';
+      }
+    }
     let totalAmount = 0;
     if (ratio > 0) {
       const singleServingsAmount = mealsPerDay > 0 ? (item.weight * ratio / mealsPerDay) : 0;
@@ -8964,18 +8991,23 @@ async function searchIngredients(query) {
   try {
     const params = new URLSearchParams({
       search: q,
+      classification: '食材', // 只搜索食材，排除包材和营养补充剂
       pageSize: 10 // 最多显示10个结果
     });
     const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
-    matches = (data.items || []).map(ing => ({
-      id: `ing_${ing.id}`, // 修复：使用 ing_ 前缀，与 loadIngredientsFromBackend 保持一致
-      _backendId: ing.id,
-      name: ing.name,
-      description: ing.description,
-      brand: ing.brand,
-      category: ing.category,
-      unit: ing.unit || 'g'
-    }));
+    // 再次过滤，确保只包含食材（双重保险）
+    matches = (data.items || [])
+      .filter(ing => ing.classification === '食材')
+      .map(ing => ({
+        id: `ing_${ing.id}`, // 修复：使用 ing_ 前缀，与 loadIngredientsFromBackend 保持一致
+        _backendId: ing.id,
+        name: ing.name,
+        description: ing.description,
+        brand: ing.brand,
+        category: ing.category,
+        classification: ing.classification,
+        unit: ing.unit || 'g'
+      }));
   } catch (error) {
     console.error('[searchIngredients] 后端搜索失败:', error);
     resultsEl.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-error);">搜索失败，请稍后重试</div>';
@@ -9041,21 +9073,13 @@ function renderRecipeIngredientsList() {
   }
   
   listEl.innerHTML = currentRecipeIngredients.map((item, idx) => {
-    const ing = store.ingredients.find(i => i.id === item.ingredientId);
-    if (!ing) return '';
+    // 直接使用保存的食材名称
+    const ingredientName = item.ingredientName || '';
+    if (!ingredientName) return '';
     
-    const unit = item.unit || ing.unit || 'g';
-    // 格式：项目-说明（品牌/来源），例如"葵花籽-有机生葵花籽（人民食品）"
-    const name = ing.name || '';
-    const description = ing.description || '';
-    const brand = ing.brand || '';
-    let displayText = name;
-    if (description) {
-      displayText += '-' + description;
-    }
-    if (brand) {
-      displayText += '（' + brand + '）';
-    }
+    const unit = item.unit || 'g';
+    // 直接显示食材名称
+    const displayText = ingredientName;
     
     const isEditing = editingIngredientIndex === idx;
     
@@ -9171,9 +9195,6 @@ function renderRecipeIngredientsList() {
       const item = currentRecipeIngredients[idx];
       if (!item) return;
       
-      const ing = store.ingredients.find(i => i.id === item.ingredientId);
-      if (!ing) return;
-      
       if (editingIngredientIndex === idx) {
         // 保存编辑
         const weightInputEl = listEl.querySelector(`[data-edit-weight="${idx}"]`);
@@ -9211,7 +9232,7 @@ function renderRecipeIngredientsList() {
         }
         
         editingIngredientIndex = idx;
-        selectedIngredientId = item.ingredientId;
+        // 不再需要设置 selectedIngredientId，因为编辑时只修改重量
         
         renderRecipeIngredientsList();
         
@@ -9487,11 +9508,24 @@ async function addIngredientToRecipe() {
     return;
   }
   
+  // 检查是否为包材，如果是则不允许添加
+  if (ing.classification === '包材') {
+    alert('食谱中不能添加包材，请选择食材');
+    return;
+  }
+  
+  // 获取食材名称（只保存名称，不保存ID）
+  const ingredientName = ing.name || '';
+  if (!ingredientName) {
+    alert('食材名称不能为空');
+    return;
+  }
+  
   // 如果正在编辑某个项，更新该项
   if (editingIngredientIndex !== null) {
     const item = currentRecipeIngredients[editingIngredientIndex];
     if (item) {
-      item.ingredientId = ingredientId;
+      item.ingredientName = ingredientName; // 只保存食材名称
       item.weight = weight;
       item.unit = ing.unit || 'g';
       editingIngredientIndex = null;
@@ -9508,10 +9542,10 @@ async function addIngredientToRecipe() {
     }
   }
   
-  // 检查是否已添加（编辑模式下不检查）
-  const exists = currentRecipeIngredients.find(item => item.ingredientId === ingredientId);
+  // 检查是否已添加（编辑模式下不检查）- 根据食材名称判断
+  const exists = currentRecipeIngredients.find(item => item.ingredientName === ingredientName);
   if (exists) {
-    if (confirm('该原料已添加，是否更新重量？')) {
+    if (confirm('该食材已添加，是否更新重量？')) {
       exists.weight = weight;
       exists.unit = ing.unit || 'g';
     } else {
@@ -9519,7 +9553,7 @@ async function addIngredientToRecipe() {
     }
   } else {
     currentRecipeIngredients.push({
-      ingredientId: ingredientId,
+      ingredientName: ingredientName, // 只保存食材名称，不保存ID
       weight: weight,
       unit: ing.unit || 'g'
     });
@@ -9541,8 +9575,20 @@ function calculateRecipeTotalWeight() {
   let totalWeight = 0;
   
   currentRecipeIngredients.forEach(item => {
-    const ing = store.ingredients.find(i => i.id === item.ingredientId);
-    if (!ing) return;
+    // 使用食材名称查找（可能有多个同名食材，取第一个匹配的）
+    const ing = store.ingredients.find(i => i.name === item.ingredientName && i.classification === '食材');
+    if (!ing) {
+      // 如果没有找到，使用默认单位 'g' 直接计算
+      const unit = item.unit || 'g';
+      let weightInG = item.weight;
+      if (unit === 'kg') {
+        weightInG = item.weight * 1000;
+      } else if (unit === 'L') {
+        weightInG = item.weight * 1000;
+      }
+      totalWeight += weightInG;
+      return;
+    }
     
     const unit = item.unit || ing.unit || 'g';
     let weightInG = item.weight;
@@ -9986,12 +10032,30 @@ function openRecipeForm(id = null, recipeData = null) {
     currentRecipeCookingSteps = Array.isArray(recipe.cookingSteps) ? [...recipe.cookingSteps] : [];
     renderRecipeCookingSteps();
     
-    // 设置食材列表
-    currentRecipeIngredients = (recipe.ingredients || []).map(item => ({
-      ingredientId: item.ingredientId,
-      weight: item.weight,
-      unit: item.unit
-    }));
+    // 设置食材列表（兼容旧数据：如果有ingredientId，尝试从store中获取名称；如果有ingredientName，直接使用）
+    currentRecipeIngredients = (recipe.ingredients || []).map(item => {
+      let ingredientName = '';
+      if (item.ingredientName) {
+        // 新格式：直接使用ingredientName
+        ingredientName = item.ingredientName;
+      } else if (item.ingredientId) {
+        // 旧格式：从store中查找食材名称（兼容旧数据）
+        const ing = store.ingredients.find(i => {
+          if (typeof item.ingredientId === 'number') {
+            return i._backendId === item.ingredientId;
+          } else if (typeof item.ingredientId === 'string') {
+            return i.id === item.ingredientId || i._backendId === parseInt(item.ingredientId.replace('ing_', ''), 10);
+          }
+          return false;
+        });
+        ingredientName = ing ? (ing.name || '') : '';
+      }
+      return {
+        ingredientName: ingredientName, // 只保存食材名称
+        weight: item.weight,
+        unit: item.unit || 'g'
+      };
+    });
     renderRecipeIngredientsList();
     
     // 设置营养数据
@@ -10339,13 +10403,9 @@ function setupRecipesModule() {
         software: $('r-software').value || 'ADF',
         recipeType: $('r-recipeType').value || 'standard',
         ingredients: currentRecipeIngredients.map(item => {
-          // 提取后端ID（如果存在）
-          const backendId = item._backendId || (item.ingredientId && item.ingredientId.toString().startsWith('ingredient_') 
-            ? parseInt(item.ingredientId.replace('ingredient_', ''), 10) 
-            : (typeof item.ingredientId === 'number' ? item.ingredientId : null));
-          
+          // 只保存食材名称，不保存ID
           return {
-            ingredientId: backendId || item.ingredientId,
+            ingredientName: item.ingredientName || '', // 只保存食材名称
             weight: item.weight,
             unit: item.unit || 'g'
           };
