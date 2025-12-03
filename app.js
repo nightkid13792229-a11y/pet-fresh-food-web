@@ -9091,20 +9091,15 @@ async function searchIngredients(query) {
   
   resultsEl.innerHTML = matches.map(ing => {
     const unit = ing.unit || 'g';
-    // 包材没有name字段，显示类别
-    let displayName = ing.name || ing.category || '';
-    if (ing.description) {
-      displayName += (displayName ? '-' : '') + ing.description;
-    }
-    if (ing.brand) {
-      displayName += (displayName ? '（' : '') + ing.brand + '）';
-    }
+    // 只显示食材名称，不包含品牌、说明等其他信息
+    const displayName = ing.name || '-';
+    
     return `
       <div class="ingredient-search-item" data-id="${ing.id}" data-backend-id="${ing._backendId || ''}" style="padding:8px 12px; cursor:pointer; border-bottom:0.5px solid var(--border); transition:background 0.2s;"
            onmouseover="this.style.background='var(--bg-secondary)'"
            onmouseout="this.style.background=''">
-        <div style="font-weight:500;">${displayName || '-'}</div>
-        <div style="font-size:12px; color:var(--text-secondary);">${ing.category ? '类别: ' + ing.category : ''}${ing.category && unit ? ' | ' : ''}${unit ? '单位: ' + unit : ''}</div>
+        <div style="font-weight:500;">${displayName}</div>
+        <div style="font-size:12px; color:var(--text-secondary);">单位: ${unit}</div>
       </div>
     `;
   }).join('');
