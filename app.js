@@ -8954,51 +8954,33 @@ async function searchIngredients(query) {
   
   let matches = [];
   
-  // 优先从后端搜索
-  if (backendState.token) {
-    try {
-      const params = new URLSearchParams({
-        search: q,
-        pageSize: 10 // 最多显示10个结果
-      });
-      const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
-      matches = (data.items || []).map(ing => ({
-        id: `ingredient_${ing.id}`,
-        _backendId: ing.id,
-        name: ing.name,
-        description: ing.description,
-        brand: ing.brand,
-        category: ing.category,
-        unit: ing.unit || 'g'
-      }));
-    } catch (error) {
-      console.warn('[searchIngredients] 后端搜索失败，使用本地数据:', error);
-      // 后端搜索失败时，回退到本地搜索
-      const qLower = q.toLowerCase();
-      matches = store.ingredients.filter(ing => {
-        if (!ing.category) return false;
-        // 包材没有name字段，所以只检查category
-        const name = (ing.name || '').toLowerCase();
-        const category = (ing.category || '').toLowerCase();
-        const brand = (ing.brand || '').toLowerCase();
-        const description = (ing.description || '').toLowerCase();
-        const code = (ing.code || '').toLowerCase();
-        return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower) || description.includes(qLower) || code.includes(qLower);
-      }).slice(0, 10);
-    }
-  } else {
-    // 本地数据搜索
-    const qLower = q.toLowerCase();
-    matches = store.ingredients.filter(ing => {
-      if (!ing.category) return false;
-      // 包材没有name字段，所以只检查category
-      const name = (ing.name || '').toLowerCase();
-      const category = (ing.category || '').toLowerCase();
-      const brand = (ing.brand || '').toLowerCase();
-      const description = (ing.description || '').toLowerCase();
-      const code = (ing.code || '').toLowerCase();
-      return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower) || description.includes(qLower) || code.includes(qLower);
-    }).slice(0, 10);
+  // 始终从服务器端搜索
+  if (!backendState.token) {
+    resultsEl.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-secondary);">请先登录以搜索原料</div>';
+    resultsEl.style.display = 'block';
+    return;
+  }
+  
+  try {
+    const params = new URLSearchParams({
+      search: q,
+      pageSize: 10 // 最多显示10个结果
+    });
+    const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+    matches = (data.items || []).map(ing => ({
+      id: `ing_${ing.id}`, // 修复：使用 ing_ 前缀，与 loadIngredientsFromBackend 保持一致
+      _backendId: ing.id,
+      name: ing.name,
+      description: ing.description,
+      brand: ing.brand,
+      category: ing.category,
+      unit: ing.unit || 'g'
+    }));
+  } catch (error) {
+    console.error('[searchIngredients] 后端搜索失败:', error);
+    resultsEl.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-error);">搜索失败，请稍后重试</div>';
+    resultsEl.style.display = 'block';
+    return;
   }
   
   if (matches.length === 0) {
@@ -9031,36 +9013,16 @@ async function searchIngredients(query) {
   resultsEl.querySelectorAll('.ingredient-search-item').forEach(item => {
     item.addEventListener('click', () => {
       const id = item.dataset.id;
-      const backendId = item.dataset.backendId;
-      // 尝试从store中找到，如果找不到，使用后端ID
-      let ing = store.ingredients.find(i => i.id === id);
-      if (!ing && backendId) {
-        // 如果本地找不到，创建一个临时对象
-        ing = {
-          id: id,
-          _backendId: parseInt(backendId, 10),
-          name: item.querySelector('div').textContent.split('（')[0].split('-')[0].trim(),
-          unit: item.querySelector('div:last-child').textContent.replace('单位: ', '').trim()
-        };
+      // 设置选中的食材ID（数据来自服务器，ID格式为 ing_xxx）
+      selectedIngredientId = id;
+      const searchInput = $('r-ingredient-search');
+      if (searchInput) {
+        // 从搜索结果中提取显示文本（第一个div包含完整名称）
+        const displayDiv = item.querySelector('div:first-child');
+        const displayText = displayDiv ? displayDiv.textContent.trim() : '';
+        searchInput.value = displayText;
       }
-      if (ing) {
-        selectedIngredientId = id;
-        const searchInput = $('r-ingredient-search');
-        if (searchInput) {
-          const name = ing.name || '';
-          const description = ing.description || '';
-          const brand = ing.brand || '';
-          let displayText = name;
-          if (description) {
-            displayText += '-' + description;
-          }
-          if (brand) {
-            displayText += '（' + brand + '）';
-          }
-          searchInput.value = displayText;
-        }
-        resultsEl.style.display = 'none';
-      }
+      resultsEl.style.display = 'none';
     });
   });
   
@@ -9437,7 +9399,7 @@ async function autoGenerateRecipeCode() {
 }
 
 // 添加食材到食谱
-function addIngredientToRecipe() {
+async function addIngredientToRecipe() {
   const weightInput = $('r-ingredient-weight');
   const searchInput = $('r-ingredient-search');
   
@@ -9456,9 +9418,41 @@ function addIngredientToRecipe() {
     return;
   }
   
-  const ing = store.ingredients.find(i => i.id === ingredientId);
+  // 尝试从 store.ingredients 中查找
+  let ing = store.ingredients.find(i => i.id === ingredientId);
+  
+  // 如果找不到，尝试从后端获取（如果 ingredientId 包含 _backendId 信息）
+  if (!ing && backendState.token) {
+    // 从 ingredientId 格式中提取：ing_123 -> 123
+    const backendIdMatch = ingredientId.match(/^ing_(\d+)$/);
+    if (backendIdMatch) {
+      const backendId = parseInt(backendIdMatch[1], 10);
+      try {
+        const data = await backendRequest(`/api/v1/ingredients/${backendId}`);
+        // 转换为前端格式
+        ing = {
+          id: `ing_${data.id}`,
+          _backendId: data.id,
+          code: data.code || '',
+          category: data.category || '',
+          name: data.name || '',
+          brand: data.brand || '',
+          source: data.source || '',
+          unit: data.unit || 'g',
+          classification: data.classification || null,
+          description: data.description || '',
+          // 其他字段根据需要添加
+        };
+      } catch (error) {
+        console.error('[addIngredientToRecipe] 从后端获取食材失败:', error);
+        alert('无法获取食材信息，请重试');
+        return;
+      }
+    }
+  }
+  
   if (!ing) {
-    alert('原料不存在');
+    alert('原料不存在，请重新搜索并选择');
     return;
   }
   
