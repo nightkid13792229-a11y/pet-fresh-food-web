@@ -267,13 +267,13 @@
 
           <div class="section-title">食材列表</div>
           <div style="margin-bottom:12px;">
-            <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:8px;">
-              <div style="position:relative; flex:1;">
-                <input id="r-ingredient-search" type="text" placeholder="搜索原料名称或类别..." style="width:100%;" autocomplete="off" />
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+              <div style="position:relative; flex:1; min-width:0;">
+                <input id="r-ingredient-search" type="text" placeholder="搜索原料名称或类别..." style="width:100%; padding:8px;" autocomplete="off" />
                 <div id="r-ingredient-search-results" style="position:absolute; top:100%; left:0; right:0; background:var(--bg-primary); border:1px solid var(--border); border-radius:6px; max-height:200px; overflow-y:auto; z-index:100; display:none; margin-top:4px; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
               </div>
-              <input id="r-ingredient-weight" type="number" min="0" step="0.1" placeholder="重量" style="width:120px; flex-shrink:0;" />
-              <button type="button" id="btn-add-ingredient" class="btn small" style="flex-shrink:0;">添加</button>
+              <input id="r-ingredient-weight" type="number" min="0" step="0.1" placeholder="重量" style="width:120px; padding:8px; flex-shrink:0;" />
+              <button type="button" id="btn-add-ingredient" class="btn small" style="flex-shrink:0; white-space:nowrap;">添加</button>
             </div>
             <div id="recipe-ingredients-list" style="display:grid; gap:6px; margin-top:12px;">
               <!-- 食材列表将在这里显示 -->
