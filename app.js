@@ -2997,9 +2997,11 @@ async function loadRecipesFromBackend() {
     if (recipeType) params.append('recipeType', recipeType);
     
     const data = await backendRequest(`/api/v1/recipes?${params.toString()}`);
+    console.log('[loadRecipesFromBackend] 后端返回的原始数据:', data);
     
     // 转换数据格式（将后端返回的数据转换为前端格式）
     const recipes = (data.items || []).map(recipe => {
+      console.log('[loadRecipesFromBackend] 处理食谱:', recipe.name, 'ingredients:', recipe.ingredients);
       return {
         id: `recipe_${recipe.id}`, // 使用recipe_前缀避免ID冲突
         code: recipe.code || '',
@@ -3021,10 +3023,10 @@ async function loadRecipesFromBackend() {
         totalWeight: recipe.totalWeight || null,
         kcalDensity: recipe.kcalDensity || null,
         ingredients: (recipe.ingredients || []).map(ing => ({
-          ingredientName: ing.ingredientName || '', // 只使用后端返回的字段
-          weight: ing.weight,
-          unit: ing.unit || 'g'
-        })),
+          ingredientName: (ing.ingredientName != null && ing.ingredientName !== '') ? String(ing.ingredientName).trim() : '', // 确保是字符串且不为空
+          weight: ing.weight != null ? ing.weight : 0,
+          unit: (ing.unit && ing.unit.trim()) ? ing.unit.trim() : 'g'
+        })).filter(ing => ing.ingredientName), // 过滤掉没有名称的项
         cookingSteps: (recipe.cookingSteps || []).map(step => ({
           stepOrder: step.stepOrder,
           description: step.description
@@ -10097,11 +10099,13 @@ function openRecipeForm(id = null, recipeData = null) {
     renderRecipeCookingSteps();
     
     // 设置食材列表（兼容旧数据：如果有ingredientId，尝试从store中获取名称；如果有ingredientName，直接使用）
+    console.log('[openRecipeForm] 原始recipe.ingredients:', recipe.ingredients);
     currentRecipeIngredients = (recipe.ingredients || []).map(item => {
       let ingredientName = '';
-      if (item.ingredientName) {
+      // 检查 ingredientName 是否存在且不为空（包括空字符串的情况）
+      if (item.ingredientName != null && item.ingredientName !== '') {
         // 新格式：直接使用ingredientName
-        ingredientName = item.ingredientName;
+        ingredientName = String(item.ingredientName).trim();
       } else if (item.ingredientId) {
         // 旧格式：从store中查找食材名称（兼容旧数据）
         const ing = store.ingredients.find(i => {
@@ -10119,7 +10123,8 @@ function openRecipeForm(id = null, recipeData = null) {
         weight: item.weight,
         unit: item.unit || 'g'
       };
-    });
+    }).filter(item => item.ingredientName); // 过滤掉没有名称的项
+    console.log('[openRecipeForm] 处理后的currentRecipeIngredients:', currentRecipeIngredients);
     renderRecipeIngredientsList();
     
     // 设置营养数据
