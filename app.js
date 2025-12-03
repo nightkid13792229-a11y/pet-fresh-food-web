@@ -3021,12 +3021,9 @@ async function loadRecipesFromBackend() {
         totalWeight: recipe.totalWeight || null,
         kcalDensity: recipe.kcalDensity || null,
         ingredients: (recipe.ingredients || []).map(ing => ({
-          ingredientId: ing.ingredientId,
+          ingredientName: ing.ingredientName || '', // 只使用后端返回的字段
           weight: ing.weight,
-          unit: ing.unit || 'g',
-          ingredientName: ing.ingredientName,
-          ingredientCategory: ing.ingredientCategory,
-          ingredientCode: ing.ingredientCode
+          unit: ing.unit || 'g'
         })),
         cookingSteps: (recipe.cookingSteps || []).map(step => ({
           stepOrder: step.stepOrder,
