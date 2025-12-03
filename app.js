@@ -9429,7 +9429,12 @@ async function addIngredientToRecipe() {
       const backendId = parseInt(backendIdMatch[1], 10);
       try {
         const data = await backendRequest(`/api/v1/ingredients/${backendId}`);
-        // 转换为前端格式
+        // 确保source字段被正确读取
+        const sourceValue = (data.source !== null && data.source !== undefined && data.source !== '') 
+          ? String(data.source).trim() 
+          : '';
+        
+        // 转换为前端格式（与 loadIngredientsFromBackend 保持一致）
         ing = {
           id: `ing_${data.id}`,
           _backendId: data.id,
@@ -9437,12 +9442,38 @@ async function addIngredientToRecipe() {
           category: data.category || '',
           name: data.name || '',
           brand: data.brand || '',
-          source: data.source || '',
+          source: sourceValue,
+          cost: data.cost || null,
+          quantity: data.quantity || null,
           unit: data.unit || 'g',
+          pricePer500: data.pricePer500 || null,
+          ediblePortion: data.ediblePortion !== undefined ? data.ediblePortion : 1.0,
+          ediblePricePer500: data.ediblePricePer500 || null,
+          weightPerUnit: data.weightPerUnit || null,
           classification: data.classification || null,
           description: data.description || '',
-          // 其他字段根据需要添加
+          mainFunction: data.mainFunction || '',
+          subject: data.subject || null,
+          part: data.part || null,
+          originType: data.originType || null,
+          model: data.model || null,
+          mainNutrient: data.mainNutrient || null,
+          unitContent: data.unitContent || null,
+          nutrientUnit: data.nutrientUnit || null,
+          pricePer100NutrientUnit: data.pricePer100NutrientUnit || null,
+          createdAt: data.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
+          updatedAt: data.updatedAt ? new Date(data.updatedAt).getTime() : Date.now(),
         };
+        
+        // 重要：将获取的食材添加到 store.ingredients 缓存中（如果不存在）
+        const existingIndex = store.ingredients.findIndex(i => i.id === ing.id);
+        if (existingIndex >= 0) {
+          // 如果已存在，更新它
+          store.ingredients[existingIndex] = ing;
+        } else {
+          // 如果不存在，添加到数组
+          store.ingredients.push(ing);
+        }
       } catch (error) {
         console.error('[addIngredientToRecipe] 从后端获取食材失败:', error);
         alert('无法获取食材信息，请重试');

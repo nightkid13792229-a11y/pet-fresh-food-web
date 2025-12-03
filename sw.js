@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pet-fresh-food-cache-v71';
+const CACHE_NAME = 'pet-fresh-food-cache-v72';
 const ASSETS = [
   '/',
   '/index.html',
