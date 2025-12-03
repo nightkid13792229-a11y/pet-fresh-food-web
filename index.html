@@ -258,25 +258,11 @@
             <label>制作损耗（%）
               <input id="r-cookingLoss" type="number" min="0" max="100" step="1" value="7" required />
             </label>
-            <label>食谱售价（元）
-              <input id="r-sellingPrice" type="number" min="0" step="0.01" placeholder="默认=成本×2" />
-            </label>
-            <label>基础价格（元）
-              <input id="r-basePrice" type="number" min="0" step="0.01" placeholder="可选" />
-            </label>
-            <label>默认份数
-              <input id="r-defaultServings" type="number" min="1" step="1" placeholder="可选" />
-            </label>
           </div>
           
           <div class="section-title">食谱描述</div>
           <div style="margin-bottom:12px;">
             <textarea id="r-description" placeholder="输入食谱描述（可选）" rows="3" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; font-family:inherit; resize:vertical;"></textarea>
-          </div>
-          <div style="margin-top:12px;">
-            <label>食谱描述
-              <textarea id="r-description" rows="3" placeholder="输入食谱描述信息（可选）" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; font-family:inherit; resize:vertical;"></textarea>
-            </label>
           </div>
 
           <div class="section-title">食材列表</div>
@@ -1111,7 +1097,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="app.js?v=20241202-6"></script>
+    <script src="app.js?v=20241202-7"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

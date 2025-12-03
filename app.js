@@ -2983,7 +2983,6 @@ async function loadRecipesFromBackend() {
         software: recipe.software || 'ADF',
         nutritionStandard: recipe.nutritionStandard || 'FEDIAF',
         cookingLoss: recipe.cookingLoss !== undefined ? recipe.cookingLoss : 7,
-        sellingPrice: recipe.sellingPrice || null,
         protein: recipe.protein || null,
         fat: recipe.fat || null,
         carb: recipe.carb || null,
@@ -2994,8 +2993,6 @@ async function loadRecipesFromBackend() {
         totalKcal: recipe.totalKcal || null,
         totalWeight: recipe.totalWeight || null,
         kcalDensity: recipe.kcalDensity || null,
-        basePrice: recipe.basePrice || null,
-        defaultServings: recipe.defaultServings || null,
         ingredients: (recipe.ingredients || []).map(ing => ({
           ingredientId: ing.ingredientId,
           weight: ing.weight,
@@ -8979,22 +8976,28 @@ async function searchIngredients(query) {
       // 后端搜索失败时，回退到本地搜索
       const qLower = q.toLowerCase();
       matches = store.ingredients.filter(ing => {
-        if (!ing.category || !ing.name) return false;
+        if (!ing.category) return false;
+        // 包材没有name字段，所以只检查category
         const name = (ing.name || '').toLowerCase();
         const category = (ing.category || '').toLowerCase();
         const brand = (ing.brand || '').toLowerCase();
-        return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower);
+        const description = (ing.description || '').toLowerCase();
+        const code = (ing.code || '').toLowerCase();
+        return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower) || description.includes(qLower) || code.includes(qLower);
       }).slice(0, 10);
     }
   } else {
     // 本地数据搜索
     const qLower = q.toLowerCase();
     matches = store.ingredients.filter(ing => {
-      if (!ing.category || !ing.name) return false;
+      if (!ing.category) return false;
+      // 包材没有name字段，所以只检查category
       const name = (ing.name || '').toLowerCase();
       const category = (ing.category || '').toLowerCase();
       const brand = (ing.brand || '').toLowerCase();
-      return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower);
+      const description = (ing.description || '').toLowerCase();
+      const code = (ing.code || '').toLowerCase();
+      return name.includes(qLower) || category.includes(qLower) || brand.includes(qLower) || description.includes(qLower) || code.includes(qLower);
     }).slice(0, 10);
   }
   
@@ -9006,12 +9009,20 @@ async function searchIngredients(query) {
   
   resultsEl.innerHTML = matches.map(ing => {
     const unit = ing.unit || 'g';
+    // 包材没有name字段，显示类别
+    let displayName = ing.name || ing.category || '';
+    if (ing.description) {
+      displayName += (displayName ? '-' : '') + ing.description;
+    }
+    if (ing.brand) {
+      displayName += (displayName ? '（' : '') + ing.brand + '）';
+    }
     return `
       <div class="ingredient-search-item" data-id="${ing.id}" data-backend-id="${ing._backendId || ''}" style="padding:8px 12px; cursor:pointer; border-bottom:0.5px solid var(--border); transition:background 0.2s;"
            onmouseover="this.style.background='var(--bg-secondary)'"
            onmouseout="this.style.background=''">
-        <div style="font-weight:500;">${ing.name || ''}${ing.description ? '-' + ing.description : ''}${ing.brand ? '（' + ing.brand + '）' : ''}</div>
-        <div style="font-size:12px; color:var(--text-secondary);">单位: ${unit}</div>
+        <div style="font-weight:500;">${displayName || '-'}</div>
+        <div style="font-size:12px; color:var(--text-secondary);">${ing.category ? '类别: ' + ing.category : ''}${ing.category && unit ? ' | ' : ''}${unit ? '单位: ' + unit : ''}</div>
       </div>
     `;
   }).join('');
@@ -9676,16 +9687,6 @@ function formatRecipeDetails(recipe) {
   if (recipe.cookingLoss != null) {
     parts.push(`制作损耗：${recipe.cookingLoss}%`);
   }
-  if (recipe.sellingPrice != null) {
-    parts.push(`食谱售价：${recipe.sellingPrice} 元`);
-  }
-  if (recipe.basePrice != null) {
-    parts.push(`基础价格：${recipe.basePrice} 元`);
-  }
-  if (recipe.defaultServings != null) {
-    parts.push(`默认份数：${recipe.defaultServings}`);
-  }
-  
   // 食材列表
   if (recipe.ingredients && recipe.ingredients.length > 0) {
     parts.push(`食材列表：`);
@@ -9950,10 +9951,6 @@ function openRecipeForm(id = null, recipeData = null) {
     
     // 设置制作损耗、售价、基础价格、默认份数
     $('r-cookingLoss').value = recipe.cookingLoss != null ? recipe.cookingLoss : 7;
-    $('r-sellingPrice').value = recipe.sellingPrice != null ? recipe.sellingPrice : '';
-    $('r-basePrice').value = recipe.basePrice != null ? recipe.basePrice : '';
-    $('r-defaultServings').value = recipe.defaultServings != null ? recipe.defaultServings : '';
-    
     // 设置描述
     const descEl = $('r-description');
     if (descEl) {
@@ -9995,9 +9992,6 @@ function openRecipeForm(id = null, recipeData = null) {
     $('r-software').value = 'ADF';
     $('r-recipeType').value = 'standard';
     $('r-cookingLoss').value = 7;
-    $('r-sellingPrice').value = '';
-    $('r-basePrice').value = '';
-    $('r-defaultServings').value = '';
     const descEl = $('r-description');
     if (descEl) {
       descEl.value = '';
@@ -10342,9 +10336,6 @@ function setupRecipesModule() {
         totalWeight: totalWeight > 0 ? totalWeight : null,
         kcalDensity: kcalDensity > 0 ? kcalDensity : null,
         cookingLoss: parseInt($('r-cookingLoss').value) || 7,
-        sellingPrice: $('r-sellingPrice').value ? parseFloat($('r-sellingPrice').value) : null,
-        basePrice: $('r-basePrice').value ? parseFloat($('r-basePrice').value) : null,
-        defaultServings: $('r-defaultServings').value ? parseInt($('r-defaultServings').value, 10) : null,
         cookingSteps: currentRecipeCookingSteps
           .map((step, index) => {
             // 处理不同格式的步骤数据
