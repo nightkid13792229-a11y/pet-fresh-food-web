@@ -215,6 +215,7 @@ export const createRecipe = async (payload, userId) => {
     
     // 插入食材关联
     // 注意：现在只保存 ingredientName，不保存 ingredientId
+    console.log(`[createRecipe] 准备保存的食材数据:`, payload.ingredients);
     if (payload.ingredients && Array.isArray(payload.ingredients) && payload.ingredients.length > 0) {
       const ingredientSql = `
         INSERT INTO recipe_ingredients (recipe_id, ingredient_name, weight, unit)
@@ -226,7 +227,11 @@ export const createRecipe = async (payload, userId) => {
         ing.weight || null,
         ing.unit || 'g'
       ]);
+      console.log(`[createRecipe] 准备插入 ${ingredientValues.length} 条食材记录到食谱 ${recipeId}`);
       await conn.query(ingredientSql, [ingredientValues]);
+      console.log(`[createRecipe] 成功插入食材记录`);
+    } else {
+      console.log(`[createRecipe] 没有食材数据需要保存`);
     }
     
     // 插入制作步骤
@@ -362,7 +367,11 @@ export const updateRecipe = async (id, payload, userId) => {
           ing.weight || null,
           ing.unit || 'g'
         ]);
+        console.log(`[updateRecipe] 准备插入 ${ingredientValues.length} 条食材记录到食谱 ${id}`);
         await conn.query(ingredientSql, [ingredientValues]);
+        console.log(`[updateRecipe] 成功插入食材记录`);
+      } else {
+        console.log(`[updateRecipe] 没有食材数据需要保存`);
       }
     }
     

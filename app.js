@@ -10464,14 +10464,19 @@ function setupRecipesModule() {
         nutritionStandard: $('r-nutritionStandard').value || 'FEDIAF',
         software: $('r-software').value || 'ADF',
         recipeType: $('r-recipeType').value || 'standard',
-        ingredients: currentRecipeIngredients.map(item => {
-          // 只保存食材名称，不保存ID
-          return {
-            ingredientName: item.ingredientName || '', // 只保存食材名称
-            weight: item.weight,
-            unit: item.unit || 'g'
-          };
-        }),
+        ingredients: (() => {
+          const ingredientsToSave = currentRecipeIngredients.map(item => {
+            // 只保存食材名称，不保存ID
+            return {
+              ingredientName: item.ingredientName || '', // 只保存食材名称
+              weight: item.weight,
+              unit: item.unit || 'g'
+            };
+          });
+          console.log('[saveRecipe] 准备保存的食材数据:', ingredientsToSave);
+          console.log('[saveRecipe] currentRecipeIngredients 长度:', currentRecipeIngredients.length);
+          return ingredientsToSave;
+        })(),
         protein: $('r-protein').value ? parseFloat($('r-protein').value) : null,
         fat: $('r-fat').value ? parseFloat($('r-fat').value) : null,
         carb: $('r-carb').value ? parseFloat($('r-carb').value) : null,
