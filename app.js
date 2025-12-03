@@ -4687,13 +4687,19 @@ function formatIngredientDetails(ing) {
     }
   } else if (ing.classification === '营养补充剂' && (ing.mainNutrient || ing.unitContent || ing.nutrientUnit)) {
     rows.push({ type: 'section', title: '营养补充剂信息' });
+    
+    // 获取单位值用于显示
+    const unitDisplay = ing.unit || '单位';
+    const nutrientUnitDisplay = ing.nutrientUnit || '';
+    
+    // 营养素含量/单位的显示：数值 + 营养素单位（如：500 mg）
+    const unitContentValue = ing.unitContent 
+      ? `${ing.unitContent}${nutrientUnitDisplay ? ' ' + nutrientUnitDisplay : ''}` 
+      : '-';
+    
     rows.push([
       { label: '主要营养素', value: ing.mainNutrient || '-' },
-      { label: '营养素含量/单位', value: ing.unitContent || '-' }
-    ]);
-    rows.push([
-      { label: '营养素单位', value: ing.nutrientUnit || '-' },
-      { label: '价格/100营养素单位', value: ing.pricePer100NutrientUnit != null ? formatNum(ing.pricePer100NutrientUnit, 4) : '-' }
+      { label: `营养素含量/${unitDisplay}`, value: unitContentValue }
     ]);
   }
   
@@ -4706,17 +4712,43 @@ function formatIngredientDetails(ing) {
   
   // ========== 采购信息组 ==========
   rows.push({ type: 'section', title: '采购信息' });
-  rows.push([
-    { label: '采购渠道', value: ing.source || '-' },
-    { label: '单位', value: ing.unit || '-' }
-  ]);
   
-  const cost = ing.cost != null ? formatNum(ing.cost, 2) : '-';
-  const quantity = ing.quantity != null ? `${formatNum(ing.quantity, 1)} ${ing.unit || ''}` : '-';
-  rows.push([
-    { label: '费用（采购价格）', value: cost },
-    { label: '单量（采购数量）', value: quantity }
-  ]);
+  if (ing.classification === '营养补充剂') {
+    // 营养补充剂：不显示单位字段，添加采购日期字段
+    rows.push([
+      { label: '采购渠道', value: ing.source || '-' },
+      { label: '采购日期', value: '' } // 暂时留空，待后续完善采购系统
+    ]);
+    
+    const cost = ing.cost != null ? formatNum(ing.cost, 2) : '-';
+    const quantity = ing.quantity != null ? `${formatNum(ing.quantity, 1)} ${ing.unit || ''}` : '-';
+    rows.push([
+      { label: '费用（采购价格）', value: cost },
+      { label: '单量（采购数量）', value: quantity }
+    ]);
+    
+    // 价格/100营养素单位：移动到采购信息中，营养素单位替换为实际值
+    const nutrientUnitDisplay = ing.nutrientUnit || '营养素单位';
+    const pricePer100NutrientUnit = ing.pricePer100NutrientUnit != null 
+      ? formatNum(ing.pricePer100NutrientUnit, 4) 
+      : '-';
+    rows.push([
+      { label: `价格/100${nutrientUnitDisplay}`, value: pricePer100NutrientUnit, colspan: 2 }
+    ]);
+  } else {
+    // 食材和包材：显示单位字段，不显示采购日期
+    rows.push([
+      { label: '采购渠道', value: ing.source || '-' },
+      { label: '单位', value: ing.unit || '-' }
+    ]);
+    
+    const cost = ing.cost != null ? formatNum(ing.cost, 2) : '-';
+    const quantity = ing.quantity != null ? `${formatNum(ing.quantity, 1)} ${ing.unit || ''}` : '-';
+    rows.push([
+      { label: '费用（采购价格）', value: cost },
+      { label: '单量（采购数量）', value: quantity }
+    ]);
+  }
   
   // ========== 价格信息组 ==========
   // 营养补充剂不显示价格信息（价格/100营养素单位已在"营养补充剂信息"组中显示）
