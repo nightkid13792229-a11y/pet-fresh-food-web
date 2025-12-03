@@ -75,11 +75,18 @@ export const listRecipes = async (options = {}) => {
 
   // 为每个食谱加载关联的食材数据
   for (const recipe of items) {
+    // 初始化，确保始终有值
+    recipe.ingredients = [];
+    recipe.cookingSteps = [];
+    
     try {
       logger.info(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
+      logger.info(`[listRecipes] 当前 recipe 对象键:`, Object.keys(recipe).join(', '));
+      
       // 尝试查询 weight 字段，如果不存在则查询 default_amount 字段（兼容旧表结构）
       let ingredients = [];
       try {
+        logger.info(`[listRecipes] 准备查询食谱 ${recipe.id} 的食材记录（使用 weight 字段）`);
         ingredients = await query(`
           SELECT 
             ri.id,
@@ -92,11 +99,13 @@ export const listRecipes = async (options = {}) => {
         `, [recipe.id]);
         logger.info(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
         if (ingredients.length > 0) {
+          logger.info(`[listRecipes] 查询结果:`, JSON.stringify(ingredients, null, 2));
           logger.debug(`[listRecipes] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
         }
       } catch (error) {
         logger.error(`[listRecipes] 查询食材记录失败:`, error);
         logger.error(`[listRecipes] 错误代码: ${error.code}, 错误信息: ${error.message}`);
+        logger.error(`[listRecipes] 错误堆栈:`, error.stack);
         // 如果 weight 字段不存在，尝试使用 default_amount 字段
         if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
           logger.info(`[listRecipes] weight 字段不存在，使用 default_amount 字段查询`);
@@ -112,8 +121,12 @@ export const listRecipes = async (options = {}) => {
               ORDER BY ri.id ASC
             `, [recipe.id]);
             logger.info(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
+            if (ingredients.length > 0) {
+              logger.info(`[listRecipes] 查询结果:`, JSON.stringify(ingredients, null, 2));
+            }
           } catch (error2) {
             logger.error(`[listRecipes] 使用 default_amount 字段查询也失败:`, error2);
+            logger.error(`[listRecipes] 错误堆栈:`, error2.stack);
             ingredients = [];
           }
         } else {
@@ -124,18 +137,28 @@ export const listRecipes = async (options = {}) => {
       
       // 确保 ingredients 是数组
       if (!Array.isArray(ingredients)) {
-        logger.warn(`[listRecipes] ingredients 不是数组，重置为空数组`);
+        logger.warn(`[listRecipes] ingredients 不是数组，重置为空数组。实际类型: ${typeof ingredients}, 值:`, ingredients);
         ingredients = [];
       }
       
-      recipe.ingredients = ingredients.map(ing => ({
-        id: ing.id,
-        ingredientName: ing.ingredientName || '',
-        weight: ing.weight,
-        unit: ing.unit || 'g'
-      }));
+      logger.info(`[listRecipes] 准备映射 ingredients，数量: ${ingredients.length}`);
+      recipe.ingredients = ingredients.map(ing => {
+        if (!ing) {
+          logger.warn(`[listRecipes] 发现 null 或 undefined 的 ing 项`);
+          return null;
+        }
+        return {
+          id: ing.id,
+          ingredientName: ing.ingredientName || '',
+          weight: ing.weight,
+          unit: ing.unit || 'g'
+        };
+      }).filter(ing => ing !== null);
       
       logger.info(`[listRecipes] 食谱 ${recipe.id} 最终 ingredients 数量: ${recipe.ingredients.length}`);
+      if (recipe.ingredients.length > 0) {
+        logger.info(`[listRecipes] 最终 ingredients 内容:`, JSON.stringify(recipe.ingredients, null, 2));
+      }
 
       // 加载制作步骤
       let steps = [];
@@ -175,6 +198,35 @@ export const listRecipes = async (options = {}) => {
       logger.warn(`[listRecipes] 食谱 ${recipe.id} cookingSteps 为 undefined，设置为空数组`);
       recipe.cookingSteps = [];
     }
+    
+    // 最终验证：确保 ingredients 是数组
+    if (!Array.isArray(recipe.ingredients)) {
+      logger.error(`[listRecipes] 食谱 ${recipe.id} ingredients 不是数组！类型: ${typeof recipe.ingredients}, 值:`, recipe.ingredients);
+      recipe.ingredients = [];
+    }
+    
+    logger.info(`[listRecipes] 食谱 ${recipe.id} 最终验证后 ingredients 数量: ${recipe.ingredients.length}`);
+    logger.info(`[listRecipes] 食谱 ${recipe.id} 最终返回数据包含 ingredients: ${'ingredients' in recipe}`);
+  }
+
+  // 在返回前，再次验证所有 items
+  logger.info(`[listRecipes] 准备返回 ${items.length} 条食谱记录`);
+  for (const recipe of items) {
+    if (!recipe.ingredients) {
+      logger.error(`[listRecipes] 返回前发现食谱 ${recipe.id} ingredients 为 undefined！`);
+      recipe.ingredients = [];
+    }
+    if (!Array.isArray(recipe.ingredients)) {
+      logger.error(`[listRecipes] 返回前发现食谱 ${recipe.id} ingredients 不是数组！`);
+      recipe.ingredients = [];
+    }
+    logger.info(`[listRecipes] 食谱 ${recipe.id} (${recipe.name}) 返回数据检查:`, JSON.stringify({
+      id: recipe.id,
+      name: recipe.name,
+      hasIngredients: 'ingredients' in recipe,
+      ingredientsCount: recipe.ingredients ? recipe.ingredients.length : 'N/A',
+      ingredientsType: typeof recipe.ingredients
+    }));
   }
 
   return {
