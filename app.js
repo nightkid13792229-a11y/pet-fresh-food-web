@@ -9075,7 +9075,11 @@ async function searchIngredients(query) {
         category: ing.category,
         classification: ing.classification,
         unit: ing.unit || 'g'
-      }));
+      }))
+      // 按食材名称和单位去重（因为食谱中只保存名称，显示多个同名原料没有意义）
+      .filter((ing, index, self) => 
+        index === self.findIndex(i => i.name === ing.name && (i.unit || 'g') === (ing.unit || 'g'))
+      );
   } catch (error) {
     console.error('[searchIngredients] 后端搜索失败:', error);
     resultsEl.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-error);">搜索失败，请稍后重试</div>';
