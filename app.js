@@ -10135,8 +10135,9 @@ function openRecipeForm(id = null, recipeData = null) {
     // 兼容 caRatio（后端）和 caPratio（旧数据）
     $('r-caPratio').value = (recipe.caRatio || recipe.caPratio) != null ? (recipe.caRatio || recipe.caPratio) : '';
     $('r-totalKcal').value = recipe.totalKcal != null ? recipe.totalKcal : '';
-    $('r-totalWeight').value = recipe.totalWeight != null ? recipe.totalWeight.toFixed(2) : '';
-    $('r-kcalDensity').value = recipe.kcalDensity != null ? recipe.kcalDensity.toFixed(2) : '';
+    // 确保 totalWeight 和 kcalDensity 转换为数字后再调用 toFixed
+    $('r-totalWeight').value = recipe.totalWeight != null ? parseFloat(recipe.totalWeight).toFixed(2) : '';
+    $('r-kcalDensity').value = recipe.kcalDensity != null ? parseFloat(recipe.kcalDensity).toFixed(2) : '';
     
     // 计算总重量和热量密度
     calculateRecipeTotalWeight();
