@@ -70,10 +70,12 @@ export const listRecipes = async (options = {}) => {
   }
 
   const items = await query(sql, params);
+  console.log(`[listRecipes] 查询到 ${items.length} 条食谱记录`);
 
   // 为每个食谱加载关联的食材数据
   for (const recipe of items) {
     try {
+      console.log(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
       const ingredients = await query(`
         SELECT 
           ri.id,
@@ -85,6 +87,7 @@ export const listRecipes = async (options = {}) => {
         ORDER BY ri.id ASC
       `, [recipe.id]);
       
+      console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录`);
       recipe.ingredients = ingredients.map(ing => ({
         id: ing.id,
         ingredientName: ing.ingredientName || '',
