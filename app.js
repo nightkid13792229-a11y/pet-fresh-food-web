@@ -4810,8 +4810,8 @@ function renderIngredientsList() {
           <div>${ing.category || '-'}</div>
           <div>${ing.classification === '包材' ? '-' : (ing.name || '-')}</div>
           <div>${ing.brand || '-'}</div>
-          <div>${ing.model || '-'}</div>
           <div>${ing.source || '-'}</div>
+          <div>${ing.model || '-'}</div>
           <div style="font-size:13px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;" title="${description}">${description}</div>
         </div>
         <div class="item-actions">
