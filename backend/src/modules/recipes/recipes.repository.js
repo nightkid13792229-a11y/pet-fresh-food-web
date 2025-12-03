@@ -71,12 +71,12 @@ export const listRecipes = async (options = {}) => {
   }
 
   const items = await query(sql, params);
-  console.log(`[listRecipes] 查询到 ${items.length} 条食谱记录`);
+  logger.info(`[listRecipes] 查询到 ${items.length} 条食谱记录`);
 
   // 为每个食谱加载关联的食材数据
   for (const recipe of items) {
     try {
-      console.log(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
+      logger.info(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
       // 尝试查询 weight 字段，如果不存在则查询 default_amount 字段（兼容旧表结构）
       let ingredients;
       try {
@@ -90,16 +90,16 @@ export const listRecipes = async (options = {}) => {
           WHERE ri.recipe_id = ?
           ORDER BY ri.id ASC
         `, [recipe.id]);
-        console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
+        logger.info(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
         if (ingredients.length > 0) {
-          console.log(`[listRecipes] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
+          logger.debug(`[listRecipes] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
         }
       } catch (error) {
-        console.error(`[listRecipes] 查询食材记录失败:`, error);
-        console.error(`[listRecipes] 错误代码: ${error.code}, 错误信息: ${error.message}`);
+        logger.error(`[listRecipes] 查询食材记录失败:`, error);
+        logger.error(`[listRecipes] 错误代码: ${error.code}, 错误信息: ${error.message}`);
         // 如果 weight 字段不存在，尝试使用 default_amount 字段
         if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
-          console.log(`[listRecipes] weight 字段不存在，使用 default_amount 字段查询`);
+          logger.info(`[listRecipes] weight 字段不存在，使用 default_amount 字段查询`);
           ingredients = await query(`
             SELECT 
               ri.id,
@@ -110,9 +110,9 @@ export const listRecipes = async (options = {}) => {
             WHERE ri.recipe_id = ?
             ORDER BY ri.id ASC
           `, [recipe.id]);
-          console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
+          logger.info(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
         } else {
-          console.error(`[listRecipes] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
+          logger.error(`[listRecipes] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
           throw error;
         }
       }
@@ -137,7 +137,7 @@ export const listRecipes = async (options = {}) => {
         description: step.description
       }));
     } catch (error) {
-      console.error(`[listRecipes] 加载食谱 ${recipe.id} (${recipe.name}) 的关联数据失败:`, error);
+      logger.error(`[listRecipes] 加载食谱 ${recipe.id} (${recipe.name}) 的关联数据失败:`, error);
       // 确保即使出错也有默认值
       recipe.ingredients = [];
       recipe.cookingSteps = [];
@@ -174,16 +174,16 @@ export const getRecipeById = async (id) => {
       WHERE ri.recipe_id = ?
       ORDER BY ri.id ASC
     `, [id]);
-    console.log(`[getRecipeById] 食谱 ${id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
+    logger.info(`[getRecipeById] 食谱 ${id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
     if (ingredients.length > 0) {
-      console.log(`[getRecipeById] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
+      logger.debug(`[getRecipeById] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
     }
   } catch (error) {
-    console.error(`[getRecipeById] 查询食材记录失败:`, error);
-    console.error(`[getRecipeById] 错误代码: ${error.code}, 错误信息: ${error.message}`);
+    logger.error(`[getRecipeById] 查询食材记录失败:`, error);
+    logger.error(`[getRecipeById] 错误代码: ${error.code}, 错误信息: ${error.message}`);
     // 如果 weight 字段不存在，尝试使用 default_amount 字段
     if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
-      console.log(`[getRecipeById] weight 字段不存在，使用 default_amount 字段查询`);
+      logger.info(`[getRecipeById] weight 字段不存在，使用 default_amount 字段查询`);
       ingredients = await query(`
         SELECT 
           ri.id,
@@ -194,9 +194,9 @@ export const getRecipeById = async (id) => {
         WHERE ri.recipe_id = ?
         ORDER BY ri.id ASC
       `, [id]);
-      console.log(`[getRecipeById] 食谱 ${id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
+      logger.info(`[getRecipeById] 食谱 ${id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
     } else {
-      console.error(`[getRecipeById] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
+      logger.error(`[getRecipeById] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
       throw error;
     }
   }
@@ -454,18 +454,18 @@ export const updateRecipe = async (id, payload, userId) => {
           ing.weight || null,
           ing.unit || 'g'
         ]);
-        console.log(`[updateRecipe] 准备插入 ${ingredientValues.length} 条食材记录到食谱 ${id}`);
-        console.log(`[updateRecipe] 食材数据:`, JSON.stringify(ingredientValues, null, 2));
+        logger.info(`[updateRecipe] 准备插入 ${ingredientValues.length} 条食材记录到食谱 ${id}`);
+        logger.debug(`[updateRecipe] 食材数据:`, JSON.stringify(ingredientValues, null, 2));
         try {
           await conn.query(ingredientSql, [ingredientValues]);
-          console.log(`[updateRecipe] 成功插入食材记录（使用 weight 字段）`);
+          logger.info(`[updateRecipe] 成功插入食材记录（使用 weight 字段）`);
         } catch (error) {
-          console.error(`[updateRecipe] 插入食材记录失败:`, error);
-          console.error(`[updateRecipe] 错误代码: ${error.code}, 错误信息: ${error.message}`);
-          console.error(`[updateRecipe] SQL: ${ingredientSql}`);
+          logger.error(`[updateRecipe] 插入食材记录失败:`, error);
+          logger.error(`[updateRecipe] 错误代码: ${error.code}, 错误信息: ${error.message}`);
+          logger.error(`[updateRecipe] SQL: ${ingredientSql}`);
           // 如果 weight 字段不存在，尝试使用 default_amount 字段
           if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
-            console.log(`[updateRecipe] weight 字段不存在，尝试使用 default_amount 字段`);
+            logger.info(`[updateRecipe] weight 字段不存在，尝试使用 default_amount 字段`);
             ingredientSql = `
               INSERT INTO recipe_ingredients (recipe_id, ingredient_name, default_amount, unit)
               VALUES ?
@@ -476,17 +476,17 @@ export const updateRecipe = async (id, payload, userId) => {
               ing.weight || null,
               ing.unit || 'g'
             ]);
-            console.log(`[updateRecipe] 使用 default_amount 字段，数据:`, JSON.stringify(ingredientValuesAlt, null, 2));
+            logger.debug(`[updateRecipe] 使用 default_amount 字段，数据:`, JSON.stringify(ingredientValuesAlt, null, 2));
             await conn.query(ingredientSql, [ingredientValuesAlt]);
-            console.log(`[updateRecipe] 成功插入食材记录（使用 default_amount 字段）`);
+            logger.info(`[updateRecipe] 成功插入食材记录（使用 default_amount 字段）`);
           } else {
             // 记录详细错误信息并抛出
-            console.error(`[updateRecipe] 无法插入食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
+            logger.error(`[updateRecipe] 无法插入食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
             throw error;
           }
         }
       } else {
-        console.log(`[updateRecipe] 没有食材数据需要保存`);
+        logger.info(`[updateRecipe] 没有食材数据需要保存`);
       }
     }
     
