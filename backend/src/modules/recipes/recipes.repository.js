@@ -76,16 +76,37 @@ export const listRecipes = async (options = {}) => {
   for (const recipe of items) {
     try {
       console.log(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
-      const ingredients = await query(`
-        SELECT 
-          ri.id,
-          ri.ingredient_name AS ingredientName,
-          ri.weight,
-          ri.unit
-        FROM recipe_ingredients ri
-        WHERE ri.recipe_id = ?
-        ORDER BY ri.id ASC
-      `, [recipe.id]);
+      // 尝试查询 weight 字段，如果不存在则查询 default_amount 字段（兼容旧表结构）
+      let ingredients;
+      try {
+        ingredients = await query(`
+          SELECT 
+            ri.id,
+            ri.ingredient_name AS ingredientName,
+            ri.weight,
+            ri.unit
+          FROM recipe_ingredients ri
+          WHERE ri.recipe_id = ?
+          ORDER BY ri.id ASC
+        `, [recipe.id]);
+      } catch (error) {
+        // 如果 weight 字段不存在，尝试使用 default_amount 字段
+        if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
+          console.log(`[listRecipes] weight 字段不存在，使用 default_amount 字段查询`);
+          ingredients = await query(`
+            SELECT 
+              ri.id,
+              ri.ingredient_name AS ingredientName,
+              ri.default_amount AS weight,
+              ri.unit
+            FROM recipe_ingredients ri
+            WHERE ri.recipe_id = ?
+            ORDER BY ri.id ASC
+          `, [recipe.id]);
+        } else {
+          throw error;
+        }
+      }
       
       console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录`);
       recipe.ingredients = ingredients.map(ing => ({
@@ -217,7 +238,8 @@ export const createRecipe = async (payload, userId) => {
     // 注意：现在只保存 ingredientName，不保存 ingredientId
     console.log(`[createRecipe] 准备保存的食材数据:`, payload.ingredients);
     if (payload.ingredients && Array.isArray(payload.ingredients) && payload.ingredients.length > 0) {
-      const ingredientSql = `
+      // 尝试使用 weight 字段，如果失败则使用 default_amount 字段（兼容旧表结构）
+      let ingredientSql = `
         INSERT INTO recipe_ingredients (recipe_id, ingredient_name, weight, unit)
         VALUES ?
       `;
@@ -228,8 +250,29 @@ export const createRecipe = async (payload, userId) => {
         ing.unit || 'g'
       ]);
       console.log(`[createRecipe] 准备插入 ${ingredientValues.length} 条食材记录到食谱 ${recipeId}`);
-      await conn.query(ingredientSql, [ingredientValues]);
-      console.log(`[createRecipe] 成功插入食材记录`);
+      try {
+        await conn.query(ingredientSql, [ingredientValues]);
+        console.log(`[createRecipe] 成功插入食材记录（使用 weight 字段）`);
+      } catch (error) {
+        // 如果 weight 字段不存在，尝试使用 default_amount 字段
+        if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
+          console.log(`[createRecipe] weight 字段不存在，尝试使用 default_amount 字段`);
+          ingredientSql = `
+            INSERT INTO recipe_ingredients (recipe_id, ingredient_name, default_amount, unit)
+            VALUES ?
+          `;
+          const ingredientValuesAlt = payload.ingredients.map(ing => [
+            recipeId,
+            ing.ingredientName || '',
+            ing.weight || null,
+            ing.unit || 'g'
+          ]);
+          await conn.query(ingredientSql, [ingredientValuesAlt]);
+          console.log(`[createRecipe] 成功插入食材记录（使用 default_amount 字段）`);
+        } else {
+          throw error;
+        }
+      }
     } else {
       console.log(`[createRecipe] 没有食材数据需要保存`);
     }
