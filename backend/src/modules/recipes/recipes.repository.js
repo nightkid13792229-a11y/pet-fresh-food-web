@@ -89,7 +89,13 @@ export const listRecipes = async (options = {}) => {
           WHERE ri.recipe_id = ?
           ORDER BY ri.id ASC
         `, [recipe.id]);
+        console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
+        if (ingredients.length > 0) {
+          console.log(`[listRecipes] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
+        }
       } catch (error) {
+        console.error(`[listRecipes] 查询食材记录失败:`, error);
+        console.error(`[listRecipes] 错误代码: ${error.code}, 错误信息: ${error.message}`);
         // 如果 weight 字段不存在，尝试使用 default_amount 字段
         if (error.code === 'ER_BAD_FIELD_ERROR' && error.message.includes('weight')) {
           console.log(`[listRecipes] weight 字段不存在，使用 default_amount 字段查询`);
@@ -103,12 +109,12 @@ export const listRecipes = async (options = {}) => {
             WHERE ri.recipe_id = ?
             ORDER BY ri.id ASC
           `, [recipe.id]);
+          console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
         } else {
+          console.error(`[listRecipes] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
           throw error;
         }
       }
-      
-      console.log(`[listRecipes] 食谱 ${recipe.id} 查询到 ${ingredients.length} 条食材记录`);
       recipe.ingredients = ingredients.map(ing => ({
         id: ing.id,
         ingredientName: ing.ingredientName || '',
