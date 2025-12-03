@@ -9059,13 +9059,13 @@ async function searchIngredients(query) {
   try {
     const params = new URLSearchParams({
       search: q,
-      classification: '食材', // 只搜索食材，排除包材和营养补充剂
-      pageSize: 10 // 最多显示10个结果
+      // 不限制分类，允许搜索食材和营养补充剂（食谱中可以添加这两种）
+      pageSize: 20 // 增加结果数量，因为要去重
     });
     const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
-    // 再次过滤，确保只包含食材（双重保险）
+    // 过滤，只包含食材和营养补充剂（排除包材）
     matches = (data.items || [])
-      .filter(ing => ing.classification === '食材')
+      .filter(ing => ing.classification === '食材' || ing.classification === '营养补充剂')
       .map(ing => ({
         id: `ing_${ing.id}`, // 修复：使用 ing_ 前缀，与 loadIngredientsFromBackend 保持一致
         _backendId: ing.id,
@@ -10398,28 +10398,20 @@ function setupRecipesModule() {
         return;
       }
       
-      // 验证食材ID有效性（如果有后端连接）
+      // 验证食材名称有效性（如果有后端连接）
+      // 注意：现在只保存 ingredientName，不保存 ingredientId
       if (backendState.token) {
         const invalidIngredients = [];
         for (const item of currentRecipeIngredients) {
-          if (!item.ingredientId) {
-            invalidIngredients.push('存在无效的食材ID');
+          // 验证食材名称是否存在且不为空
+          if (!item.ingredientName || !item.ingredientName.trim()) {
+            invalidIngredients.push('存在无效的食材名称');
             break;
           }
-          // 检查本地store中是否存在，如果不存在，尝试从后端验证
-          const localIng = store.ingredients.find(i => i.id === item.ingredientId);
-          if (!localIng) {
-            // 如果本地找不到，尝试从后端获取（使用_backendId）
-            const backendId = item._backendId || (item.ingredientId.toString().startsWith('ingredient_') ? parseInt(item.ingredientId.replace('ingredient_', ''), 10) : null);
-            if (backendId) {
-              try {
-                await backendRequest(`/api/v1/ingredients/${backendId}`);
-              } catch (error) {
-                invalidIngredients.push(`食材ID ${backendId} 不存在`);
-              }
-            } else {
-              invalidIngredients.push('存在无效的食材ID');
-            }
+          // 验证重量是否有效
+          if (!item.weight || item.weight <= 0) {
+            invalidIngredients.push(`食材"${item.ingredientName}"的重量无效`);
+            break;
           }
         }
         if (invalidIngredients.length > 0) {
