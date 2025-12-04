@@ -10072,13 +10072,53 @@ function formatRecipeDetails(recipe) {
           const nutrientUnit = supplement.nutrientUnit || '';
           const mainNutrient = supplement.mainNutrient || '';
           
+          // 调试信息：输出营养补充剂的详细信息
+          console.log(`[formatRecipeDetails] 营养补充剂 "${item.name}":`, {
+            unitContent,
+            nutrientUnit,
+            mainNutrient,
+            weight: item.weight,
+            totalWeight: recipe.totalWeight,
+            supplement: {
+              name: supplement.name,
+              unitContent: supplement.unitContent,
+              nutrientUnit: supplement.nutrientUnit,
+              mainNutrient: supplement.mainNutrient
+            }
+          });
+          
           // 检查必要的数据是否完整
           if (unitContent > 0 && recipe.totalWeight > 0 && recipe.totalWeight > 0 && item.weight > 0) {
             // N = 该营养补充剂在食谱中的用量 * 该营养补充剂营养素含量 / 食谱总重量 * 100
             const N = Math.round((item.weight * unitContent / recipe.totalWeight) * 100);
-            if (N > 0 && nutrientUnit && mainNutrient) {
-              fourthColumn = `每100g饭量添加 ${N} ${nutrientUnit} ${mainNutrient}`;
+            if (N > 0) {
+              // 即使 nutrientUnit 或 mainNutrient 为空，也尝试显示
+              if (nutrientUnit && mainNutrient) {
+                fourthColumn = `每100g饭量添加 ${N} ${nutrientUnit} ${mainNutrient}`;
+              } else if (nutrientUnit) {
+                fourthColumn = `每100g饭量添加 ${N} ${nutrientUnit}`;
+              } else if (mainNutrient) {
+                fourthColumn = `每100g饭量添加 ${N} ${mainNutrient}`;
+              } else {
+                // 如果都没有，至少显示N值
+                fourthColumn = `每100g饭量添加 ${N} 单位营养素`;
+              }
+            } else {
+              console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 计算出的N为0或负数:`, {
+                weight: item.weight,
+                unitContent,
+                totalWeight: recipe.totalWeight,
+                calculatedN: (item.weight * unitContent / recipe.totalWeight) * 100
+              });
             }
+          } else {
+            console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 数据不完整:`, {
+              unitContent,
+              totalWeight: recipe.totalWeight,
+              itemWeight: item.weight,
+              hasNutrientUnit: !!nutrientUnit,
+              hasMainNutrient: !!mainNutrient
+            });
           }
         } else {
           // 调试信息：如果找不到营养补充剂，在控制台输出
