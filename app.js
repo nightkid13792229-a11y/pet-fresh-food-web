@@ -10159,13 +10159,19 @@ function formatRecipeDetails(recipe) {
           const nutrientUnit = supplement.nutrientUnit || '';
           const mainNutrient = supplement.mainNutrient || '';
           
+          // 修复：使用计算出的 totalWeightForPercent 作为总重量，而不是 recipe.totalWeight
+          // 如果 totalWeightForPercent 为 0，则使用服务器端的 recipe.totalWeight 作为后备
+          const effectiveTotalWeight = totalWeightForPercent > 0 ? totalWeightForPercent : (recipe.totalWeight || 0);
+          
           // 调试信息：输出营养补充剂的详细信息
           console.log(`[formatRecipeDetails] 营养补充剂 "${item.name}":`, {
             unitContent,
             nutrientUnit,
             mainNutrient,
             weight: item.weight,
-            totalWeight: recipe.totalWeight,
+            totalWeightForPercent,
+            recipeTotalWeight: recipe.totalWeight,
+            effectiveTotalWeight,
             supplement: {
               name: supplement.name,
               unitContent: supplement.unitContent,
@@ -10175,9 +10181,9 @@ function formatRecipeDetails(recipe) {
           });
           
           // 检查必要的数据是否完整
-          if (unitContent > 0 && recipe.totalWeight > 0 && recipe.totalWeight > 0 && item.weight > 0) {
+          if (unitContent > 0 && effectiveTotalWeight > 0 && item.weight > 0) {
             // N = 该营养补充剂在食谱中的用量 * 该营养补充剂营养素含量 / 食谱总重量 * 100
-            const N = Math.round((item.weight * unitContent / recipe.totalWeight) * 100);
+            const N = Math.round((item.weight * unitContent / effectiveTotalWeight) * 100);
             if (N > 0) {
               // 即使 nutrientUnit 或 mainNutrient 为空，也尝试显示
               if (nutrientUnit && mainNutrient) {
@@ -10194,14 +10200,16 @@ function formatRecipeDetails(recipe) {
               console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 计算出的N为0或负数:`, {
                 weight: item.weight,
                 unitContent,
-                totalWeight: recipe.totalWeight,
-                calculatedN: (item.weight * unitContent / recipe.totalWeight) * 100
+                totalWeight: effectiveTotalWeight,
+                calculatedN: (item.weight * unitContent / effectiveTotalWeight) * 100
               });
             }
           } else {
             console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 数据不完整:`, {
               unitContent,
-              totalWeight: recipe.totalWeight,
+              totalWeight: effectiveTotalWeight,
+              totalWeightForPercent,
+              recipeTotalWeight: recipe.totalWeight,
               itemWeight: item.weight,
               hasNutrientUnit: !!nutrientUnit,
               hasMainNutrient: !!mainNutrient
@@ -10224,8 +10232,10 @@ function formatRecipeDetails(recipe) {
     if (recipe.totalKcal != null) {
       html += `<span style="margin-right:16px;">总热量：${parseFloat(recipe.totalKcal).toFixed(2)} kcal</span>`;
     }
-    if (recipe.totalWeight != null) {
-      html += `<span>总重量：${parseFloat(recipe.totalWeight).toFixed(2)} g</span>`;
+    // 修复：使用计算出的 totalWeightForPercent，如果为0则使用服务器端的值
+    const displayTotalWeight = totalWeightForPercent > 0 ? totalWeightForPercent : (recipe.totalWeight || 0);
+    if (displayTotalWeight > 0) {
+      html += `<span>总重量：${parseFloat(displayTotalWeight).toFixed(2)} g</span>`;
     }
     html += '</div>';
     
