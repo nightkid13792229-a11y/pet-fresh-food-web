@@ -8198,8 +8198,20 @@ function addNameToForm() {
   selectNameForForm(newName);
 }
 function setupIngredientsModule() {
-  populateCategorySelects();
-  populateUnitSelect();
+  // 检查视图元素是否存在，如果不存在则延迟初始化
+  const viewInventory = $('view-inventory');
+  if (!viewInventory) {
+    console.warn('[setupIngredientsModule] view-inventory 元素不存在，跳过初始化');
+    return;
+  }
+  
+  try {
+    populateCategorySelects();
+    populateUnitSelect();
+  } catch (error) {
+    console.error('[setupIngredientsModule] 初始化分类和单位选择失败:', error);
+    // 继续执行其他初始化，不中断
+  }
   
   const newBtn = $('btn-new-ingredient');
   if (newBtn) newBtn.addEventListener('click', () => openIngredientForm());
@@ -14616,13 +14628,49 @@ function init() {
   setupNav();
   setupPWA();
   setupCustomersModule();
-  setupIngredientsModule();
-  setupRecipesModule();
-  setupOrdersModule();
-  setupBreedsModule();
-  setupSettingsModule();
+  
+  // 延迟初始化需要特定视图元素的模块
+  try {
+    setupIngredientsModule();
+  } catch (error) {
+    console.error('[init] setupIngredientsModule 失败:', error);
+  }
+  
+  try {
+    setupRecipesModule();
+  } catch (error) {
+    console.error('[init] setupRecipesModule 失败:', error);
+  }
+  
+  try {
+    setupOrdersModule();
+  } catch (error) {
+    console.error('[init] setupOrdersModule 失败:', error);
+  }
+  
+  try {
+    setupBreedsModule();
+  } catch (error) {
+    console.error('[init] setupBreedsModule 失败:', error);
+  }
+  
+  try {
+    setupSettingsModule();
+  } catch (error) {
+    console.error('[init] setupSettingsModule 失败:', error);
+  }
+  
   updateAuthUI();
-  renderCustomersList();
+  
+  // 只在 customers 视图存在时才渲染
+  const customersList = $('customers-list');
+  if (customersList) {
+    try {
+      renderCustomersList();
+    } catch (error) {
+      console.error('[init] renderCustomersList 失败:', error);
+    }
+  }
   
   // 恢复上次的视图，如果没有则默认显示customers
   let savedView = 'customers';
