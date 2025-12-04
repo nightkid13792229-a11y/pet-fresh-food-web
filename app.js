@@ -3293,6 +3293,60 @@ async function loadIngredientsFromBackend() {
       }
     }
     
+    // 从加载的原料中提取所有已使用的所属科目，并添加到下拉框选项
+    const usedSubjects = new Set();
+    ingredients.forEach(ing => {
+      if (ing.subject && ing.subject.trim()) {
+        usedSubjects.add(ing.subject.trim());
+      }
+    });
+    
+    if (usedSubjects.size > 0) {
+      const currentSubjects = getSubjects();
+      const subjectsToAdd = Array.from(usedSubjects).filter(s => !currentSubjects.includes(s));
+      if (subjectsToAdd.length > 0) {
+        console.log('[loadIngredientsFromBackend] Adding new subjects from ingredients:', subjectsToAdd);
+        const updatedSubjects = [...currentSubjects, ...subjectsToAdd];
+        saveSubjects(updatedSubjects);
+      }
+    }
+    
+    // 从加载的原料中提取所有已使用的部位，并添加到下拉框选项
+    const usedParts = new Set();
+    ingredients.forEach(ing => {
+      if (ing.part && ing.part.trim()) {
+        usedParts.add(ing.part.trim());
+      }
+    });
+    
+    if (usedParts.size > 0) {
+      const currentParts = getParts();
+      const partsToAdd = Array.from(usedParts).filter(p => !currentParts.includes(p));
+      if (partsToAdd.length > 0) {
+        console.log('[loadIngredientsFromBackend] Adding new parts from ingredients:', partsToAdd);
+        const updatedParts = [...currentParts, ...partsToAdd];
+        saveParts(updatedParts);
+      }
+    }
+    
+    // 从加载的原料中提取所有已使用的产地类型，并添加到下拉框选项
+    const usedOriginTypes = new Set();
+    ingredients.forEach(ing => {
+      if (ing.originType && ing.originType.trim()) {
+        usedOriginTypes.add(ing.originType.trim());
+      }
+    });
+    
+    if (usedOriginTypes.size > 0) {
+      const currentOriginTypes = getOriginTypes();
+      const originTypesToAdd = Array.from(usedOriginTypes).filter(o => !currentOriginTypes.includes(o));
+      if (originTypesToAdd.length > 0) {
+        console.log('[loadIngredientsFromBackend] Adding new origin types from ingredients:', originTypesToAdd);
+        const updatedOriginTypes = [...currentOriginTypes, ...originTypesToAdd];
+        saveOriginTypes(updatedOriginTypes);
+      }
+    }
+    
     console.log(`✓ 从后端加载了 ${ingredients.length} 条原料记录（共 ${data.total} 条）`);
     
     renderIngredientsList();
@@ -6399,9 +6453,83 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       
       // 设置新字段（根据分类）
       if (ing.classification === '食材') {
-        if ($('i-subject')) $('i-subject').value = ing.subject || '';
-        if ($('i-part')) $('i-part').value = ing.part || '';
-        if ($('i-originType')) $('i-originType').value = ing.originType || '';
+        // 所属科目
+        if ($('i-subject')) {
+          const subjectValue = (ing.subject !== null && ing.subject !== undefined) ? ing.subject : '';
+          if (subjectValue) {
+            const subjectSelect = $('i-subject');
+            const subjectExists = Array.from(subjectSelect.options).some(opt => opt.value === subjectValue);
+            if (subjectExists) {
+              subjectSelect.value = subjectValue;
+            } else {
+              // 如果选项不存在，动态添加
+              const option = document.createElement('option');
+              option.value = subjectValue;
+              option.textContent = subjectValue;
+              subjectSelect.appendChild(option);
+              subjectSelect.value = subjectValue;
+              // 同时保存到所属科目列表
+              const currentSubjects = getSubjects();
+              if (!currentSubjects.includes(subjectValue)) {
+                saveSubjects([...currentSubjects, subjectValue]);
+              }
+            }
+          } else {
+            $('i-subject').value = '';
+          }
+        }
+        
+        // 部位
+        if ($('i-part')) {
+          const partValue = (ing.part !== null && ing.part !== undefined) ? ing.part : '';
+          if (partValue) {
+            const partSelect = $('i-part');
+            const partExists = Array.from(partSelect.options).some(opt => opt.value === partValue);
+            if (partExists) {
+              partSelect.value = partValue;
+            } else {
+              // 如果选项不存在，动态添加
+              const option = document.createElement('option');
+              option.value = partValue;
+              option.textContent = partValue;
+              partSelect.appendChild(option);
+              partSelect.value = partValue;
+              // 同时保存到部位列表
+              const currentParts = getParts();
+              if (!currentParts.includes(partValue)) {
+                saveParts([...currentParts, partValue]);
+              }
+            }
+          } else {
+            $('i-part').value = '';
+          }
+        }
+        
+        // 产地类型
+        if ($('i-originType')) {
+          const originTypeValue = (ing.originType !== null && ing.originType !== undefined) ? ing.originType : '';
+          if (originTypeValue) {
+            const originTypeSelect = $('i-originType');
+            const originTypeExists = Array.from(originTypeSelect.options).some(opt => opt.value === originTypeValue);
+            if (originTypeExists) {
+              originTypeSelect.value = originTypeValue;
+            } else {
+              // 如果选项不存在，动态添加
+              const option = document.createElement('option');
+              option.value = originTypeValue;
+              option.textContent = originTypeValue;
+              originTypeSelect.appendChild(option);
+              originTypeSelect.value = originTypeValue;
+              // 同时保存到产地类型列表
+              const currentOriginTypes = getOriginTypes();
+              if (!currentOriginTypes.includes(originTypeValue)) {
+                saveOriginTypes([...currentOriginTypes, originTypeValue]);
+              }
+            }
+          } else {
+            $('i-originType').value = '';
+          }
+        }
       }
       if ($('i-model')) $('i-model').value = ing.model || '';
       if (ing.classification === '营养补充剂') {
@@ -10557,16 +10685,40 @@ function renderRecipesList() {
               if (!supplementName) return;
               
               try {
-                // 从后端API查询营养补充剂
+                // 从后端API查询营养补充剂（使用更精确的查询）
                 const params = new URLSearchParams({
                   search: supplementName,
                   classification: '营养补充剂',
-                  pageSize: 1
+                  pageSize: 10  // 增加返回数量，确保能找到
                 });
                 const response = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
                 
+                // 在返回结果中精确匹配名称
+                let found = null;
                 if (response.items && response.items.length > 0) {
-                  const found = response.items[0];
+                  // 先尝试精确匹配
+                  found = response.items.find(item => item.name === supplementName);
+                  // 如果精确匹配没找到，尝试去掉空格后匹配
+                  if (!found) {
+                    const normalizedName = supplementName.replace(/\s+/g, '');
+                    found = response.items.find(item => {
+                      const itemName = (item.name || '').replace(/\s+/g, '');
+                      return itemName === normalizedName;
+                    });
+                  }
+                  // 如果还是没找到，尝试模糊匹配
+                  if (!found) {
+                    found = response.items.find(item => {
+                      const itemName = (item.name || '').trim();
+                      const searchName = supplementName.trim();
+                      return itemName === searchName || 
+                             itemName.includes(searchName) || 
+                             searchName.includes(itemName);
+                    });
+                  }
+                }
+                
+                if (found) {
                   // 转换为前端格式
                   const supplement = {
                     name: found.name,
