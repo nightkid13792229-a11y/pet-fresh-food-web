@@ -1361,6 +1361,7 @@ function switchView(view) {
           }
         }, 100);
       }
+    }
     // 如果切换到顾客视图，从后端加载数据
     if (view === 'customers' && backendState.token) {
       setTimeout(async () => {
