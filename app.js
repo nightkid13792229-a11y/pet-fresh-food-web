@@ -1328,58 +1328,50 @@ function switchView(view) {
         }
       }, 50);
       
-      if (backendState.token) {
-        setTimeout(async () => {
-          try {
-            await loadIngredientsFromBackend();
+      setTimeout(async () => {
+        try {
+          await loadIngredientsFromBackend(); // 函数内部会处理未登录的情况
+          if (backendState.token) {
             await loadAllIngredientsForFilters(); // 加载所有数据填充筛选下拉框
-          } catch (error) {
-            console.error('[switchView] 加载原料数据失败:', error);
-          }
-        }, 100);
-      } else {
-        setTimeout(() => {
-          try {
-            store.ingredients = [];
-            renderIngredientsList();
+          } else {
             updateIngredientFilterSelects(); // 未登录时使用本地数据
-          } catch (error) {
-            console.error('[switchView] 渲染原料列表失败:', error);
           }
-        }, 100);
-      }
+        } catch (error) {
+          console.error('[switchView] 加载原料数据失败:', error);
+        }
+      }, 100);
     }
     
     // 如果切换到食谱视图，从后端加载数据
     if (view === 'recipes') {
-      if (backendState.token) {
-        setTimeout(async () => {
-          try {
-            await loadRecipesFromBackend();
-          } catch (error) {
-            console.error('[switchView] 加载食谱数据失败:', error);
-          }
-        }, 100);
-      }
+      setTimeout(async () => {
+        try {
+          await loadRecipesFromBackend(); // 函数内部会处理未登录的情况
+        } catch (error) {
+          console.error('[switchView] 加载食谱数据失败:', error);
+        }
+      }, 100);
     }
     // 如果切换到顾客视图，从后端加载数据
-    if (view === 'customers' && backendState.token) {
+    if (view === 'customers') {
       setTimeout(async () => {
-        await loadCustomersFromBackend();
+        try {
+          await loadCustomersFromBackend(); // 函数内部会处理未登录的情况
+        } catch (error) {
+          console.error('[switchView] 加载顾客数据失败:', error);
+        }
       }, 100);
     }
     // 如果切换到品种管理视图，加载数据
-    if (view === 'breeds' && backendState.token) {
+    if (view === 'breeds') {
       setTimeout(async () => {
-        await loadBreeds();
-        await loadBreedCategories();
-        renderBreedsList();
-      }, 100);
-    }
-    // 如果切换到食谱视图，重新渲染列表
-    if (view === 'recipes') {
-      setTimeout(() => {
-        renderRecipesList();
+        try {
+          await loadBreeds(); // 函数内部会处理未登录的情况
+          await loadBreedCategories();
+          renderBreedsList();
+        } catch (error) {
+          console.error('[switchView] 加载品种数据失败:', error);
+        }
       }, 100);
     }
     // 如果切换到设置视图，刷新备份列表
@@ -3277,7 +3269,12 @@ async function loadIngredientsFromBackend() {
 // 从后端加载顾客和宠物数据
 async function loadCustomersFromBackend() {
   if (!backendState.token) {
-    console.log('未登录，跳过从后端加载数据');
+    console.log('未登录，无法加载顾客数据');
+    // 清空数据并渲染空列表
+    store.customers = [];
+    store.totalCustomers = 0;
+    store.totalPages = 1;
+    renderCustomersList();
     return;
   }
   
