@@ -3223,10 +3223,10 @@ async function loadIngredientsFromBackend() {
         part: ing.part || null, // 部位（仅食材）
         originType: ing.originType || null, // 产地类型（仅食材）
         model: ing.model || null, // 型号（所有分类）
-        mainNutrient: ing.mainNutrient || null, // 主要营养素（仅营养补充剂）
-        unitContent: ing.unitContent || null, // 营养素含量/单位（仅营养补充剂）
-        nutrientUnit: ing.nutrientUnit || null, // 营养素单位（仅营养补充剂）
-        pricePer100NutrientUnit: ing.pricePer100NutrientUnit || null, // 每100营养素单位价格（仅营养补充剂）
+        mainNutrient: (ing.mainNutrient !== null && ing.mainNutrient !== undefined && ing.mainNutrient !== '') ? ing.mainNutrient : null, // 主要营养素（仅营养补充剂）
+        unitContent: (ing.unitContent !== null && ing.unitContent !== undefined) ? ing.unitContent : null, // 营养素含量/单位（仅营养补充剂）- 注意：0 是有效值，不应该转换为 null
+        nutrientUnit: (ing.nutrientUnit !== null && ing.nutrientUnit !== undefined && ing.nutrientUnit !== '') ? ing.nutrientUnit : null, // 营养素单位（仅营养补充剂）
+        pricePer100NutrientUnit: (ing.pricePer100NutrientUnit !== null && ing.pricePer100NutrientUnit !== undefined) ? ing.pricePer100NutrientUnit : null, // 每100营养素单位价格（仅营养补充剂）- 注意：0 是有效值
         createdAt: ing.createdAt ? new Date(ing.createdAt).getTime() : Date.now(),
         updatedAt: ing.updatedAt ? new Date(ing.updatedAt).getTime() : Date.now(),
         // 保存后端ID用于更新和删除
@@ -6223,7 +6223,9 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       // 设置其他字段
       $('i-cost').value = ing.cost || '';
       $('i-quantity').value = ing.quantity || '';
-      $('i-unit').value = ing.unit || 'g';
+      // 修复：如果 ing.unit 是空字符串，应该保持为空字符串，而不是默认值 'g'
+      // 但如果是 null 或 undefined，才使用默认值 'g'
+      $('i-unit').value = (ing.unit !== null && ing.unit !== undefined && ing.unit !== '') ? ing.unit : 'g';
       
       // 设置新字段（根据分类）
       if (ing.classification === '食材') {
@@ -6234,16 +6236,20 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       if ($('i-model')) $('i-model').value = ing.model || '';
       if (ing.classification === '营养补充剂') {
         if ($('i-mainNutrient')) {
-          $('i-mainNutrient').value = ing.mainNutrient || '';
+          // 修复：确保 mainNutrient 正确显示，即使值为空字符串
+          $('i-mainNutrient').value = (ing.mainNutrient !== null && ing.mainNutrient !== undefined) ? ing.mainNutrient : '';
         }
         if ($('i-unitContent')) {
-          $('i-unitContent').value = ing.unitContent || '';
+          // 修复：如果 unitContent 是 0，应该显示 '0'，而不是空字符串
+          $('i-unitContent').value = (ing.unitContent !== null && ing.unitContent !== undefined) ? String(ing.unitContent) : '';
         }
         if ($('i-nutrientUnit')) {
-          $('i-nutrientUnit').value = ing.nutrientUnit || '';
+          // 修复：确保 nutrientUnit 正确显示，即使值为空字符串
+          $('i-nutrientUnit').value = (ing.nutrientUnit !== null && ing.nutrientUnit !== undefined) ? ing.nutrientUnit : '';
         }
         if ($('i-pricePer100NutrientUnit')) {
-          $('i-pricePer100NutrientUnit').value = ing.pricePer100NutrientUnit || '';
+          // 修复：如果 pricePer100NutrientUnit 是 0，应该显示 '0'，而不是空字符串
+          $('i-pricePer100NutrientUnit').value = (ing.pricePer100NutrientUnit !== null && ing.pricePer100NutrientUnit !== undefined) ? String(ing.pricePer100NutrientUnit) : '';
         }
       }
       $('i-pricePer500').value = ing.pricePer500 || '';
@@ -8980,10 +8986,15 @@ function setupIngredientsModule() {
         const pricePer100NutrientUnitEl = $('i-pricePer100NutrientUnit');
         
         mainNutrient = mainNutrientEl && mainNutrientEl.value ? mainNutrientEl.value.trim() || null : null;
-        unitContent = unitContentEl && unitContentEl.value ? unitContentEl.value.trim() || null : null;
+        // 修复：unitContent 应该转换为数字，而不是字符串
+        // 注意：0 是有效值，不应该被转换为 null
+        unitContent = unitContentEl && unitContentEl.value 
+          ? (Number(unitContentEl.value) || (unitContentEl.value.trim() === '0' ? 0 : null))
+          : null;
         nutrientUnit = nutrientUnitEl && nutrientUnitEl.value ? nutrientUnitEl.value.trim() || null : null;
+        // 修复：pricePer100NutrientUnit 的处理，确保 0 是有效值
         pricePer100NutrientUnit = pricePer100NutrientUnitEl && pricePer100NutrientUnitEl.value 
-          ? (Number(pricePer100NutrientUnitEl.value) || null) 
+          ? (Number(pricePer100NutrientUnitEl.value) || (pricePer100NutrientUnitEl.value.trim() === '0' ? 0 : null))
           : null;
         
         // 调试日志
