@@ -72,17 +72,22 @@ export const listRecipes = async (options = {}) => {
 
   const items = await query(sql, params);
   logger.info(`[listRecipes] 查询到 ${items.length} 条食谱记录`);
+  logger.info(`[listRecipes] 开始处理 ${items.length} 条食谱记录`);
 
   // 为每个食谱加载关联的食材数据
   for (let i = 0; i < items.length; i++) {
+    logger.info(`[listRecipes] 处理第 ${i + 1}/${items.length} 条食谱记录`);
     // 将 RowDataPacket 转换为纯 JavaScript 对象，避免序列化问题
     const recipeRow = items[i];
+    logger.info(`[listRecipes] 原始 recipeRow 类型: ${typeof recipeRow}, keys: ${Object.keys(recipeRow).join(', ')}`);
     const recipe = JSON.parse(JSON.stringify(recipeRow));
     items[i] = recipe; // 替换原对象
+    logger.info(`[listRecipes] 转换后 recipe 类型: ${typeof recipe}, keys: ${Object.keys(recipe).join(', ')}`);
     
     // 初始化，确保始终有值
     recipe.ingredients = [];
     recipe.cookingSteps = [];
+    logger.info(`[listRecipes] 初始化后 recipe.ingredients: ${JSON.stringify(recipe.ingredients)}`);
     
     try {
       logger.info(`[listRecipes] 开始加载食谱 ${recipe.id} (${recipe.name}) 的关联数据`);
