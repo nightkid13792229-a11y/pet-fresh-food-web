@@ -14180,8 +14180,10 @@ let breedsState = {
 // 加载品种列表
 async function loadBreeds() {
   if (!backendState.token) {
+    console.warn('未登录，无法加载品种数据');
     breedsState.breeds = [];
     breedsState.total = 0;
+    renderBreedsList(); // 渲染空列表
     return;
   }
   
