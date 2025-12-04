@@ -1097,34 +1097,48 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="app.js?v=20241204-03"></script>
+    <script src="app.js?v=20241204-04"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-          console.log('Service Worker注册成功:', reg.scope);
-          // 检查是否有更新
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'activated') {
-                console.log('Service Worker已更新，建议刷新页面');
+    // Service Worker 注册（仅在支持的环境下）
+    if ('serviceWorker' in navigator && navigator.serviceWorker) {
+      // 检查是否为安全上下文（HTTPS 或 localhost）
+      const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      
+      if (isSecureContext) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log('Service Worker注册成功:', reg.scope);
+            // 检查是否有更新
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'activated') {
+                    console.log('Service Worker已更新，建议刷新页面');
+                  }
+                });
               }
             });
+          }).catch(err => {
+            console.warn('Service Worker注册失败:', err);
           });
-        }).catch(err => {
-          console.error('Service Worker注册失败:', err);
+          
+          // 取消注册有问题的Service Worker
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+              registrations.forEach(reg => {
+                if (reg.active && reg.active.scriptURL && !reg.active.scriptURL.includes('sw.js')) {
+                  reg.unregister();
+                }
+              });
+            }).catch(err => {
+              console.warn('获取Service Worker注册信息失败:', err);
+            });
+          }
         });
-        
-        // 取消注册有问题的Service Worker
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          registrations.forEach(reg => {
-            if (reg.active && reg.active.scriptURL && !reg.active.scriptURL.includes('sw.js')) {
-              reg.unregister();
-            }
-          });
-        });
-      });
+      } else {
+        console.log('当前环境不支持Service Worker（需要HTTPS或localhost）');
+      }
     }
   </script>
 </body>
