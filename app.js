@@ -16474,4 +16474,4 @@ if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init);
 } else {
   init();
-}
+}}
