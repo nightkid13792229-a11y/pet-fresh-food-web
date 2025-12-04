@@ -205,9 +205,12 @@ export const listRecipes = async (options = {}) => {
       recipe.ingredients = [];
     }
     
-    logger.info(`[listRecipes] 食谱 ${recipe.id} 最终验证后 ingredients 数量: ${recipe.ingredients.length}`);
-    logger.info(`[listRecipes] 食谱 ${recipe.id} 最终返回数据包含 ingredients: ${'ingredients' in recipe}`);
-  }
+      logger.info(`[listRecipes] 食谱 ${recipe.id} 最终验证后 ingredients 数量: ${recipe.ingredients.length}`);
+      logger.info(`[listRecipes] 食谱 ${recipe.id} 最终返回数据包含 ingredients: ${'ingredients' in recipe}`);
+      if (recipe.ingredients.length > 0) {
+        logger.info(`[listRecipes] 食谱 ${recipe.id} ingredients 详细内容:`, JSON.stringify(recipe.ingredients, null, 2));
+      }
+    }
 
   // 在返回前，再次验证所有 items
   logger.info(`[listRecipes] 准备返回 ${items.length} 条食谱记录`);
@@ -220,12 +223,22 @@ export const listRecipes = async (options = {}) => {
       logger.error(`[listRecipes] 返回前发现食谱 ${recipe.id} ingredients 不是数组！`);
       recipe.ingredients = [];
     }
+    // 确保 ingredients 是普通对象数组，而不是 RowDataPacket
+    recipe.ingredients = recipe.ingredients.map(ing => ({
+      id: ing.id,
+      ingredientName: ing.ingredientName || '',
+      weight: ing.weight,
+      unit: ing.unit || 'g'
+    }));
+    
     logger.info(`[listRecipes] 食谱 ${recipe.id} (${recipe.name}) 返回数据检查:`, JSON.stringify({
       id: recipe.id,
       name: recipe.name,
       hasIngredients: 'ingredients' in recipe,
       ingredientsCount: recipe.ingredients ? recipe.ingredients.length : 'N/A',
-      ingredientsType: typeof recipe.ingredients
+      ingredientsType: typeof recipe.ingredients,
+      ingredientsIsArray: Array.isArray(recipe.ingredients),
+      firstIngredient: recipe.ingredients && recipe.ingredients.length > 0 ? recipe.ingredients[0] : null
     }));
   }
 
