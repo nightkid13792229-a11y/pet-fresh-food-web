@@ -4138,6 +4138,11 @@ function populateCategorySelects() {
   const categorySelect = $('i-category');
   const categoryFilterSelect = $('ingredient-category-filter');
   
+  // 如果元素不存在，直接返回
+  if (!categorySelect) {
+    return;
+  }
+  
   // 如果原料分类已选择，从后端加载对应的类别
   const classificationSelect = $('i-classification');
   if (classificationSelect && classificationSelect.value) {
