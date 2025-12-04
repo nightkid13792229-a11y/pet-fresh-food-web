@@ -14637,8 +14637,11 @@ function setupSettingsModule() {
   renderBackupsList();
 }
 function init() {
-  console.log('App init');
-  console.log('检查localStorage中的键:');
+  try {
+    console.log('[init] 开始初始化应用...');
+    console.log('[init] document.readyState:', document.readyState);
+    console.log('[init] DOM是否已加载:', document.body !== null);
+    console.log('[init] 检查localStorage中的键:');
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key && key.startsWith('pff-')) {
@@ -14737,6 +14740,13 @@ function init() {
         clearBackendAuth();
       }
     });
+  }
+  
+  console.log('[init] 初始化完成');
+  } catch (error) {
+    console.error('[init] 初始化失败:', error);
+    console.error('[init] 错误堆栈:', error.stack);
+    alert('应用初始化失败，请刷新页面重试。错误信息：' + error.message);
   }
 }
 
@@ -16464,5 +16474,4 @@ if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init);
 } else {
   init();
-}
 }
