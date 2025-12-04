@@ -9977,7 +9977,7 @@ function formatRecipeDetails(recipe) {
     });
     
     // 添加表头
-    html += '<div style="display:grid; grid-template-columns: 50px 1fr 120px 200px; gap:8px; padding:8px; background:var(--bg-tertiary); border-radius:4px; margin-bottom:6px; font-weight:600; font-size:13px; border-bottom:2px solid var(--border);">';
+    html += '<div style="display:grid; grid-template-columns: 50px 1fr 120px 200px; gap:8px; padding:4px; background:var(--bg-tertiary); border-radius:4px; margin-bottom:3px; font-weight:600; font-size:13px; border-bottom:2px solid var(--border);">';
     html += '<div>序号</div>';
     html += '<div>食材名称</div>';
     html += '<div>用量</div>';
@@ -9986,7 +9986,7 @@ function formatRecipeDetails(recipe) {
     
     // 渲染食材列表（序号、名称、用量、重量占比/每100g营养素在同一行）
     ingredientsData.forEach(item => {
-      html += '<div style="display:grid; grid-template-columns: 50px 1fr 120px 200px; gap:8px; padding:6px; background:var(--bg-secondary); border-radius:4px; margin-bottom:4px; align-items:center;">';
+      html += '<div style="display:grid; grid-template-columns: 50px 1fr 120px 200px; gap:8px; padding:3px; background:var(--bg-secondary); border-radius:4px; margin-bottom:2px; align-items:center;">';
       
       // 序号
       html += `<div style="font-weight:500;">${item.index}.</div>`;
@@ -10000,18 +10000,33 @@ function formatRecipeDetails(recipe) {
       // 重量占比或营养素信息（第四列）
       let fourthColumn = '-';
       if (item.classification === '食材') {
-        // 食材：显示重量占比
+        // 食材：显示重量占比（不显示"重量占比："文字）
         if (totalWeightForPercent > 0 && item.weightInG > 0) {
           const weightPercent = ((item.weightInG / totalWeightForPercent) * 100).toFixed(2);
-          fourthColumn = `重量占比：${weightPercent}%`;
+          fourthColumn = `${weightPercent}%`;
         }
       } else if (item.classification === '营养补充剂') {
         // 营养补充剂：显示每100g饭量添加的营养素
         let supplement = item.ingredient;
         
-        // 如果找不到ingredient，尝试从store中再次查找
-        if (!supplement) {
-          supplement = store.ingredients.find(i => i.name === item.name && i.classification === '营养补充剂');
+        // 如果找不到ingredient，尝试从store中再次查找（使用item.name，因为ingredientsData中已经设置了name字段）
+        if (!supplement && item.name) {
+          supplement = store.ingredients.find(i => {
+            // 精确匹配名称和分类
+            return i.name === item.name && i.classification === '营养补充剂';
+          });
+        }
+        
+        // 如果还是找不到，尝试模糊匹配（处理可能的名称差异）
+        if (!supplement && item.name) {
+          supplement = store.ingredients.find(i => {
+            const nameMatch = i.name && item.name && (
+              i.name === item.name || 
+              i.name.includes(item.name) || 
+              item.name.includes(i.name)
+            );
+            return nameMatch && i.classification === '营养补充剂';
+          });
         }
         
         if (supplement) {
@@ -10019,7 +10034,7 @@ function formatRecipeDetails(recipe) {
           const nutrientUnit = supplement.nutrientUnit || '';
           const mainNutrient = supplement.mainNutrient || '';
           
-          if (unitContent > 0 && recipe.totalWeight > 0) {
+          if (unitContent > 0 && recipe.totalWeight > 0 && recipe.totalWeight > 0) {
             // N = 该营养补充剂在食谱中的用量 * 该营养补充剂营养素含量 / 食谱总重量 * 100
             const N = Math.round((item.weight * unitContent / recipe.totalWeight) * 100);
             fourthColumn = `每100g饭量添加 ${N} ${nutrientUnit} ${mainNutrient}`;
