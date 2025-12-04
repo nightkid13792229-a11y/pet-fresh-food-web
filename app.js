@@ -1312,25 +1312,54 @@ function switchView(view) {
     el.setAttribute('style', 'display: block !important');
     console.log('视图元素:', el, '显示状态:', el.style.display);
     // 如果切换到原料视图，从后端加载数据
-    if (view === 'inventory' && backendState.token) {
-      setTimeout(async () => {
-        await loadIngredientsFromBackend();
-        await loadAllIngredientsForFilters(); // 加载所有数据填充筛选下拉框
-      }, 100);
+    if (view === 'inventory') {
+      // 延迟初始化模块（如果还没有初始化）
+      setTimeout(() => {
+        try {
+          // 检查是否已经初始化，如果没有则初始化
+          const newBtn = $('btn-new-ingredient');
+          if (newBtn && !newBtn.hasAttribute('data-initialized')) {
+            setupIngredientsModule();
+            newBtn.setAttribute('data-initialized', 'true');
+          }
+        } catch (error) {
+          console.error('[switchView] 初始化原料模块失败:', error);
+        }
+      }, 50);
+      
+      if (backendState.token) {
+        setTimeout(async () => {
+          try {
+            await loadIngredientsFromBackend();
+            await loadAllIngredientsForFilters(); // 加载所有数据填充筛选下拉框
+          } catch (error) {
+            console.error('[switchView] 加载原料数据失败:', error);
+          }
+        }, 100);
+      } else {
+        setTimeout(() => {
+          try {
+            store.ingredients = [];
+            renderIngredientsList();
+            updateIngredientFilterSelects(); // 未登录时使用本地数据
+          } catch (error) {
+            console.error('[switchView] 渲染原料列表失败:', error);
+          }
+        }, 100);
+      }
     }
     
     // 如果切换到食谱视图，从后端加载数据
-    if (view === 'recipes' && backendState.token) {
-      setTimeout(async () => {
-        await loadRecipesFromBackend();
-      }, 100);
-    } else if (view === 'inventory') {
-      setTimeout(() => {
-        store.ingredients = [];
-        renderIngredientsList();
-        updateIngredientFilterSelects(); // 未登录时使用本地数据
-      }, 100);
-    }
+    if (view === 'recipes') {
+      if (backendState.token) {
+        setTimeout(async () => {
+          try {
+            await loadRecipesFromBackend();
+          } catch (error) {
+            console.error('[switchView] 加载食谱数据失败:', error);
+          }
+        }, 100);
+      }
     // 如果切换到顾客视图，从后端加载数据
     if (view === 'customers' && backendState.token) {
       setTimeout(async () => {
