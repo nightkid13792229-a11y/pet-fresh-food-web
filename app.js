@@ -9754,41 +9754,24 @@ function calculateRecipeTotalWeight() {
   currentRecipeIngredients.forEach(item => {
     // 使用食材名称查找（可能有多个同名食材，取第一个匹配的）
     const ing = store.ingredients.find(i => i.name === item.ingredientName && i.classification === '食材');
-    if (!ing) {
-      // 如果没有找到，使用默认单位 'g' 直接计算
-      const unit = item.unit || 'g';
-      let weightInG = item.weight;
-      if (unit === 'kg') {
-        weightInG = item.weight * 1000;
-      } else if (unit === 'L') {
-        weightInG = item.weight * 1000;
-      }
-      totalWeight += weightInG;
-      return;
+    
+    // 确定单位：优先使用item.unit，如果item.unit为空或undefined，则使用ing.unit，最后默认为'g'
+    // 注意：item.unit 在 openRecipeForm 中已经被处理过（空值会被设置为'g'），但这里为了安全还是做一次处理
+    let unit = item.unit;
+    if (!unit || (typeof unit === 'string' && unit.trim() === '')) {
+      unit = ing ? (ing.unit || 'g') : 'g';
     }
     
-    const unit = item.unit || ing.unit || 'g';
-    let weightInG = item.weight;
-    
-    // 转换为g
-    if (unit === 'kg') {
-      weightInG = item.weight * 1000;
-    } else if (unit === 'g' || unit === 'ml') {
-      weightInG = item.weight;
-    } else if (unit === 'L') {
-      weightInG = item.weight * 1000;
-    } else {
-      // 其他单位（个、包、盒、瓶、袋）需要知道每单位重量
-      if (ing.weightPerUnit) {
-        weightInG = item.weight * ing.weightPerUnit;
-      } else {
-        // 如果没有每单位重量，跳过
-        console.warn('原料缺少每单位重量，无法计算:', ing.name);
-        return;
-      }
+    // 只计算单位为'g'的食材
+    if (unit !== 'g') {
+      return; // 跳过非'g'单位的食材
     }
     
-    totalWeight += weightInG;
+    // 确保 weight 是数字
+    const itemWeight = parseFloat(item.weight) || 0;
+    
+    // 单位已经是'g'，直接累加
+    totalWeight += itemWeight;
   });
   
   const totalWeightEl = $('r-totalWeight');
@@ -10248,12 +10231,16 @@ function openRecipeForm(id = null, recipeData = null) {
     // 兼容 caRatio（后端）和 caPratio（旧数据）
     $('r-caPratio').value = (recipe.caRatio || recipe.caPratio) != null ? (recipe.caRatio || recipe.caPratio) : '';
     $('r-totalKcal').value = recipe.totalKcal != null ? recipe.totalKcal : '';
-    // 确保 totalWeight 和 kcalDensity 转换为数字后再调用 toFixed
-    $('r-totalWeight').value = recipe.totalWeight != null ? parseFloat(recipe.totalWeight).toFixed(2) : '';
-    $('r-kcalDensity').value = recipe.kcalDensity != null ? parseFloat(recipe.kcalDensity).toFixed(2) : '';
     
-    // 计算总重量和热量密度
+    // 先计算总重量（使用新逻辑重新计算，而不是使用服务器端存储的旧值）
+    // 这样可以确保显示的是根据当前食材列表重新计算的值
     calculateRecipeTotalWeight();
+    
+    // 热量密度会在 calculateRecipeTotalWeight() 中自动计算
+    // 但如果服务器端有存储的值且计算失败，可以保留作为后备
+    if (!$('r-kcalDensity').value) {
+      $('r-kcalDensity').value = recipe.kcalDensity != null ? parseFloat(recipe.kcalDensity).toFixed(2) : '';
+    }
   } else {
     if (title) title.textContent = '新增食谱';
     form.reset();
