@@ -9901,23 +9901,21 @@ function formatRecipeDetails(recipe) {
   html += '<div style="margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);">';
   html += '<div style="font-weight:600; font-size:14px; margin-bottom:8px; color:var(--text-primary);">基本信息</div>';
   
-  const basicFields = [
-    { label: '食谱编号', value: recipe.code || '-' },
-    { label: '食谱名称', value: recipe.name || '-' },
-    { label: '适用生命阶段', value: lifeStageMap[recipe.lifeStage] || recipe.lifeStage || '-' },
-    { label: '营养参考标准', value: nutritionLabelMap[recipe.nutritionStandard] || recipe.nutritionStandard || '-' },
-    { label: '食谱制作软件', value: recipe.software || '-' },
-    { label: '食谱类型', value: recipeTypeLabelMap[recipe.recipeType] || (recipe.isCustom ? '定制食谱' : '通用食谱') },
-    { label: '制作损耗', value: recipe.cookingLoss != null ? `${recipe.cookingLoss}%` : '-' }
-  ];
+  // 使用紧凑的两列布局
+  html += '<div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:6px 16px; margin-bottom:8px;">';
+  html += `<div><span style="color:var(--text-secondary);">食谱编号：</span><span>${escapeHtml(recipe.code || '-')}</span></div>`;
+  html += `<div><span style="color:var(--text-secondary);">食谱名称：</span><span>${escapeHtml(recipe.name || '-')}</span></div>`;
+  html += `<div><span style="color:var(--text-secondary);">适用生命阶段：</span><span>${escapeHtml(lifeStageMap[recipe.lifeStage] || recipe.lifeStage || '-')}</span></div>`;
+  html += `<div><span style="color:var(--text-secondary);">营养参考标准：</span><span>${escapeHtml(nutritionLabelMap[recipe.nutritionStandard] || recipe.nutritionStandard || '-')}</span></div>`;
+  html += `<div><span style="color:var(--text-secondary);">食谱制作软件：</span><span>${escapeHtml(recipe.software || '-')}</span></div>`;
+  html += `<div><span style="color:var(--text-secondary);">食谱类型：</span><span>${escapeHtml(recipeTypeLabelMap[recipe.recipeType] || (recipe.isCustom ? '定制食谱' : '通用食谱'))}</span></div>`;
+  html += `<div><span style="color:var(--text-secondary);">制作损耗：</span><span>${recipe.cookingLoss != null ? `${recipe.cookingLoss}%` : '-'}</span></div>`;
+  html += '</div>';
   
-  basicFields.forEach(field => {
-    html += `<div style="margin-bottom:4px;"><span style="color:var(--text-secondary);">${field.label}：</span><span>${escapeHtml(String(field.value))}</span></div>`;
-  });
-  
-  if (recipe.description) {
-    html += `<div style="margin-top:8px; margin-bottom:4px;"><span style="color:var(--text-secondary);">食谱描述：</span></div>`;
-    html += `<div style="padding:8px; background:var(--bg-secondary); border-radius:4px; white-space:pre-wrap;">${escapeHtml(recipe.description)}</div>`;
+  // 食谱描述（如果有）
+  if (recipe.description && recipe.description.trim()) {
+    html += `<div style="margin-top:8px;"><span style="color:var(--text-secondary);">食谱描述：</span></div>`;
+    html += `<div style="margin-top:4px; padding:8px; background:var(--bg-secondary); border-radius:4px; white-space:pre-wrap;">${escapeHtml(recipe.description)}</div>`;
   }
   
   html += '</div>';
@@ -9937,47 +9935,50 @@ function formatRecipeDetails(recipe) {
       const supplement = store.ingredients.find(i => i.name === item.ingredientName && i.classification === '营养补充剂');
       const ingredient = ing || supplement;
       
-      if (!ingredient) return;
-      
-      const unit = item.unit || ingredient.unit || 'g';
+      // 即使找不到ingredient，也显示食材信息
+      const unit = item.unit || (ingredient ? ingredient.unit : 'g');
       const weight = parseFloat(item.weight) || 0;
+      const classification = ingredient ? ingredient.classification : '食材'; // 默认当作食材处理
       
       // 计算重量（用于占比计算，只计算单位为g的食材）
       let weightInG = 0;
-      if (ingredient.classification === '食材' && unit === 'g') {
+      if (classification === '食材' && unit === 'g') {
         weightInG = weight;
         totalWeightForPercent += weightInG;
       }
       
       ingredientsData.push({
         index: idx + 1,
-        name: item.ingredientName,
+        name: item.ingredientName || '未知食材',
         weight: weight,
         unit: unit,
-        classification: ingredient.classification,
-        ingredient: ingredient,
+        classification: classification,
+        ingredient: ingredient || null,
         weightInG: weightInG
       });
     });
     
-    // 渲染食材列表
+    // 渲染食材列表（序号、名称、用量、重量占比/每100g营养素在同一行）
     ingredientsData.forEach(item => {
-      html += '<div style="margin-bottom:6px; padding:6px; background:var(--bg-secondary); border-radius:4px;">';
+      html += '<div style="margin-bottom:4px; padding:6px; background:var(--bg-secondary); border-radius:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">';
       
-      // 食材名称和用量
-      html += `<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">`;
-      html += `<span style="font-weight:500;">${item.index}. ${escapeHtml(item.name)}</span>`;
-      html += `<span style="color:var(--text-secondary); margin-left:8px; white-space:nowrap;">${item.weight} ${item.unit}</span>`;
-      html += `</div>`;
+      // 序号
+      html += `<span style="font-weight:500; min-width:24px;">${item.index}.</span>`;
       
-      // 重量占比或营养素信息
+      // 食材名称
+      html += `<span style="font-weight:500; flex:1; min-width:120px;">${escapeHtml(item.name)}</span>`;
+      
+      // 用量
+      html += `<span style="color:var(--text-secondary); white-space:nowrap;">${item.weight} ${item.unit}</span>`;
+      
+      // 重量占比或营养素信息（在同一行）
       if (item.classification === '食材') {
         // 食材：显示重量占比
         if (totalWeightForPercent > 0 && item.weightInG > 0) {
           const weightPercent = ((item.weightInG / totalWeightForPercent) * 100).toFixed(2);
-          html += `<div style="font-size:12px; color:var(--text-secondary);">重量占比：${weightPercent}%</div>`;
+          html += `<span style="color:var(--text-secondary); font-size:12px; white-space:nowrap;">重量占比：${weightPercent}%</span>`;
         }
-      } else if (item.classification === '营养补充剂') {
+      } else if (item.classification === '营养补充剂' && item.ingredient) {
         // 营养补充剂：显示每100g饭量添加的营养素
         const unitContent = parseFloat(item.ingredient.unitContent) || 0;
         const nutrientUnit = item.ingredient.nutrientUnit || '';
@@ -9986,9 +9987,9 @@ function formatRecipeDetails(recipe) {
         if (unitContent > 0 && recipe.totalWeight > 0) {
           // N = 该营养补充剂在食谱中的用量 * 该营养补充剂营养素含量
           const N = item.weight * unitContent;
-          // 每100g饭量添加的营养素 = N / (总重量/100)
-          const per100g = (N / (recipe.totalWeight / 100)).toFixed(2);
-          html += `<div style="font-size:12px; color:var(--text-secondary);">每100g饭量添加 ${per100g} ${nutrientUnit} ${mainNutrient}</div>`;
+          // 每100g饭量添加的营养素 = N / (总重量/100)，保留整数
+          const per100g = Math.round(N / (recipe.totalWeight / 100));
+          html += `<span style="color:var(--text-secondary); font-size:12px; white-space:nowrap;">每100g饭量添加 ${per100g} ${nutrientUnit} ${mainNutrient}</span>`;
         }
       }
       
@@ -10015,34 +10016,46 @@ function formatRecipeDetails(recipe) {
   html += '<div style="margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);">';
   html += '<div style="font-weight:600; font-size:14px; margin-bottom:8px; color:var(--text-primary);">营养数据（干物质占比，除水分外）</div>';
   
-  const nutritionFields = [
-    { label: '蛋白质（DM）', value: recipe.protein != null ? `${recipe.protein}%` : null },
-    { label: '脂肪（DM）', value: recipe.fat != null ? `${recipe.fat}%` : null },
-    { label: '碳水化合物（DM）', value: recipe.carb != null ? `${recipe.carb}%` : null },
-    { label: '膳食纤维（DM）', value: recipe.fiber != null ? `${recipe.fiber}%` : null },
-    { label: '灰分（DM）', value: recipe.ash != null ? `${recipe.ash}%` : null },
-    { label: '水分', value: recipe.moisture != null ? `${recipe.moisture}%` : null },
-    { label: '钙磷比', value: (recipe.caRatio || recipe.caPratio) || null },
-    { label: '热量密度', value: recipe.kcalDensity != null ? `${parseFloat(recipe.kcalDensity).toFixed(2)} kcal/kg` : null }
-  ];
-  
-  nutritionFields.forEach(field => {
-    if (field.value != null) {
-      html += `<div style="margin-bottom:4px;"><span style="color:var(--text-secondary);">${field.label}：</span><span>${escapeHtml(String(field.value))}</span></div>`;
-    }
-  });
+  // 使用紧凑的两列布局
+  html += '<div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:6px 16px;">';
+  if (recipe.protein != null) {
+    html += `<div><span style="color:var(--text-secondary);">蛋白质（DM）：</span><span>${recipe.protein}%</span></div>`;
+  }
+  if (recipe.fat != null) {
+    html += `<div><span style="color:var(--text-secondary);">脂肪（DM）：</span><span>${recipe.fat}%</span></div>`;
+  }
+  if (recipe.carb != null) {
+    html += `<div><span style="color:var(--text-secondary);">碳水化合物（DM）：</span><span>${recipe.carb}%</span></div>`;
+  }
+  if (recipe.fiber != null) {
+    html += `<div><span style="color:var(--text-secondary);">膳食纤维（DM）：</span><span>${recipe.fiber}%</span></div>`;
+  }
+  if (recipe.ash != null) {
+    html += `<div><span style="color:var(--text-secondary);">灰分（DM）：</span><span>${recipe.ash}%</span></div>`;
+  }
+  if (recipe.moisture != null) {
+    html += `<div><span style="color:var(--text-secondary);">水分：</span><span>${recipe.moisture}%</span></div>`;
+  }
+  if (recipe.caRatio || recipe.caPratio) {
+    html += `<div><span style="color:var(--text-secondary);">钙磷比：</span><span>${escapeHtml(recipe.caRatio || recipe.caPratio)}</span></div>`;
+  }
+  if (recipe.kcalDensity != null) {
+    html += `<div><span style="color:var(--text-secondary);">热量密度：</span><span>${parseFloat(recipe.kcalDensity).toFixed(2)} kcal/kg</span></div>`;
+  }
+  html += '</div>';
   
   html += '</div>';
   
   // ========== 4. 制作流程板块（默认隐藏） ==========
+  // 始终显示制作流程标题和箭头，即使没有步骤也显示（但内容为空）
+  const stepsId = `recipe-steps-${recipe.id || Date.now()}`;
+  html += '<div style="margin-bottom:16px;">';
+  html += `<div style="display:flex; align-items:center; cursor:pointer; user-select:none; padding:6px; border-radius:4px; transition:background 0.2s;" onclick="(function(el){const steps=el.nextElementSibling;const arrow=el.querySelector('.arrow');if(steps.style.display==='none'||!steps.style.display){steps.style.display='block';arrow.style.transform='rotate(180deg)';}else{steps.style.display='none';arrow.style.transform='rotate(0deg)';}})(this)" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">`;
+  html += `<span style="font-weight:600; font-size:14px; color:var(--text-primary); margin-right:8px;">制作流程</span>`;
+  html += `<span class="arrow" style="display:inline-block; transition:transform 0.2s; font-size:12px; color:var(--text-secondary); transform:rotate(0deg);">▼</span>`;
+  html += `</div>`;
+  html += `<div id="${stepsId}" style="display:none; margin-top:8px; padding-left:16px;">`;
   if (recipe.cookingSteps && recipe.cookingSteps.length > 0) {
-    const stepsId = `recipe-steps-${recipe.id || Date.now()}`;
-    html += '<div style="margin-bottom:16px;">';
-    html += `<div style="display:flex; align-items:center; cursor:pointer; user-select:none; padding:6px; border-radius:4px; transition:background 0.2s;" onclick="(function(el){const steps=el.nextElementSibling;const arrow=el.querySelector('.arrow');if(steps.style.display==='none'){steps.style.display='block';arrow.style.transform='rotate(180deg)';}else{steps.style.display='none';arrow.style.transform='rotate(0deg)';}})(this)" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">`;
-    html += `<span style="font-weight:600; font-size:14px; color:var(--text-primary); margin-right:8px;">制作流程</span>`;
-    html += `<span class="arrow" style="display:inline-block; transition:transform 0.2s; font-size:12px; color:var(--text-secondary); transform:rotate(0deg);">▼</span>`;
-    html += `</div>`;
-    html += `<div id="${stepsId}" style="display:none; margin-top:8px; padding-left:16px;">`;
     recipe.cookingSteps.forEach((step, index) => {
       const stepDesc = typeof step === 'object' ? step.description : step;
       if (stepDesc) {
@@ -10052,9 +10065,11 @@ function formatRecipeDetails(recipe) {
         html += `</div>`;
       }
     });
-    html += `</div>`;
-    html += '</div>';
+  } else {
+    html += `<div style="color:var(--text-secondary); font-size:12px; padding:6px;">暂无制作流程</div>`;
   }
+  html += `</div>`;
+  html += '</div>';
   
   html += '</div>';
   return html;
