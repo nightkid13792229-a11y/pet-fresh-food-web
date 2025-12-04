@@ -219,9 +219,17 @@ export const listRecipes = async (options = {}) => {
 
   // 在返回前，再次验证所有 items 并确保是纯 JavaScript 对象
   logger.info(`[listRecipes] 准备返回 ${items.length} 条食谱记录`);
+  logger.info(`[listRecipes] 序列化前，第一个食谱的 keys: ${items.length > 0 ? Object.keys(items[0]).join(', ') : 'N/A'}`);
+  logger.info(`[listRecipes] 序列化前，第一个食谱是否有 ingredients: ${items.length > 0 ? ('ingredients' in items[0]) : 'N/A'}`);
+  logger.info(`[listRecipes] 序列化前，第一个食谱的 ingredients 值: ${items.length > 0 ? JSON.stringify(items[0].ingredients) : 'N/A'}`);
+  
   const serializedItems = items.map(recipe => {
     // 确保 recipe 是纯 JavaScript 对象
     const serializedRecipe = JSON.parse(JSON.stringify(recipe));
+    
+    logger.info(`[listRecipes] 序列化后，食谱 ${serializedRecipe.id} 的 keys: ${Object.keys(serializedRecipe).join(', ')}`);
+    logger.info(`[listRecipes] 序列化后，食谱 ${serializedRecipe.id} 是否有 ingredients: ${'ingredients' in serializedRecipe}`);
+    logger.info(`[listRecipes] 序列化后，食谱 ${serializedRecipe.id} 的 ingredients 值: ${JSON.stringify(serializedRecipe.ingredients)}`);
     
     if (!serializedRecipe.ingredients) {
       logger.error(`[listRecipes] 返回前发现食谱 ${serializedRecipe.id} ingredients 为 undefined！`);
