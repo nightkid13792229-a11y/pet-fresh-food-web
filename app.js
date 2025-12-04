@@ -1,3 +1,4 @@
+console.log('[app.js] 文件开始加载...');
 const $ = (id) => document.getElementById(id);
 
 const STORAGE_KEY_APP = 'pff-app-v2';
@@ -16470,8 +16471,15 @@ function addMainNutrient() {
   inputEl.focus();
 }
 
+console.log('[app.js] 文件加载完成，准备初始化...');
+console.log('[app.js] document.readyState:', document.readyState);
 if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', init);
+  console.log('[app.js] DOM未加载完成，等待DOMContentLoaded事件...');
+  window.addEventListener('DOMContentLoaded', () => {
+    console.log('[app.js] DOMContentLoaded事件触发，调用init()...');
+    init();
+  });
 } else {
+  console.log('[app.js] DOM已加载，立即调用init()...');
   init();
-}}
+}
