@@ -55,20 +55,11 @@ if [ -n "$(git status --porcelain)" ]; then
   git stash
 fi
 
-# 拉取最新代码
+# 拉取最新代码（前端和后端一起更新，因为它们在同一个仓库中）
 if git pull origin main; then
-  echo "   ✓ 前端代码已更新"
+  echo "   ✓ 代码已更新（前端和后端）"
 else
-  echo "   ✗ 前端代码更新失败"
-  exit 1
-fi
-
-# 更新后端代码
-cd backend
-if git pull origin main; then
-  echo "   ✓ 后端代码已更新"
-else
-  echo "   ✗ 后端代码更新失败"
+  echo "   ✗ 代码更新失败"
   exit 1
 fi
 
