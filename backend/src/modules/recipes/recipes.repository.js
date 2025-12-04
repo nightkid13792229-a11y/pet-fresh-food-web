@@ -224,12 +224,51 @@ export const listRecipes = async (options = {}) => {
   logger.info(`[listRecipes] 序列化前，第一个食谱的 ingredients 值: ${items.length > 0 ? JSON.stringify(items[0].ingredients) : 'N/A'}`);
   
   const serializedItems = items.map(recipe => {
-    // 确保 recipe 是纯 JavaScript 对象
-    const serializedRecipe = JSON.parse(JSON.stringify(recipe));
+    // 手动构建纯 JavaScript 对象，确保所有字段都被包含
+    const serializedRecipe = {
+      id: recipe.id,
+      code: recipe.code,
+      name: recipe.name,
+      description: recipe.description,
+      lifeStage: recipe.lifeStage,
+      recipeType: recipe.recipeType,
+      software: recipe.software,
+      nutritionStandard: recipe.nutritionStandard,
+      cookingLoss: recipe.cookingLoss,
+      sellingPrice: recipe.sellingPrice,
+      protein: recipe.protein,
+      fat: recipe.fat,
+      carb: recipe.carb,
+      fiber: recipe.fiber,
+      ash: recipe.ash,
+      moisture: recipe.moisture,
+      caRatio: recipe.caRatio,
+      totalKcal: recipe.totalKcal,
+      totalWeight: recipe.totalWeight,
+      kcalDensity: recipe.kcalDensity,
+      basePrice: recipe.basePrice,
+      defaultServings: recipe.defaultServings,
+      createdAt: recipe.createdAt,
+      updatedAt: recipe.updatedAt,
+      createdBy: recipe.createdBy,
+      updatedBy: recipe.updatedBy,
+      // 确保 ingredients 和 cookingSteps 被明确包含
+      ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients.map(ing => ({
+        id: ing.id,
+        ingredientName: ing.ingredientName || '',
+        weight: ing.weight,
+        unit: ing.unit || 'g'
+      })) : [],
+      cookingSteps: Array.isArray(recipe.cookingSteps) ? recipe.cookingSteps.map(step => ({
+        id: step.id,
+        stepOrder: step.stepOrder,
+        description: step.description
+      })) : []
+    };
     
-    logger.info(`[listRecipes] 序列化后，食谱 ${serializedRecipe.id} 的 keys: ${Object.keys(serializedRecipe).join(', ')}`);
-    logger.info(`[listRecipes] 序列化后，食谱 ${serializedRecipe.id} 是否有 ingredients: ${'ingredients' in serializedRecipe}`);
-    logger.info(`[listRecipes] 序列化后，食谱 ${serializedRecipe.id} 的 ingredients 值: ${JSON.stringify(serializedRecipe.ingredients)}`);
+    logger.info(`[listRecipes] 手动构建后，食谱 ${serializedRecipe.id} 的 keys: ${Object.keys(serializedRecipe).join(', ')}`);
+    logger.info(`[listRecipes] 手动构建后，食谱 ${serializedRecipe.id} 是否有 ingredients: ${'ingredients' in serializedRecipe}`);
+    logger.info(`[listRecipes] 手动构建后，食谱 ${serializedRecipe.id} 的 ingredients 值: ${JSON.stringify(serializedRecipe.ingredients)}`);
     
     if (!serializedRecipe.ingredients) {
       logger.error(`[listRecipes] 返回前发现食谱 ${serializedRecipe.id} ingredients 为 undefined！`);
@@ -239,25 +278,6 @@ export const listRecipes = async (options = {}) => {
       logger.error(`[listRecipes] 返回前发现食谱 ${serializedRecipe.id} ingredients 不是数组！`);
       serializedRecipe.ingredients = [];
     }
-    
-    // 确保 ingredients 中的每个元素也是纯 JavaScript 对象
-    serializedRecipe.ingredients = serializedRecipe.ingredients.map(ing => {
-      const ingObj = JSON.parse(JSON.stringify(ing));
-      return {
-        id: ingObj.id,
-        ingredientName: ingObj.ingredientName || '',
-        weight: ingObj.weight,
-        unit: ingObj.unit || 'g'
-      };
-    });
-    
-    // 确保 cookingSteps 也是纯 JavaScript 对象数组
-    if (!serializedRecipe.cookingSteps) {
-      serializedRecipe.cookingSteps = [];
-    }
-    serializedRecipe.cookingSteps = serializedRecipe.cookingSteps.map(step => {
-      return JSON.parse(JSON.stringify(step));
-    });
     
     logger.info(`[listRecipes] 食谱 ${serializedRecipe.id} (${serializedRecipe.name}) 返回数据检查:`, JSON.stringify({
       id: serializedRecipe.id,
