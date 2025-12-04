@@ -3011,6 +3011,21 @@ async function loadRecipesFromBackend() {
     // 转换数据格式（将后端返回的数据转换为前端格式）
     const recipes = (data.items || []).map(recipe => {
       console.log('[loadRecipesFromBackend] 处理食谱:', recipe.name, 'ingredients:', recipe.ingredients);
+      
+      // 确保 ingredients 始终是数组
+      let ingredients = [];
+      if (recipe.ingredients) {
+        if (Array.isArray(recipe.ingredients)) {
+          ingredients = recipe.ingredients;
+        } else {
+          console.warn('[loadRecipesFromBackend] recipe.ingredients 不是数组:', typeof recipe.ingredients, recipe.ingredients);
+          ingredients = [];
+        }
+      } else {
+        console.warn('[loadRecipesFromBackend] recipe.ingredients 为 undefined 或 null，使用空数组');
+        ingredients = [];
+      }
+      
       return {
         id: `recipe_${recipe.id}`, // 使用recipe_前缀避免ID冲突
         code: recipe.code || '',
@@ -3031,11 +3046,17 @@ async function loadRecipesFromBackend() {
         totalKcal: recipe.totalKcal || null,
         totalWeight: recipe.totalWeight || null,
         kcalDensity: recipe.kcalDensity || null,
-        ingredients: (recipe.ingredients || []).map(ing => ({
-          ingredientName: (ing.ingredientName != null && ing.ingredientName !== '') ? String(ing.ingredientName).trim() : '', // 确保是字符串且不为空
-          weight: ing.weight != null ? ing.weight : 0,
-          unit: (ing.unit && ing.unit.trim()) ? ing.unit.trim() : 'g'
-        })).filter(ing => ing.ingredientName), // 过滤掉没有名称的项
+        ingredients: ingredients.map(ing => {
+          if (!ing || typeof ing !== 'object') {
+            console.warn('[loadRecipesFromBackend] 发现无效的食材项:', ing);
+            return null;
+          }
+          return {
+            ingredientName: (ing.ingredientName != null && ing.ingredientName !== '') ? String(ing.ingredientName).trim() : '', // 确保是字符串且不为空
+            weight: ing.weight != null ? ing.weight : 0,
+            unit: (ing.unit && ing.unit.trim()) ? ing.unit.trim() : 'g'
+          };
+        }).filter(ing => ing && ing.ingredientName), // 过滤掉没有名称的项
         cookingSteps: (recipe.cookingSteps || []).map(step => ({
           stepOrder: step.stepOrder,
           description: step.description
