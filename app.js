@@ -3326,6 +3326,94 @@ async function loadIngredientsFromBackend() {
   }
 }
 
+// 原料数据缓存（用于存储按需查询的数据）
+const ingredientCache = new Map();
+
+// 获取原料数据的统一函数（支持按需查询和缓存）
+async function getIngredientById(id) {
+  if (!id) return null;
+  
+  // 1. 先从 store.ingredients 查找（当前页数据）
+  let ing = store.ingredients.find(x => x.id === id);
+  if (ing) {
+    // 存入缓存，避免重复查找
+    ingredientCache.set(id, ing);
+    return ing;
+  }
+  
+  // 2. 从缓存查找
+  if (ingredientCache.has(id)) {
+    return ingredientCache.get(id);
+  }
+  
+  // 3. 从后端API查询（按需加载）
+  if (!backendState.token) {
+    console.warn('[getIngredientById] 未登录，无法从后端查询原料数据');
+    return null;
+  }
+  
+  try {
+    // 提取后端ID（去掉 ing_ 前缀）
+    const backendId = id.startsWith('ing_') ? id.replace('ing_', '') : id;
+    const response = await backendRequest(`/api/v1/ingredients/${backendId}`);
+    
+    if (response) {
+      // 转换为前端格式（与 loadIngredientsFromBackend 保持一致）
+      const sourceValue = (response.source !== null && response.source !== undefined && response.source !== '') 
+        ? String(response.source).trim() 
+        : '';
+      
+      ing = {
+        id: `ing_${response.id}`,
+        code: response.code || '',
+        category: response.category || '',
+        name: response.name || '',
+        brand: response.brand || '',
+        source: sourceValue,
+        cost: response.cost || null,
+        quantity: response.quantity || null,
+        unit: response.unit || 'g',
+        pricePer500: response.pricePer500 || null,
+        ediblePortion: response.ediblePortion !== undefined ? response.ediblePortion : 1.0,
+        ediblePricePer500: response.ediblePricePer500 || null,
+        weightPerUnit: response.weightPerUnit || null,
+        classification: response.classification || null,
+        description: response.description || '',
+        mainFunction: response.mainFunction || '',
+        subject: (response.subject !== null && response.subject !== undefined && response.subject !== '') ? response.subject : null,
+        part: (response.part !== null && response.part !== undefined && response.part !== '') ? response.part : null,
+        originType: (response.originType !== null && response.originType !== undefined && response.originType !== '') ? response.originType : null,
+        model: (response.model !== null && response.model !== undefined && response.model !== '') ? response.model : null,
+        mainNutrient: (response.mainNutrient !== null && response.mainNutrient !== undefined && response.mainNutrient !== '') ? response.mainNutrient : null,
+        unitContent: (response.unitContent !== null && response.unitContent !== undefined) ? response.unitContent : null,
+        nutrientUnit: (response.nutrientUnit !== null && response.nutrientUnit !== undefined && response.nutrientUnit !== '') ? response.nutrientUnit : null,
+        pricePer100NutrientUnit: (response.pricePer100NutrientUnit !== null && response.pricePer100NutrientUnit !== undefined) ? response.pricePer100NutrientUnit : null,
+        createdAt: response.createdAt ? new Date(response.createdAt).getTime() : Date.now(),
+        updatedAt: response.updatedAt ? new Date(response.updatedAt).getTime() : Date.now(),
+        _backendId: response.id
+      };
+      
+      // 存入缓存
+      ingredientCache.set(id, ing);
+      
+      // 可选：也添加到 store.ingredients（如果不在当前页）
+      const existsInStore = store.ingredients.some(i => i.id === id);
+      if (!existsInStore) {
+        store.ingredients.push(ing);
+      }
+      
+      console.log(`[getIngredientById] 从后端查询并缓存原料数据: ${id}`);
+      return ing;
+    }
+  } catch (error) {
+    console.error(`[getIngredientById] 无法从后端查询原料数据 (ID: ${id}):`, error);
+    // 不抛出错误，返回 null，让调用者处理
+    return null;
+  }
+  
+  return null;
+}
+
 // 从后端加载顾客和宠物数据
 async function loadCustomersFromBackend() {
   if (!backendState.token) {
@@ -5013,16 +5101,39 @@ function renderIngredientsList() {
   
   // 绑定详细信息按钮
   list.querySelectorAll('[data-detail]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = btn.dataset.detail;
       const wrap = list.querySelector(`.list-item[data-id="${id}"]`);
+      if (!wrap) return;
+      
       const existing = wrap.querySelector('.item-details');
       if (existing) {
         existing.remove();
         return;
       }
-      const ing = store.ingredients.find(x => x.id === id);
-      if (!ing) return;
+      
+      // 显示加载提示
+      const loadingEl = document.createElement('div');
+      loadingEl.className = 'item-details';
+      loadingEl.style.cssText = 'padding:12px; text-align:center; color:var(--text-secondary);';
+      loadingEl.textContent = '正在加载详细信息...';
+      wrap.insertAdjacentElement('beforeend', loadingEl);
+      
+      // 使用统一的 getIngredientById 函数（支持按需查询和缓存）
+      const ing = await getIngredientById(id);
+      
+      // 移除加载提示
+      loadingEl.remove();
+      
+      if (!ing) {
+        const errorEl = document.createElement('div');
+        errorEl.className = 'item-details';
+        errorEl.style.cssText = 'padding:12px; text-align:center; color:var(--error-color, #d32f2f);';
+        errorEl.textContent = '无法加载详细信息，请刷新后重试';
+        wrap.insertAdjacentElement('beforeend', errorEl);
+        return;
+      }
+      
       wrap.insertAdjacentHTML('beforeend', formatIngredientDetails(ing));
     });
   });
@@ -6053,18 +6164,6 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
 
   if (id) {
     // 编辑模式：先加载数据，再显示表单
-    const findStartTime = performance.now();
-    const ing = store.ingredients.find(x => x.id === id);
-    const findEndTime = performance.now();
-    if (findEndTime - findStartTime > 10) {
-      console.warn(`[Performance] Slow ingredient find: ${(findEndTime - findStartTime).toFixed(2)}ms`);
-    }
-    
-    if (!ing) {
-      console.error('未找到原料数据，ID:', id);
-      return;
-    }
-    
     // 显示加载遮罩（表单可见但不可操作）
     card.style.display = 'block';
     card.style.opacity = '0.6';
@@ -6093,6 +6192,21 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
     card.appendChild(loadingIndicator);
     
     try {
+      // 使用统一的 getIngredientById 函数（支持按需查询和缓存）
+      const findStartTime = performance.now();
+      const ing = await getIngredientById(id);
+      const findEndTime = performance.now();
+      if (findEndTime - findStartTime > 10) {
+        console.warn(`[Performance] Slow ingredient find: ${(findEndTime - findStartTime).toFixed(2)}ms`);
+      }
+      
+      if (!ing) {
+        console.error('未找到原料数据，ID:', id);
+        loadingIndicator.remove();
+        card.style.display = 'none';
+        alert('无法加载原料数据，请刷新后重试');
+        return;
+      }
       // 并行加载类别和项目数据
       const loadStartTime = performance.now();
       
@@ -10154,7 +10268,11 @@ function formatRecipeDetails(recipe) {
           });
         }
         
-        if (supplement) {
+        // 如果还是找不到，标记需要从后端查询（在渲染完成后异步查询）
+        if (!supplement && item.name) {
+          // 添加 data 属性标记，用于后续异步查询
+          fourthColumn = `<span data-supplement-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
+        } else if (supplement) {
           const unitContent = parseFloat(supplement.unitContent) || 0;
           const nutrientUnit = supplement.nutrientUnit || '';
           const mainNutrient = supplement.mainNutrient || '';
@@ -10414,6 +10532,103 @@ function renderRecipesList() {
       const recipe = store.recipes.find(x => x.id === id);
       if (!recipe) return;
       wrap.insertAdjacentHTML('beforeend', formatRecipeDetails(recipe));
+      
+      // 异步查询并更新标记的营养补充剂
+      const detailsEl = wrap.querySelector('.item-details');
+      if (detailsEl) {
+        const supplementQueries = detailsEl.querySelectorAll('[data-supplement-query]');
+        if (supplementQueries.length > 0) {
+          (async () => {
+            // 计算总重量（用于计算N值）
+            let totalWeightForPercent = 0;
+            recipe.ingredients.forEach(item => {
+              const unit = item.unit || 'g';
+              const weight = parseFloat(item.weight) || 0;
+              // 只计算单位为g的食材
+              if (unit === 'g') {
+                totalWeightForPercent += weight;
+              }
+            });
+            const effectiveTotalWeight = totalWeightForPercent > 0 ? totalWeightForPercent : (recipe.totalWeight || 0);
+            
+            // 并行查询所有标记的营养补充剂
+            const queries = Array.from(supplementQueries).map(async (el) => {
+              const supplementName = el.getAttribute('data-supplement-query');
+              if (!supplementName) return;
+              
+              try {
+                // 从后端API查询营养补充剂
+                const params = new URLSearchParams({
+                  search: supplementName,
+                  classification: '营养补充剂',
+                  pageSize: 1
+                });
+                const response = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+                
+                if (response.items && response.items.length > 0) {
+                  const found = response.items[0];
+                  // 转换为前端格式
+                  const supplement = {
+                    name: found.name,
+                    unitContent: found.unitContent,
+                    nutrientUnit: found.nutrientUnit,
+                    mainNutrient: found.mainNutrient
+                  };
+                  
+                  // 添加到缓存
+                  const supplementId = `ing_${found.id}`;
+                  ingredientCache.set(supplementId, {
+                    id: supplementId,
+                    name: supplement.name,
+                    unitContent: supplement.unitContent,
+                    nutrientUnit: supplement.nutrientUnit,
+                    mainNutrient: supplement.mainNutrient,
+                    classification: '营养补充剂',
+                    _backendId: found.id
+                  });
+                  
+                  // 查找对应的食材项，获取用量
+                  const recipeItem = recipe.ingredients.find(ri => ri.ingredientName === supplementName);
+                  if (recipeItem && effectiveTotalWeight > 0) {
+                    const unitContent = parseFloat(supplement.unitContent) || 0;
+                    const nutrientUnit = supplement.nutrientUnit || '';
+                    const mainNutrient = supplement.mainNutrient || '';
+                    const itemWeight = parseFloat(recipeItem.weight) || 0;
+                    
+                    if (unitContent > 0 && itemWeight > 0) {
+                      const N = Math.round((itemWeight * unitContent / effectiveTotalWeight) * 100);
+                      if (N > 0) {
+                        if (nutrientUnit && mainNutrient) {
+                          el.textContent = `每100g饭量添加 ${N} ${nutrientUnit} ${mainNutrient}`;
+                        } else if (nutrientUnit) {
+                          el.textContent = `每100g饭量添加 ${N} ${nutrientUnit}`;
+                        } else if (mainNutrient) {
+                          el.textContent = `每100g饭量添加 ${N} ${mainNutrient}`;
+                        } else {
+                          el.textContent = `每100g饭量添加 ${N} 单位营养素`;
+                        }
+                        el.removeAttribute('data-supplement-query');
+                        el.style.color = 'var(--text-secondary)';
+                        return;
+                      }
+                    }
+                  }
+                }
+                
+                // 如果查询失败或数据不完整，显示"-"
+                el.textContent = '-';
+                el.removeAttribute('data-supplement-query');
+              } catch (error) {
+                console.error(`[formatRecipeDetails] 无法查询营养补充剂 "${supplementName}":`, error);
+                el.textContent = '-';
+                el.removeAttribute('data-supplement-query');
+              }
+            });
+            
+            await Promise.all(queries);
+          })();
+        }
+      }
     });
   });
   
