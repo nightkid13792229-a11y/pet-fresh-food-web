@@ -1,4 +1,5 @@
 import { success } from '../../utils/response.js';
+import logger from '../../utils/logger.js';
 import {
   fetchRecipes,
   fetchRecipe,
@@ -16,6 +17,22 @@ export const listRecipesController = async (req, res) => {
     pageSize: parseInt(req.query.pageSize, 10) || 20
   };
   const result = await fetchRecipes(options);
+  
+  // 添加日志：确认返回的数据包含 ingredients
+  if (result.items && result.items.length > 0) {
+    logger.info(`[listRecipesController] 返回 ${result.items.length} 条食谱`);
+    const firstRecipe = result.items[0];
+    logger.info(`[listRecipesController] 第一个食谱: ${firstRecipe.name}`);
+    logger.info(`[listRecipesController] ingredients 存在: ${'ingredients' in firstRecipe}`);
+    logger.info(`[listRecipesController] ingredients 数量: ${firstRecipe.ingredients ? firstRecipe.ingredients.length : 'N/A'}`);
+    if (firstRecipe.ingredients && firstRecipe.ingredients.length > 0) {
+      logger.info(`[listRecipesController] 第一个食材: ${JSON.stringify(firstRecipe.ingredients[0])}`);
+    } else {
+      logger.warn(`[listRecipesController] 第一个食谱没有食材数据！`);
+      logger.warn(`[listRecipesController] 第一个食谱的完整数据: ${JSON.stringify(firstRecipe, null, 2)}`);
+    }
+  }
+  
   return success(res, result);
 };
 

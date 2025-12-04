@@ -2998,6 +2998,15 @@ async function loadRecipesFromBackend() {
     
     const data = await backendRequest(`/api/v1/recipes?${params.toString()}`);
     console.log('[loadRecipesFromBackend] 后端返回的原始数据:', data);
+    console.log('[loadRecipesFromBackend] data.items 长度:', data.items?.length);
+    if (data.items && data.items.length > 0) {
+      console.log('[loadRecipesFromBackend] 第一个食谱的完整数据:', JSON.stringify(data.items[0], null, 2));
+      console.log('[loadRecipesFromBackend] 第一个食谱的 keys:', Object.keys(data.items[0]));
+      console.log('[loadRecipesFromBackend] ingredients 存在:', 'ingredients' in data.items[0]);
+      console.log('[loadRecipesFromBackend] ingredients 值:', data.items[0].ingredients);
+      console.log('[loadRecipesFromBackend] ingredients 类型:', typeof data.items[0].ingredients);
+      console.log('[loadRecipesFromBackend] ingredients 是否为数组:', Array.isArray(data.items[0].ingredients));
+    }
     
     // 转换数据格式（将后端返回的数据转换为前端格式）
     const recipes = (data.items || []).map(recipe => {
