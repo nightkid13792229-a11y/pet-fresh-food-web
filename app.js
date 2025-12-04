@@ -16500,4 +16500,3 @@ if (document.readyState === 'loading') {
   console.log('[app.js] DOM已加载，立即调用init()...');
   init();
 }
-}
