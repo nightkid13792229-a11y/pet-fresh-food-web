@@ -10680,9 +10680,26 @@ window.openRecipeForm = openRecipeForm;
 window.deleteRecipe = deleteRecipe;
 
 function setupNav() {
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  console.log('[setupNav] 开始设置导航...');
+  const navButtons = document.querySelectorAll('.nav-btn');
+  console.log('[setupNav] 找到导航按钮数量:', navButtons.length);
+  
+  navButtons.forEach((btn, index) => {
+    const view = btn.dataset.view;
+    console.log(`[setupNav] 按钮 ${index}: view=${view}, text=${btn.textContent}`);
+    btn.addEventListener('click', (e) => {
+      console.log('[setupNav] 点击了导航按钮:', view);
+      e.preventDefault();
+      e.stopPropagation();
+      if (view) {
+        switchView(view);
+      } else {
+        console.warn('[setupNav] 按钮没有 data-view 属性:', btn);
+      }
+    });
   });
+  
+  console.log('[setupNav] 导航设置完成');
 }
 
 function setupPWA() {
