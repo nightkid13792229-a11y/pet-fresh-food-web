@@ -25,12 +25,32 @@ export const listRecipesController = async (req, res) => {
     logger.info(`[listRecipesController] 第一个食谱: ${firstRecipe.name}`);
     logger.info(`[listRecipesController] ingredients 存在: ${'ingredients' in firstRecipe}`);
     logger.info(`[listRecipesController] ingredients 数量: ${firstRecipe.ingredients ? firstRecipe.ingredients.length : 'N/A'}`);
+    logger.info(`[listRecipesController] 第一个食谱的所有键: ${Object.keys(firstRecipe).join(', ')}`);
     if (firstRecipe.ingredients && firstRecipe.ingredients.length > 0) {
       logger.info(`[listRecipesController] 第一个食材: ${JSON.stringify(firstRecipe.ingredients[0])}`);
     } else {
       logger.warn(`[listRecipesController] 第一个食谱没有食材数据！`);
-      logger.warn(`[listRecipesController] 第一个食谱的完整数据: ${JSON.stringify(firstRecipe, null, 2)}`);
+      logger.warn(`[listRecipesController] 第一个食谱的完整数据（前1000字符）: ${JSON.stringify(firstRecipe, null, 2).substring(0, 1000)}`);
     }
+    // 确保 ingredients 字段存在
+    if (!('ingredients' in firstRecipe)) {
+      logger.error(`[listRecipesController] 警告：第一个食谱缺少 ingredients 字段！`);
+      firstRecipe.ingredients = [];
+    }
+  }
+  
+  // 最终验证：确保所有食谱都有 ingredients 字段
+  if (result.items) {
+    result.items.forEach((recipe, index) => {
+      if (!('ingredients' in recipe)) {
+        logger.error(`[listRecipesController] 警告：食谱 ${index} (${recipe.name || recipe.id}) 缺少 ingredients 字段！`);
+        recipe.ingredients = [];
+      }
+      if (!Array.isArray(recipe.ingredients)) {
+        logger.error(`[listRecipesController] 警告：食谱 ${index} (${recipe.name || recipe.id}) ingredients 不是数组！`);
+        recipe.ingredients = [];
+      }
+    });
   }
   
   return success(res, result);
