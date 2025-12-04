@@ -18,9 +18,9 @@ export const listRecipesController = async (req, res) => {
   };
   const result = await fetchRecipes(options);
   
-  // 强制序列化和反序列化，确保所有数据都是纯 JavaScript 对象
-  // 这可以解决 MySQL RowDataPacket 序列化问题
-  const serializedResult = JSON.parse(JSON.stringify(result));
+  // 注意：repository 层已经手动构建了纯 JavaScript 对象，不需要再次序列化
+  // 直接使用 result，避免序列化时丢失 ingredients 字段
+  const serializedResult = result;
   
   // 添加日志：确认返回的数据包含 ingredients
   if (serializedResult.items && serializedResult.items.length > 0) {
