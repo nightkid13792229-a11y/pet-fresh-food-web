@@ -152,17 +152,22 @@ export const listRecipes = async (options = {}) => {
       }
       
       logger.info(`[listRecipes] 准备映射 ingredients，数量: ${ingredients.length}`);
-      recipe.ingredients = ingredients.map(ing => {
+      // 先将 RowDataPacket 对象转换为纯 JavaScript 对象
+      const plainIngredients = ingredients.map(ing => JSON.parse(JSON.stringify(ing)));
+      logger.info(`[listRecipes] 转换后的 ingredients 示例:`, plainIngredients.length > 0 ? JSON.stringify(plainIngredients[0]) : 'N/A');
+      recipe.ingredients = plainIngredients.map(ing => {
         if (!ing) {
           logger.warn(`[listRecipes] 发现 null 或 undefined 的 ing 项`);
           return null;
         }
-        return {
+        const plainIng = {
           id: ing.id,
           ingredientName: ing.ingredientName || '',
           weight: ing.weight,
           unit: ing.unit || 'g'
         };
+        logger.debug(`[listRecipes] 映射后的 ingredient:`, JSON.stringify(plainIng));
+        return plainIng;
       }).filter(ing => ing !== null);
       
       logger.info(`[listRecipes] 食谱 ${recipe.id} 最终 ingredients 数量: ${recipe.ingredients.length}`);
@@ -179,6 +184,8 @@ export const listRecipes = async (options = {}) => {
           WHERE recipe_id = ?
           ORDER BY step_order ASC
         `, [recipe.id]);
+        // 将 RowDataPacket 对象转换为纯 JavaScript 对象
+        steps = steps.map(step => JSON.parse(JSON.stringify(step)));
       } catch (error) {
         logger.error(`[listRecipes] 查询制作步骤失败:`, error);
         steps = [];
@@ -229,6 +236,12 @@ export const listRecipes = async (options = {}) => {
   logger.info(`[listRecipes] 序列化前，第一个食谱的 ingredients 值: ${items.length > 0 ? JSON.stringify(items[0].ingredients) : 'N/A'}`);
   
   const serializedItems = items.map(recipe => {
+    // 确保 recipe.ingredients 和 recipe.cookingSteps 存在
+    const recipeIngredients = recipe.ingredients || [];
+    const recipeCookingSteps = recipe.cookingSteps || [];
+    
+    logger.info(`[listRecipes] 序列化食谱 ${recipe.id}: ingredients 存在=${'ingredients' in recipe}, 类型=${typeof recipe.ingredients}, 是数组=${Array.isArray(recipeIngredients)}, 数量=${recipeIngredients.length}`);
+    
     // 手动构建纯 JavaScript 对象，确保所有字段都被包含
     const serializedRecipe = {
       id: recipe.id,
@@ -258,13 +271,16 @@ export const listRecipes = async (options = {}) => {
       createdBy: recipe.createdBy,
       updatedBy: recipe.updatedBy,
       // 确保 ingredients 和 cookingSteps 被明确包含
-      ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients.map(ing => ({
-        id: ing.id,
-        ingredientName: ing.ingredientName || '',
-        weight: ing.weight,
-        unit: ing.unit || 'g'
-      })) : [],
-      cookingSteps: Array.isArray(recipe.cookingSteps) ? recipe.cookingSteps.map(step => ({
+      ingredients: Array.isArray(recipeIngredients) ? recipeIngredients.map(ing => {
+        if (!ing) return null;
+        return {
+          id: ing.id,
+          ingredientName: ing.ingredientName || '',
+          weight: ing.weight,
+          unit: ing.unit || 'g'
+        };
+      }).filter(ing => ing !== null) : [],
+      cookingSteps: Array.isArray(recipeCookingSteps) ? recipeCookingSteps.map(step => ({
         id: step.id,
         stepOrder: step.stepOrder,
         description: step.description
@@ -328,6 +344,8 @@ export const getRecipeById = async (id) => {
       ORDER BY ri.id ASC
     `, [id]);
     logger.info(`[getRecipeById] 食谱 ${id} 查询到 ${ingredients.length} 条食材记录（使用 weight 字段）`);
+    // 将 RowDataPacket 对象转换为纯 JavaScript 对象
+    ingredients = ingredients.map(ing => JSON.parse(JSON.stringify(ing)));
     if (ingredients.length > 0) {
       logger.debug(`[getRecipeById] 第一条食材记录:`, JSON.stringify(ingredients[0], null, 2));
     }
@@ -347,6 +365,8 @@ export const getRecipeById = async (id) => {
         WHERE ri.recipe_id = ?
         ORDER BY ri.id ASC
       `, [id]);
+      // 将 RowDataPacket 对象转换为纯 JavaScript 对象
+      ingredients = ingredients.map(ing => JSON.parse(JSON.stringify(ing)));
       logger.info(`[getRecipeById] 食谱 ${id} 查询到 ${ingredients.length} 条食材记录（使用 default_amount 字段）`);
     } else {
       logger.error(`[getRecipeById] 无法查询食材记录，错误代码: ${error.code}, 错误信息: ${error.message}`);
@@ -362,12 +382,14 @@ export const getRecipeById = async (id) => {
   }));
   
   // 加载制作步骤
-  const steps = await query(`
+  let steps = await query(`
     SELECT id, step_order AS stepOrder, description
     FROM recipe_cooking_steps
     WHERE recipe_id = ?
     ORDER BY step_order ASC
   `, [id]);
+  // 将 RowDataPacket 对象转换为纯 JavaScript 对象
+  steps = steps.map(step => JSON.parse(JSON.stringify(step)));
   
   recipe.cookingSteps = steps.map(step => ({
     id: step.id,
