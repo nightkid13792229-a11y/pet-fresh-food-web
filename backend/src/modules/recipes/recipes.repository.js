@@ -74,7 +74,12 @@ export const listRecipes = async (options = {}) => {
   logger.info(`[listRecipes] 查询到 ${items.length} 条食谱记录`);
 
   // 为每个食谱加载关联的食材数据
-  for (const recipe of items) {
+  for (let i = 0; i < items.length; i++) {
+    // 将 RowDataPacket 转换为纯 JavaScript 对象，避免序列化问题
+    const recipeRow = items[i];
+    const recipe = JSON.parse(JSON.stringify(recipeRow));
+    items[i] = recipe; // 替换原对象
+    
     // 初始化，确保始终有值
     recipe.ingredients = [];
     recipe.cookingSteps = [];
@@ -212,38 +217,55 @@ export const listRecipes = async (options = {}) => {
       }
     }
 
-  // 在返回前，再次验证所有 items
+  // 在返回前，再次验证所有 items 并确保是纯 JavaScript 对象
   logger.info(`[listRecipes] 准备返回 ${items.length} 条食谱记录`);
-  for (const recipe of items) {
-    if (!recipe.ingredients) {
-      logger.error(`[listRecipes] 返回前发现食谱 ${recipe.id} ingredients 为 undefined！`);
-      recipe.ingredients = [];
+  const serializedItems = items.map(recipe => {
+    // 确保 recipe 是纯 JavaScript 对象
+    const serializedRecipe = JSON.parse(JSON.stringify(recipe));
+    
+    if (!serializedRecipe.ingredients) {
+      logger.error(`[listRecipes] 返回前发现食谱 ${serializedRecipe.id} ingredients 为 undefined！`);
+      serializedRecipe.ingredients = [];
     }
-    if (!Array.isArray(recipe.ingredients)) {
-      logger.error(`[listRecipes] 返回前发现食谱 ${recipe.id} ingredients 不是数组！`);
-      recipe.ingredients = [];
+    if (!Array.isArray(serializedRecipe.ingredients)) {
+      logger.error(`[listRecipes] 返回前发现食谱 ${serializedRecipe.id} ingredients 不是数组！`);
+      serializedRecipe.ingredients = [];
     }
-    // 确保 ingredients 是普通对象数组，而不是 RowDataPacket
-    recipe.ingredients = recipe.ingredients.map(ing => ({
-      id: ing.id,
-      ingredientName: ing.ingredientName || '',
-      weight: ing.weight,
-      unit: ing.unit || 'g'
+    
+    // 确保 ingredients 中的每个元素也是纯 JavaScript 对象
+    serializedRecipe.ingredients = serializedRecipe.ingredients.map(ing => {
+      const ingObj = JSON.parse(JSON.stringify(ing));
+      return {
+        id: ingObj.id,
+        ingredientName: ingObj.ingredientName || '',
+        weight: ingObj.weight,
+        unit: ingObj.unit || 'g'
+      };
+    });
+    
+    // 确保 cookingSteps 也是纯 JavaScript 对象数组
+    if (!serializedRecipe.cookingSteps) {
+      serializedRecipe.cookingSteps = [];
+    }
+    serializedRecipe.cookingSteps = serializedRecipe.cookingSteps.map(step => {
+      return JSON.parse(JSON.stringify(step));
+    });
+    
+    logger.info(`[listRecipes] 食谱 ${serializedRecipe.id} (${serializedRecipe.name}) 返回数据检查:`, JSON.stringify({
+      id: serializedRecipe.id,
+      name: serializedRecipe.name,
+      hasIngredients: 'ingredients' in serializedRecipe,
+      ingredientsCount: serializedRecipe.ingredients ? serializedRecipe.ingredients.length : 'N/A',
+      ingredientsType: typeof serializedRecipe.ingredients,
+      ingredientsIsArray: Array.isArray(serializedRecipe.ingredients),
+      firstIngredient: serializedRecipe.ingredients && serializedRecipe.ingredients.length > 0 ? serializedRecipe.ingredients[0] : null
     }));
     
-    logger.info(`[listRecipes] 食谱 ${recipe.id} (${recipe.name}) 返回数据检查:`, JSON.stringify({
-      id: recipe.id,
-      name: recipe.name,
-      hasIngredients: 'ingredients' in recipe,
-      ingredientsCount: recipe.ingredients ? recipe.ingredients.length : 'N/A',
-      ingredientsType: typeof recipe.ingredients,
-      ingredientsIsArray: Array.isArray(recipe.ingredients),
-      firstIngredient: recipe.ingredients && recipe.ingredients.length > 0 ? recipe.ingredients[0] : null
-    }));
-  }
+    return serializedRecipe;
+  });
 
   return {
-    items,
+    items: serializedItems,
     total,
     page,
     pageSize,
