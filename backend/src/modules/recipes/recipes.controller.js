@@ -18,10 +18,14 @@ export const listRecipesController = async (req, res) => {
   };
   const result = await fetchRecipes(options);
   
+  // 强制序列化和反序列化，确保所有数据都是纯 JavaScript 对象
+  // 这可以解决 MySQL RowDataPacket 序列化问题
+  const serializedResult = JSON.parse(JSON.stringify(result));
+  
   // 添加日志：确认返回的数据包含 ingredients
-  if (result.items && result.items.length > 0) {
-    logger.info(`[listRecipesController] 返回 ${result.items.length} 条食谱`);
-    const firstRecipe = result.items[0];
+  if (serializedResult.items && serializedResult.items.length > 0) {
+    logger.info(`[listRecipesController] 返回 ${serializedResult.items.length} 条食谱`);
+    const firstRecipe = serializedResult.items[0];
     logger.info(`[listRecipesController] 第一个食谱: ${firstRecipe.name}`);
     logger.info(`[listRecipesController] ingredients 存在: ${'ingredients' in firstRecipe}`);
     logger.info(`[listRecipesController] ingredients 数量: ${firstRecipe.ingredients ? firstRecipe.ingredients.length : 'N/A'}`);
@@ -30,7 +34,7 @@ export const listRecipesController = async (req, res) => {
       logger.info(`[listRecipesController] 第一个食材: ${JSON.stringify(firstRecipe.ingredients[0])}`);
     } else {
       logger.warn(`[listRecipesController] 第一个食谱没有食材数据！`);
-      logger.warn(`[listRecipesController] 第一个食谱的完整数据（前1000字符）: ${JSON.stringify(firstRecipe, null, 2).substring(0, 1000)}`);
+      logger.warn(`[listRecipesController] 第一个食谱的完整数据（前2000字符）: ${JSON.stringify(firstRecipe, null, 2).substring(0, 2000)}`);
     }
     // 确保 ingredients 字段存在
     if (!('ingredients' in firstRecipe)) {
@@ -40,8 +44,8 @@ export const listRecipesController = async (req, res) => {
   }
   
   // 最终验证：确保所有食谱都有 ingredients 字段
-  if (result.items) {
-    result.items.forEach((recipe, index) => {
+  if (serializedResult.items) {
+    serializedResult.items.forEach((recipe, index) => {
       if (!('ingredients' in recipe)) {
         logger.error(`[listRecipesController] 警告：食谱 ${index} (${recipe.name || recipe.id}) 缺少 ingredients 字段！`);
         recipe.ingredients = [];
@@ -53,7 +57,7 @@ export const listRecipesController = async (req, res) => {
     });
   }
   
-  return success(res, result);
+  return success(res, serializedResult);
 };
 
 export const getRecipeController = async (req, res) => {
