@@ -210,12 +210,12 @@ export const listRecipes = async (options = {}) => {
       recipe.ingredients = [];
     }
     
-      logger.info(`[listRecipes] 食谱 ${recipe.id} 最终验证后 ingredients 数量: ${recipe.ingredients.length}`);
-      logger.info(`[listRecipes] 食谱 ${recipe.id} 最终返回数据包含 ingredients: ${'ingredients' in recipe}`);
-      if (recipe.ingredients.length > 0) {
-        logger.info(`[listRecipes] 食谱 ${recipe.id} ingredients 详细内容:`, JSON.stringify(recipe.ingredients, null, 2));
-      }
+    logger.info(`[listRecipes] 食谱 ${recipe.id} 最终验证后 ingredients 数量: ${recipe.ingredients.length}`);
+    logger.info(`[listRecipes] 食谱 ${recipe.id} 最终返回数据包含 ingredients: ${'ingredients' in recipe}`);
+    if (recipe.ingredients.length > 0) {
+      logger.info(`[listRecipes] 食谱 ${recipe.id} ingredients 详细内容:`, JSON.stringify(recipe.ingredients, null, 2));
     }
+  }
 
   // 在返回前，再次验证所有 items 并确保是纯 JavaScript 对象
   logger.info(`[listRecipes] 准备返回 ${items.length} 条食谱记录`);
