@@ -3023,17 +3023,32 @@ async function loadRecipesFromBackend() {
     console.log('[loadRecipesFromBackend] 后端返回的原始数据:', data);
     console.log('[loadRecipesFromBackend] data.items 长度:', data.items?.length);
     if (data.items && data.items.length > 0) {
-      console.log('[loadRecipesFromBackend] 第一个食谱的完整数据:', JSON.stringify(data.items[0], null, 2));
-      console.log('[loadRecipesFromBackend] 第一个食谱的 keys:', Object.keys(data.items[0]));
-      console.log('[loadRecipesFromBackend] ingredients 存在:', 'ingredients' in data.items[0]);
-      console.log('[loadRecipesFromBackend] ingredients 值:', data.items[0].ingredients);
-      console.log('[loadRecipesFromBackend] ingredients 类型:', typeof data.items[0].ingredients);
-      console.log('[loadRecipesFromBackend] ingredients 是否为数组:', Array.isArray(data.items[0].ingredients));
+      const firstRecipe = data.items[0];
+      console.log('[loadRecipesFromBackend] 第一个食谱的完整数据:', JSON.stringify(firstRecipe, null, 2));
+      console.log('[loadRecipesFromBackend] 第一个食谱的 keys:', Object.keys(firstRecipe));
+      console.log('[loadRecipesFromBackend] ingredients 存在:', 'ingredients' in firstRecipe);
+      console.log('[loadRecipesFromBackend] ingredients 值:', firstRecipe.ingredients);
+      console.log('[loadRecipesFromBackend] ingredients 类型:', typeof firstRecipe.ingredients);
+      console.log('[loadRecipesFromBackend] ingredients 是否为数组:', Array.isArray(firstRecipe.ingredients));
+      
+      // 如果 ingredients 不存在，尝试从其他可能的字段获取
+      if (!('ingredients' in firstRecipe) || firstRecipe.ingredients === undefined) {
+        console.error('[loadRecipesFromBackend] 警告：第一个食谱缺少 ingredients 字段！');
+        console.error('[loadRecipesFromBackend] 第一个食谱的所有字段:', Object.keys(firstRecipe));
+        // 确保 ingredients 字段存在
+        firstRecipe.ingredients = [];
+      }
     }
     
     // 转换数据格式（将后端返回的数据转换为前端格式）
     const recipes = (data.items || []).map(recipe => {
-      console.log('[loadRecipesFromBackend] 处理食谱:', recipe.name, 'ingredients:', recipe.ingredients);
+      console.log('[loadRecipesFromBackend] 处理食谱:', recipe.name);
+      console.log('[loadRecipesFromBackend] recipe.ingredients 原始值:', recipe.ingredients);
+      console.log('[loadRecipesFromBackend] recipe.ingredients 类型:', typeof recipe.ingredients);
+      console.log('[loadRecipesFromBackend] recipe.ingredients 是否为数组:', Array.isArray(recipe.ingredients));
+      if (recipe.ingredients && recipe.ingredients.length > 0) {
+        console.log('[loadRecipesFromBackend] 第一个食材项:', recipe.ingredients[0]);
+      }
       
       // 确保 ingredients 始终是数组
       let ingredients = [];
@@ -3069,17 +3084,26 @@ async function loadRecipesFromBackend() {
         totalKcal: recipe.totalKcal || null,
         totalWeight: recipe.totalWeight || null,
         kcalDensity: recipe.kcalDensity || null,
-        ingredients: ingredients.map(ing => {
+        ingredients: ingredients.map((ing, idx) => {
+          console.log(`[loadRecipesFromBackend] 处理食材项 ${idx}:`, ing);
           if (!ing || typeof ing !== 'object') {
             console.warn('[loadRecipesFromBackend] 发现无效的食材项:', ing);
             return null;
           }
-          return {
+          const result = {
             ingredientName: (ing.ingredientName != null && ing.ingredientName !== '') ? String(ing.ingredientName).trim() : '', // 确保是字符串且不为空
             weight: ing.weight != null ? ing.weight : 0,
             unit: (ing.unit && ing.unit.trim()) ? ing.unit.trim() : 'g'
           };
-        }).filter(ing => ing && ing.ingredientName), // 过滤掉没有名称的项
+          console.log(`[loadRecipesFromBackend] 处理后的食材项 ${idx}:`, result);
+          return result;
+        }).filter(ing => {
+          const isValid = ing && ing.ingredientName;
+          if (!isValid) {
+            console.warn('[loadRecipesFromBackend] 过滤掉无效食材项:', ing);
+          }
+          return isValid;
+        }), // 过滤掉没有名称的项
         cookingSteps: (recipe.cookingSteps || []).map(step => ({
           stepOrder: step.stepOrder,
           description: step.description
