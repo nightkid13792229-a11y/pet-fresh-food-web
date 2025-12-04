@@ -3257,6 +3257,42 @@ async function loadIngredientsFromBackend() {
       }
     }
     
+    // 从加载的原料中提取所有已使用的单位，并添加到下拉框选项
+    const usedUnits = new Set();
+    ingredients.forEach(ing => {
+      if (ing.unit && ing.unit.trim()) {
+        usedUnits.add(ing.unit.trim());
+      }
+    });
+    
+    if (usedUnits.size > 0) {
+      const currentUnits = getUnits();
+      const unitsToAdd = Array.from(usedUnits).filter(u => !currentUnits.includes(u));
+      if (unitsToAdd.length > 0) {
+        console.log('[loadIngredientsFromBackend] Adding new units from ingredients:', unitsToAdd);
+        const updatedUnits = [...currentUnits, ...unitsToAdd];
+        saveUnits(updatedUnits);
+      }
+    }
+    
+    // 从加载的原料中提取所有已使用的主要营养素，并添加到下拉框选项
+    const usedMainNutrients = new Set();
+    ingredients.forEach(ing => {
+      if (ing.mainNutrient && ing.mainNutrient.trim()) {
+        usedMainNutrients.add(ing.mainNutrient.trim());
+      }
+    });
+    
+    if (usedMainNutrients.size > 0) {
+      const currentMainNutrients = getMainNutrients();
+      const mainNutrientsToAdd = Array.from(usedMainNutrients).filter(m => !currentMainNutrients.includes(m));
+      if (mainNutrientsToAdd.length > 0) {
+        console.log('[loadIngredientsFromBackend] Adding new main nutrients from ingredients:', mainNutrientsToAdd);
+        const updatedMainNutrients = [...currentMainNutrients, ...mainNutrientsToAdd];
+        saveMainNutrients(updatedMainNutrients);
+      }
+    }
+    
     console.log(`✓ 从后端加载了 ${ingredients.length} 条原料记录（共 ${data.total} 条）`);
     
     renderIngredientsList();
@@ -6225,7 +6261,27 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       $('i-quantity').value = ing.quantity || '';
       // 修复：如果 ing.unit 是空字符串，应该保持为空字符串，而不是默认值 'g'
       // 但如果是 null 或 undefined，才使用默认值 'g'
-      $('i-unit').value = (ing.unit !== null && ing.unit !== undefined && ing.unit !== '') ? ing.unit : 'g';
+      // 同时，如果选项不存在，需要动态添加
+      const unitSelect = $('i-unit');
+      if (unitSelect) {
+        const unitValue = (ing.unit !== null && ing.unit !== undefined && ing.unit !== '') ? ing.unit : 'g';
+        const unitExists = Array.from(unitSelect.options).some(opt => opt.value === unitValue);
+        if (unitExists) {
+          unitSelect.value = unitValue;
+        } else {
+          // 如果选项不存在，动态添加
+          const option = document.createElement('option');
+          option.value = unitValue;
+          option.textContent = unitValue;
+          unitSelect.appendChild(option);
+          unitSelect.value = unitValue;
+          // 同时保存到单位列表，以便下次使用
+          const currentUnits = getUnits();
+          if (!currentUnits.includes(unitValue)) {
+            saveUnits([...currentUnits, unitValue]);
+          }
+        }
+      }
       
       // 设置新字段（根据分类）
       if (ing.classification === '食材') {
@@ -6236,8 +6292,28 @@ async function openIngredientForm(id = null, insertAfterElement = null) {
       if ($('i-model')) $('i-model').value = ing.model || '';
       if (ing.classification === '营养补充剂') {
         if ($('i-mainNutrient')) {
-          // 修复：确保 mainNutrient 正确显示，即使值为空字符串
-          $('i-mainNutrient').value = (ing.mainNutrient !== null && ing.mainNutrient !== undefined) ? ing.mainNutrient : '';
+          const mainNutrientValue = (ing.mainNutrient !== null && ing.mainNutrient !== undefined) ? ing.mainNutrient : '';
+          if (mainNutrientValue) {
+            const mainNutrientSelect = $('i-mainNutrient');
+            const mainNutrientExists = Array.from(mainNutrientSelect.options).some(opt => opt.value === mainNutrientValue);
+            if (mainNutrientExists) {
+              mainNutrientSelect.value = mainNutrientValue;
+            } else {
+              // 如果选项不存在，动态添加
+              const option = document.createElement('option');
+              option.value = mainNutrientValue;
+              option.textContent = mainNutrientValue;
+              mainNutrientSelect.appendChild(option);
+              mainNutrientSelect.value = mainNutrientValue;
+              // 同时保存到主要营养素列表，以便下次使用
+              const currentMainNutrients = getMainNutrients();
+              if (!currentMainNutrients.includes(mainNutrientValue)) {
+                saveMainNutrients([...currentMainNutrients, mainNutrientValue]);
+              }
+            }
+          } else {
+            $('i-mainNutrient').value = '';
+          }
         }
         if ($('i-unitContent')) {
           // 修复：如果 unitContent 是 0，应该显示 '0'，而不是空字符串
