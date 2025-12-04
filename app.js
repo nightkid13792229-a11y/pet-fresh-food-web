@@ -4886,10 +4886,14 @@ function renderIngredientsList() {
   
   if (pageItems.length === 0) {
     list.innerHTML = '<div class="muted" style="text-align:center; padding:20px">暂无原料数据</div>';
-    $('ingredients-total').textContent = '共 0 条';
-    $('ingredients-pageinfo').textContent = '';
-    $('ingredients-prev').disabled = true;
-    $('ingredients-next').disabled = true;
+    const totalEl = $('ingredients-total');
+    if (totalEl) totalEl.textContent = '共 0 条';
+    const pageInfoEl = $('ingredients-pageinfo');
+    if (pageInfoEl) pageInfoEl.textContent = '';
+    const prevBtn = $('ingredients-prev');
+    if (prevBtn) prevBtn.disabled = true;
+    const nextBtn = $('ingredients-next');
+    if (nextBtn) nextBtn.disabled = true;
     return;
   }
   
@@ -4972,10 +4976,14 @@ function renderIngredientsList() {
     btn.addEventListener('click', () => deleteIngredient(btn.dataset.del));
   });
   
-  $('ingredients-total').textContent = `共 ${total} 条`;
-  $('ingredients-pageinfo').textContent = `第 ${store.ingredientPage}/${totalPages} 页`;
-  $('ingredients-prev').disabled = store.ingredientPage <= 1;
-  $('ingredients-next').disabled = store.ingredientPage >= totalPages;
+  const totalEl = $('ingredients-total');
+  if (totalEl) totalEl.textContent = `共 ${total} 条`;
+  const pageInfoEl = $('ingredients-pageinfo');
+  if (pageInfoEl) pageInfoEl.textContent = `第 ${store.ingredientPage}/${totalPages} 页`;
+  const prevBtn = $('ingredients-prev');
+  if (prevBtn) prevBtn.disabled = store.ingredientPage <= 1;
+  const nextBtn = $('ingredients-next');
+  if (nextBtn) nextBtn.disabled = store.ingredientPage >= totalPages;
 }
 
 function paginatedIngredients() {
@@ -4989,9 +4997,13 @@ function paginatedIngredients() {
   }
   
   // 本地数据：客户端分页和搜索（仅用于未登录时的降级方案）
-  const searchQ = ($('ingredient-search').value || '').trim().toLowerCase();
-  const categoryFilter = ($('ingredient-category-filter').value || '').trim();
-  const nameFilter = ($('ingredient-name-filter').value || '').trim();
+  const searchEl = $('ingredient-search');
+  const categoryFilterEl = $('ingredient-category-filter');
+  const nameFilterEl = $('ingredient-name-filter');
+  
+  const searchQ = (searchEl?.value || '').trim().toLowerCase();
+  const categoryFilter = (categoryFilterEl?.value || '').trim();
+  const nameFilter = (nameFilterEl?.value || '').trim();
   
   const filtered = store.ingredients.filter(ing => {
     const matchSearch = !searchQ || 
