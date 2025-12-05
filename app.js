@@ -11958,12 +11958,27 @@ function setupRecipesModule() {
           }
         } catch (error) {
           console.error('上传封面照片失败:', error);
-          alert('上传封面照片失败: ' + (error.message || '未知错误'));
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalBtnText;
+          // 如果是404错误，说明后端接口未实现
+          const is404Error = error.message && (error.message.includes('404') || error.message.includes('Not Found'));
+          const errorMessage = is404Error 
+            ? '后端照片上传接口未实现（404错误）'
+            : (error.message || '未知错误');
+          
+          // 询问用户是否继续保存（不包含封面照片）
+          const continueWithoutCover = confirm(
+            '上传封面照片失败: ' + errorMessage + 
+            '\n\n是否继续保存食谱（不包含封面照片）？\n\n点击"确定"继续保存，点击"取消"返回编辑。'
+          );
+          if (!continueWithoutCover) {
+            // 用户选择不继续，恢复按钮状态并返回
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+            }
+            return;
           }
-          return;
+          // 用户选择继续，coverImageUrl 保持为 null
+          console.log('用户选择跳过封面照片上传，继续保存食谱');
         }
       } else {
         // 如果是编辑模式，检查是否有现有的封面照片URL
