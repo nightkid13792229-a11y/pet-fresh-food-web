@@ -9213,7 +9213,19 @@ function setupIngredientsModule() {
   // 表单提交
   const form = $('ingredient-form');
   if (form) {
-    form.addEventListener('submit', async (e) => {
+    // 移除旧的事件监听器（如果存在），避免重复绑定
+    // 通过克隆节点并替换来移除所有事件监听器
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    
+    // 重新获取表单元素（因为已经被替换）
+    const formElement = $('ingredient-form');
+    if (!formElement) {
+      console.error('[setupIngredientsModule] 无法找到表单元素');
+      return;
+    }
+    
+    formElement.addEventListener('submit', async (e) => {
       e.preventDefault();
       
       if (!backendState.token) {
@@ -9222,7 +9234,7 @@ function setupIngredientsModule() {
       }
       
       // 移除所有隐藏字段的 required 属性，避免表单验证错误
-      const allRequiredFields = form.querySelectorAll('[required]');
+      const allRequiredFields = formElement.querySelectorAll('[required]');
       allRequiredFields.forEach(field => {
         const label = field.closest('label');
         if (label && label.style.display === 'none') {
