@@ -831,6 +831,8 @@ async function uploadRecipeCover(formData) {
     const url = backendState.baseUrl.replace(/\/$/, '') + path;
     
     try {
+      console.log(`[uploadRecipeCover] 尝试上传到: ${url}`);
+      
       const fetchOptions = {
         method: 'POST',
         mode: 'cors',
@@ -844,6 +846,9 @@ async function uploadRecipeCover(formData) {
       
       const response = await fetch(url, fetchOptions);
       
+      console.log(`[uploadRecipeCover] 响应状态: ${response.status} ${response.statusText}`);
+      console.log(`[uploadRecipeCover] 响应URL: ${response.url}`);
+      
       if (response.status === 401) {
         clearBackendAuth(true);
         throw new Error('登录已过期，请重新登录。');
@@ -851,29 +856,35 @@ async function uploadRecipeCover(formData) {
       
       if (response.ok) {
         const data = await response.json();
+        console.log(`[uploadRecipeCover] 响应数据:`, data);
         
         // 处理返回格式 {success: true, data: {...}}
         if (data && typeof data === 'object' && data.success === true && data.data !== undefined) {
+          console.log(`[uploadRecipeCover] 上传成功，文件URL: ${data.data.url}`);
           return data.data;
         }
         
         return data;
       } else if (response.status === 404) {
         // 404错误，尝试下一个路径
+        console.warn(`[uploadRecipeCover] 接口不存在 (${path})，尝试下一个路径`);
         lastError = new Error(`接口不存在 (${path})`);
         continue;
       } else {
         // 其他错误，直接抛出
         const errorData = await response.json().catch(() => ({}));
+        console.error(`[uploadRecipeCover] 上传失败 (${response.status}):`, errorData);
         throw new Error(errorData.message || `上传失败 (${response.status})`);
       }
     } catch (error) {
-      // 如果是404，继续尝试下一个路径
-      if (error.message && error.message.includes('404')) {
+      // 如果是网络错误或404，继续尝试下一个路径
+      if (error.message && (error.message.includes('404') || error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+        console.warn(`[uploadRecipeCover] 请求失败，尝试下一个路径:`, error.message);
         lastError = error;
         continue;
       }
       // 其他错误直接抛出
+      console.error(`[uploadRecipeCover] 上传错误:`, error);
       throw error;
     }
   }
