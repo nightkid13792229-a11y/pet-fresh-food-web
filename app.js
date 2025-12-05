@@ -5269,22 +5269,23 @@ function paginatedIngredients() {
     if (searchQ) {
       const searchLower = searchQ.toLowerCase();
       // 将所有文本字段合并为一个字符串进行搜索
+      // 确保所有字段都被转换为字符串，null/undefined转换为空字符串
       const searchableText = [
-        ing.code || '',
-        ing.name || '',
-        ing.brand || '',
-        ing.category || '',
-        ing.classification || '',
-        ing.source || '',
-        ing.model || '',
-        ing.description || '',
-        ing.mainFunction || '',
-        ing.subject || '',
-        ing.part || '',
-        ing.originType || '',
-        ing.mainNutrient || '',
-        ing.nutrientUnit || '',
-        ing.unit || ''
+        String(ing.code || ''),
+        String(ing.name || ''),
+        String(ing.brand || ''),
+        String(ing.category || ''),
+        String(ing.classification || ''),
+        String(ing.source || ''),
+        String(ing.model || ''),
+        String(ing.description || ''),
+        String(ing.mainFunction || ''),
+        String(ing.subject || ''),
+        String(ing.part || ''),
+        String(ing.originType || ''),
+        String(ing.mainNutrient || ''),
+        String(ing.nutrientUnit || ''),
+        String(ing.unit || '')
       ].join(' ').toLowerCase();
       
       if (!searchableText.includes(searchLower)) {
@@ -5457,25 +5458,39 @@ async function searchIngredientForForm(query) {
         const data = response?.data || response;
         const items = data.items || data || [];
         
-        // 转换为前端格式
-        allIngredients = items.map(ing => ({
-          id: `ing_${ing.id}`,
-          _backendId: ing.id,
-          code: ing.code || '',
-          name: ing.name || '',
-          brand: ing.brand || ing.source || '',
-          category: ing.category || '',
-          classification: ing.classification || '',
-          unit: ing.unit || 'g',
-          cost: ing.cost || 0,
-          quantity: ing.quantity || 0,
-          pricePer500: ing.pricePer500 || 0,
-          ediblePercent: ing.ediblePercent || 100,
-          ediblePricePer500: ing.ediblePricePer500 || 0,
-          weightPerUnit: ing.weightPerUnit || 0,
-          description: ing.description || '',
-          mainFunction: ing.mainFunction || ''
-        }));
+        // 转换为前端格式（包含所有字段，与loadIngredientsFromBackend保持一致）
+        allIngredients = items.map(ing => {
+          const sourceValue = (ing.source !== null && ing.source !== undefined && ing.source !== '') 
+            ? String(ing.source).trim() 
+            : '';
+          
+          return {
+            id: `ing_${ing.id}`,
+            _backendId: ing.id,
+            code: ing.code || '',
+            name: ing.name || '',
+            brand: ing.brand || '',
+            source: sourceValue,
+            category: ing.category || '',
+            classification: ing.classification || '',
+            unit: ing.unit || 'g',
+            cost: ing.cost || 0,
+            quantity: ing.quantity || 0,
+            pricePer500: ing.pricePer500 || 0,
+            ediblePercent: ing.ediblePercent || 100,
+            ediblePricePer500: ing.ediblePricePer500 || 0,
+            weightPerUnit: ing.weightPerUnit || 0,
+            description: ing.description || '',
+            mainFunction: ing.mainFunction || '',
+            // 新增字段
+            subject: ing.subject || null,
+            part: ing.part || null,
+            originType: ing.originType || null,
+            model: ing.model || null,
+            mainNutrient: (ing.mainNutrient !== null && ing.mainNutrient !== undefined && ing.mainNutrient !== '') ? ing.mainNutrient : null,
+            nutrientUnit: (ing.nutrientUnit !== null && ing.nutrientUnit !== undefined && ing.nutrientUnit !== '') ? ing.nutrientUnit : null
+          };
+        });
       } catch (error) {
         console.error('[searchIngredientForForm] Failed to load ingredients from backend:', error);
         // 如果后端加载失败，回退到使用store.ingredients
@@ -5488,28 +5503,58 @@ async function searchIngredientForForm(query) {
     
     // 搜索匹配的原料（全字段搜索）
     console.log('[searchIngredientForForm] Searching for:', searchText, 'in', allIngredients.length, 'ingredients');
+    
+    // 调试：检查第一个原料的字段
+    if (allIngredients.length > 0) {
+      const firstIng = allIngredients[0];
+      console.log('[searchIngredientForForm] Sample ingredient fields:', {
+        code: firstIng.code,
+        name: firstIng.name,
+        category: firstIng.category,
+        model: firstIng.model,
+        classification: firstIng.classification,
+        hasModel: 'model' in firstIng,
+        hasCategory: 'category' in firstIng
+      });
+    }
+    
     const matched = allIngredients.filter(ing => {
       const searchLower = searchText.toLowerCase();
       // 将所有文本字段合并为一个字符串进行搜索
+      // 确保所有字段都被转换为字符串，null/undefined转换为空字符串
       const searchableText = [
-        ing.code || '',
-        ing.name || '',
-        ing.brand || '',
-        ing.category || '',
-        ing.classification || '',
-        ing.source || '',
-        ing.model || '',
-        ing.description || '',
-        ing.mainFunction || '',
-        ing.subject || '',
-        ing.part || '',
-        ing.originType || '',
-        ing.mainNutrient || '',
-        ing.nutrientUnit || '',
-        ing.unit || ''
+        String(ing.code || ''),
+        String(ing.name || ''),
+        String(ing.brand || ''),
+        String(ing.category || ''),
+        String(ing.classification || ''),
+        String(ing.source || ''),
+        String(ing.model || ''),
+        String(ing.description || ''),
+        String(ing.mainFunction || ''),
+        String(ing.subject || ''),
+        String(ing.part || ''),
+        String(ing.originType || ''),
+        String(ing.mainNutrient || ''),
+        String(ing.nutrientUnit || ''),
+        String(ing.unit || '')
       ].join(' ').toLowerCase();
       
-      return searchableText.includes(searchLower);
+      const matches = searchableText.includes(searchLower);
+      
+      // 调试：如果搜索"泡沫箱"，输出匹配信息
+      if (searchText.includes('泡沫') || searchText.includes('箱')) {
+        console.log('[searchIngredientForForm] Checking ingredient:', {
+          name: ing.name,
+          category: ing.category,
+          model: ing.model,
+          classification: ing.classification,
+          searchableText: searchableText.substring(0, 100),
+          matches: matches
+        });
+      }
+      
+      return matches;
     }).slice(0, 20); // 最多显示20个结果
     
     console.log('[searchIngredientForForm] Found', matched.length, 'matches');
