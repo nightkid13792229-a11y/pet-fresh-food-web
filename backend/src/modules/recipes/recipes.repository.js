@@ -7,6 +7,7 @@ const baseSelect = `
     r.code,
     r.name,
     r.description,
+    r.cover_image_url AS coverImageUrl,
     r.life_stage AS lifeStage,
     r.recipe_type AS recipeType,
     r.software,
@@ -248,6 +249,7 @@ export const listRecipes = async (options = {}) => {
       code: recipe.code,
       name: recipe.name,
       description: recipe.description,
+      coverImageUrl: recipe.coverImageUrl || null,
       lifeStage: recipe.lifeStage,
       recipeType: recipe.recipeType,
       software: recipe.software,
@@ -410,17 +412,18 @@ export const createRecipe = async (payload, userId) => {
     // 插入主表
     const recipeSql = `
       INSERT INTO recipes (
-        code, name, description, life_stage, recipe_type, software, nutrition_standard,
+        code, name, description, cover_image_url, life_stage, recipe_type, software, nutrition_standard,
         cooking_loss, selling_price, protein, fat, carb, fiber, ash, moisture,
         ca_ratio, total_kcal, total_weight, kcal_density, base_price, default_servings,
         created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const recipeParams = [
       payload.code || null,
       payload.name,
       payload.description || null,
+      payload.coverImageUrl || null,
       payload.lifeStage || null,
       payload.recipeType || 'standard',
       payload.software || 'ADF',
@@ -530,6 +533,10 @@ export const updateRecipe = async (id, payload, userId) => {
     if (payload.description !== undefined) {
       fields.push('description = ?');
       params.push(payload.description || null);
+    }
+    if (payload.coverImageUrl !== undefined) {
+      fields.push('cover_image_url = ?');
+      params.push(payload.coverImageUrl || null);
     }
     if (payload.lifeStage !== undefined) {
       fields.push('life_stage = ?');
