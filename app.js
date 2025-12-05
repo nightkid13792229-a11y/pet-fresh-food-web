@@ -11551,14 +11551,40 @@ function openRecipeForm(id = null, recipeData = null) {
           imageUrl = baseUrl.replace(/\/$/, '') + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
         }
         
-        coverImage.src = imageUrl;
-        coverImage.style.display = 'block';
         console.log('[openRecipeForm] 加载封面照片:', imageUrl);
+        
+        // 保存占位符的原始HTML内容
+        const originalPlaceholderHTML = coverPlaceholder ? coverPlaceholder.innerHTML : '';
+        
+        // 先隐藏占位符和图片，等加载成功后再显示
+        if (coverPlaceholder) coverPlaceholder.style.display = 'none';
+        coverImage.style.display = 'none';
+        
+        // 添加图片加载成功和失败的处理
+        coverImage.onload = () => {
+          // 图片加载成功
+          coverImage.style.display = 'block';
+          if (coverPlaceholder) coverPlaceholder.style.display = 'none';
+          if (removeCoverBtn) removeCoverBtn.style.display = 'inline-block';
+          if (coverInfo) coverInfo.textContent = '已上传的封面照片';
+          console.log('[openRecipeForm] 封面照片加载成功');
+        };
+        coverImage.onerror = () => {
+          // 图片加载失败
+          console.error('[openRecipeForm] 封面照片加载失败:', imageUrl);
+          coverImage.style.display = 'none';
+          if (coverPlaceholder) {
+            coverPlaceholder.style.display = 'block';
+            coverPlaceholder.innerHTML = '图片加载失败<br/>请重新上传';
+          }
+          if (removeCoverBtn) removeCoverBtn.style.display = 'none';
+          if (coverInfo) coverInfo.textContent = '封面照片加载失败';
+        };
+        
+        // 开始加载图片
+        coverImage.src = imageUrl;
       }
-      if (coverPlaceholder) coverPlaceholder.style.display = 'none';
-      if (removeCoverBtn) removeCoverBtn.style.display = 'inline-block';
       if (setCurrentCoverFile) setCurrentCoverFile(null); // 编辑时，currentCoverFile 为 null，表示使用现有照片
-      if (coverInfo) coverInfo.textContent = '已上传的封面照片';
     } else {
       if (coverImage) coverImage.style.display = 'none';
       if (coverPlaceholder) coverPlaceholder.style.display = 'block';
