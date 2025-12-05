@@ -797,6 +797,122 @@ async function backendRequest(path, options = {}) {
   return data;
 }
 
+// 上传食谱封面照片
+async function uploadRecipeCover(formData) {
+  if (!backendState.baseUrl) {
+    throw new Error('未配置后台接口地址');
+  }
+  
+  const url = backendState.baseUrl.replace(/\/$/, '') + '/api/v1/recipes/upload-cover';
+  
+  const fetchOptions = {
+    method: 'POST',
+    mode: 'cors',
+    credentials: 'include',
+    headers: {
+      // 注意：不要设置 Content-Type，让浏览器自动设置（包含 boundary）
+      ...(backendState.token ? { Authorization: `Bearer ${backendState.token}` } : {})
+    },
+    body: formData
+  };
+  
+  const response = await fetch(url, fetchOptions);
+  
+  if (response.status === 401) {
+    clearBackendAuth(true);
+    throw new Error('登录已过期，请重新登录。');
+  }
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `上传失败 (${response.status})`);
+  }
+  
+  const data = await response.json();
+  
+  // 处理返回格式 {success: true, data: {...}}
+  if (data && typeof data === 'object' && data.success === true && data.data !== undefined) {
+    return data.data;
+  }
+  
+  return data;
+}
+
+// 图片压缩函数（支持16:9宽高比，最大1920x1080）
+function compressImage(file, maxWidth = 1920, quality = 0.80) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // 计算16:9宽高比
+        const targetAspectRatio = 16 / 9;
+        const currentAspectRatio = width / height;
+        
+        // 如果图片不是16:9，进行裁剪到16:9
+        let sourceX = 0;
+        let sourceY = 0;
+        let sourceWidth = width;
+        let sourceHeight = height;
+        
+        if (Math.abs(currentAspectRatio - targetAspectRatio) > 0.01) {
+          // 裁剪到16:9（保持宽度，调整高度）
+          if (currentAspectRatio > targetAspectRatio) {
+            // 图片更宽，裁剪左右
+            sourceWidth = height * targetAspectRatio;
+            sourceX = (width - sourceWidth) / 2;
+          } else {
+            // 图片更高，裁剪上下
+            sourceHeight = width / targetAspectRatio;
+            sourceY = (height - sourceHeight) / 2;
+          }
+        }
+        
+        // 限制最大宽度
+        if (sourceWidth > maxWidth) {
+          sourceHeight = (sourceHeight * maxWidth) / sourceWidth;
+          sourceWidth = maxWidth;
+        }
+        
+        // 确保是16:9比例（精确计算）
+        const finalHeight = Math.round((sourceWidth / 16) * 9);
+        const finalWidth = Math.round((finalHeight / 9) * 16);
+        
+        canvas.width = finalWidth;
+        canvas.height = finalHeight;
+        
+        const ctx = canvas.getContext('2d');
+        // 绘制裁剪后的图片
+        ctx.drawImage(
+          img,
+          sourceX, sourceY, sourceWidth, sourceHeight,
+          0, 0, finalWidth, finalHeight
+        );
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            reject(new Error('图片压缩失败'));
+          }
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = reject;
+      img.src = event.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // 后端登录函数
 async function backendLogin(email, password) {
   const payload = await backendRequest('/api/v1/auth/login', {
@@ -3069,6 +3185,7 @@ async function loadRecipesFromBackend() {
         code: recipe.code || '',
         name: recipe.name || '',
         description: recipe.description || '',
+        coverImageUrl: recipe.coverImageUrl || null,
         lifeStage: recipe.lifeStage || null,
         recipeType: recipe.recipeType || 'standard',
         software: recipe.software || 'ADF',
@@ -5621,22 +5738,22 @@ async function searchIngredientForForm(query) {
             : '';
           
           return {
-            id: `ing_${ing.id}`,
-            _backendId: ing.id,
-            code: ing.code || '',
-            name: ing.name || '',
+          id: `ing_${ing.id}`,
+          _backendId: ing.id,
+          code: ing.code || '',
+          name: ing.name || '',
             brand: ing.brand || '',
             source: sourceValue,
-            category: ing.category || '',
-            classification: ing.classification || '',
-            unit: ing.unit || 'g',
-            cost: ing.cost || 0,
-            quantity: ing.quantity || 0,
-            pricePer500: ing.pricePer500 || 0,
-            ediblePercent: ing.ediblePercent || 100,
-            ediblePricePer500: ing.ediblePricePer500 || 0,
-            weightPerUnit: ing.weightPerUnit || 0,
-            description: ing.description || '',
+          category: ing.category || '',
+          classification: ing.classification || '',
+          unit: ing.unit || 'g',
+          cost: ing.cost || 0,
+          quantity: ing.quantity || 0,
+          pricePer500: ing.pricePer500 || 0,
+          ediblePercent: ing.ediblePercent || 100,
+          ediblePricePer500: ing.ediblePricePer500 || 0,
+          weightPerUnit: ing.weightPerUnit || 0,
+          description: ing.description || '',
             mainFunction: ing.mainFunction || '',
             // 新增字段
             subject: ing.subject || null,
@@ -9400,19 +9517,19 @@ function setupIngredientsModule() {
     const newNextBtn = nextBtn.cloneNode(true);
     nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
     newNextBtn.addEventListener('click', async () => {
-      const { totalPages } = paginatedIngredients();
+    const { totalPages } = paginatedIngredients();
       console.log(`[分页] 点击下一页，当前页: ${store.ingredientPage}, 总页数: ${totalPages}`);
-      if (store.ingredientPage < totalPages) {
+    if (store.ingredientPage < totalPages) {
         const oldPage = store.ingredientPage;
-        store.ingredientPage++;
+      store.ingredientPage++;
         console.log(`[分页] 页码从 ${oldPage} 增加到 ${store.ingredientPage}`);
-        if (backendState.token) {
-          await loadIngredientsFromBackend();  // 使用后端数据时，重新加载
-        } else {
-          renderIngredientsList();  // 本地数据只需要重新渲染
-        }
+      if (backendState.token) {
+        await loadIngredientsFromBackend();  // 使用后端数据时，重新加载
+      } else {
+        renderIngredientsList();  // 本地数据只需要重新渲染
       }
-    });
+    }
+  });
   }
   
   // 价格自动计算
@@ -10562,7 +10679,7 @@ function formatRecipeDetails(recipe) {
                    storeName.includes(ingredientName) || 
                    ingredientName.includes(storeName);
           });
-          if (ing) {
+      if (ing) {
             ingredient = ing;
           }
         }
@@ -10712,7 +10829,7 @@ function formatRecipeDetails(recipe) {
                 fourthColumn = `每100g饭量添加 ${N} ${nutrientUnit}`;
               } else if (mainNutrient) {
                 fourthColumn = `每100g饭量添加 ${N} ${mainNutrient}`;
-              } else {
+  } else {
                 // 如果都没有，至少显示N值
                 fourthColumn = `每100g饭量添加 ${N} 单位营养素`;
               }
@@ -11228,6 +11345,7 @@ function copyRecipe(id) {
     id: '', // 清空ID，作为新食谱
     name: (recipe.name || '') + '（副本）',
     code: '', // 清空编号，会自动生成新编号
+    coverImageUrl: null, // 复制时不复制封面照片
     createdAt: Date.now(),
     updatedAt: Date.now(),
     _backendId: undefined // 清空后端ID
@@ -11348,6 +11466,31 @@ function openRecipeForm(id = null, recipeData = null) {
     if (!$('r-kcalDensity').value) {
       $('r-kcalDensity').value = recipe.kcalDensity != null ? parseFloat(recipe.kcalDensity).toFixed(2) : '';
     }
+    
+    // 加载封面照片
+    const coverImage = $('recipe-cover-image');
+    const coverPlaceholder = $('recipe-cover-placeholder');
+    const removeCoverBtn = $('btn-remove-cover');
+    const coverInfo = $('recipe-cover-info');
+    const setCurrentCoverFile = window.setCurrentCoverFile;
+    const clearCurrentCoverFile = window.clearCurrentCoverFile;
+    
+    if (recipe.coverImageUrl) {
+      if (coverImage) {
+        coverImage.src = recipe.coverImageUrl;
+        coverImage.style.display = 'block';
+      }
+      if (coverPlaceholder) coverPlaceholder.style.display = 'none';
+      if (removeCoverBtn) removeCoverBtn.style.display = 'inline-block';
+      if (setCurrentCoverFile) setCurrentCoverFile(null); // 编辑时，currentCoverFile 为 null，表示使用现有照片
+      if (coverInfo) coverInfo.textContent = '已上传的封面照片';
+    } else {
+      if (coverImage) coverImage.style.display = 'none';
+      if (coverPlaceholder) coverPlaceholder.style.display = 'block';
+      if (removeCoverBtn) removeCoverBtn.style.display = 'none';
+      if (clearCurrentCoverFile) clearCurrentCoverFile();
+      if (coverInfo) coverInfo.textContent = '';
+    }
   } else {
     if (title) title.textContent = '新增食谱';
     form.reset();
@@ -11370,6 +11513,21 @@ function openRecipeForm(id = null, recipeData = null) {
     renderRecipeCookingSteps();
     $('r-totalWeight').value = '';
     $('r-kcalDensity').value = '';
+    
+    // 清空封面照片
+    const coverImage = $('recipe-cover-image');
+    const coverPlaceholder = $('recipe-cover-placeholder');
+    const removeCoverBtn = $('btn-remove-cover');
+    const coverInfo = $('recipe-cover-info');
+    const coverImageInput = $('r-cover-image');
+    const clearCurrentCoverFile = window.clearCurrentCoverFile;
+    
+    if (coverImage) coverImage.style.display = 'none';
+    if (coverPlaceholder) coverPlaceholder.style.display = 'block';
+    if (removeCoverBtn) removeCoverBtn.style.display = 'none';
+    if (coverImageInput) coverImageInput.value = '';
+    if (clearCurrentCoverFile) clearCurrentCoverFile();
+    if (coverInfo) coverInfo.textContent = '';
     
     // 自动生成编号
     autoGenerateRecipeCode();
@@ -11586,6 +11744,123 @@ function setupRecipesModule() {
     addStepBtn.addEventListener('click', addCookingStep);
   }
   
+  // 食谱封面照片上传
+  const coverImageInput = $('r-cover-image');
+  const uploadCoverBtn = $('btn-upload-cover');
+  const removeCoverBtn = $('btn-remove-cover');
+  const coverPreview = $('recipe-cover-preview');
+  const coverImage = $('recipe-cover-image');
+  const coverPlaceholder = $('recipe-cover-placeholder');
+  const coverInfo = $('recipe-cover-info');
+  
+  // 存储当前选择的文件（全局变量，在setupRecipesModule作用域内）
+  let currentCoverFile = null;
+  
+  // 显示封面预览
+  function displayCoverPreview(file) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      coverImage.src = event.target.result;
+      coverImage.style.display = 'block';
+      coverPlaceholder.style.display = 'none';
+      if (removeCoverBtn) removeCoverBtn.style.display = 'inline-block';
+      
+      // 显示文件信息
+      const sizeKB = (file.size / 1024).toFixed(1);
+      const img = new Image();
+      img.onload = () => {
+        if (coverInfo) {
+          coverInfo.textContent = `${img.width}x${img.height} 像素，${sizeKB} KB`;
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  if (uploadCoverBtn && coverImageInput) {
+    uploadCoverBtn.addEventListener('click', () => {
+      coverImageInput.click();
+    });
+    
+    coverImageInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      // 验证文件类型
+      if (!file.type.match(/^image\/(jpeg|jpg)$/)) {
+        alert('只支持 JPG/JPEG 格式的图片');
+        return;
+      }
+      
+      // 验证文件大小（400KB）
+      if (file.size > 400 * 1024) {
+        alert('图片文件大小不能超过 400KB，将自动压缩');
+      }
+      
+      try {
+        // 读取并预览图片
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            // 检查尺寸
+            const width = img.width;
+            const height = img.height;
+            const aspectRatio = width / height;
+            
+            // 如果不是16:9，提示用户（但不阻止上传）
+            const targetRatio = 16 / 9;
+            if (Math.abs(aspectRatio - targetRatio) > 0.1) {
+              console.warn('图片不是16:9比例，将自动裁剪为16:9');
+            }
+            
+            // 如果图片太大或文件太大，进行压缩
+            if (width > 1920 || height > 1080 || file.size > 300 * 1024) {
+              compressImage(file, 1920, 0.80).then(compressedFile => {
+                currentCoverFile = compressedFile;
+                displayCoverPreview(compressedFile);
+              }).catch(error => {
+                console.error('图片压缩失败:', error);
+                alert('图片压缩失败，请重试');
+              });
+            } else {
+              currentCoverFile = file;
+              displayCoverPreview(file);
+            }
+          };
+          img.onerror = () => {
+            alert('读取图片失败，请重试');
+          };
+          img.src = event.target.result;
+        };
+        reader.onerror = () => {
+          alert('读取图片失败，请重试');
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('读取图片失败:', error);
+        alert('读取图片失败，请重试');
+      }
+    });
+  }
+  
+  if (removeCoverBtn) {
+    removeCoverBtn.addEventListener('click', () => {
+      currentCoverFile = null;
+      if (coverImageInput) coverImageInput.value = '';
+      if (coverImage) coverImage.style.display = 'none';
+      if (coverPlaceholder) coverPlaceholder.style.display = 'block';
+      removeCoverBtn.style.display = 'none';
+      if (coverInfo) coverInfo.textContent = '';
+    });
+  }
+  
+  // 将currentCoverFile暴露到全局作用域，以便在表单提交时访问
+  window.currentCoverFile = () => currentCoverFile;
+  window.setCurrentCoverFile = (file) => { currentCoverFile = file; };
+  window.clearCurrentCoverFile = () => { currentCoverFile = null; };
+  
   // 表单提交
   const form = $('recipe-form');
   if (form) {
@@ -11661,10 +11936,48 @@ function setupRecipesModule() {
       autoGenerateRecipeCode();
       const code = $('r-code').value.trim();
       
+      // 处理封面照片上传
+      let coverImageUrl = null;
+      const getCurrentCoverFile = window.currentCoverFile || (() => null);
+      const currentCoverFile = getCurrentCoverFile();
+      
+      // 如果有新上传的照片，先上传照片
+      if (currentCoverFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', currentCoverFile);
+          formData.append('type', 'recipe-cover');
+          
+          // 上传照片到服务器
+          const uploadResponse = await uploadRecipeCover(formData);
+          if (uploadResponse && uploadResponse.url) {
+            coverImageUrl = uploadResponse.url;
+            console.log('✓ 封面照片已上传:', coverImageUrl);
+          } else {
+            throw new Error('上传照片失败：服务器未返回URL');
+          }
+        } catch (error) {
+          console.error('上传封面照片失败:', error);
+          alert('上传封面照片失败: ' + (error.message || '未知错误'));
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          }
+          return;
+        }
+      } else {
+        // 如果是编辑模式，检查是否有现有的封面照片URL
+        const recipe = id ? store.recipes.find(x => x.id === id) : null;
+        if (recipe && recipe.coverImageUrl) {
+          coverImageUrl = recipe.coverImageUrl; // 保留原有照片
+        }
+      }
+      
       const payload = {
         code: code || null,
         name: name,
         description: $('r-description')?.value?.trim() || null,
+        coverImageUrl: coverImageUrl,
         lifeStage: $('r-lifeStage').value || 'adult',
         nutritionStandard: $('r-nutritionStandard').value || 'FEDIAF',
         software: $('r-software').value || 'ADF',

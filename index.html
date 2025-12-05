@@ -260,6 +260,28 @@
             </label>
           </div>
           
+          <div class="section-title">食谱封面</div>
+          <div style="margin-bottom:12px;">
+            <div style="display:flex; gap:12px; align-items:flex-start;">
+              <!-- 照片预览 -->
+              <div id="recipe-cover-preview" style="width:200px; height:112px; border:2px dashed var(--border); border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--bg-secondary); overflow:hidden; position:relative; flex-shrink:0;">
+                <img id="recipe-cover-image" src="" alt="封面预览" style="width:100%; height:100%; object-fit:cover; display:none;" />
+                <span id="recipe-cover-placeholder" style="color:var(--text-secondary); font-size:12px; text-align:center; padding:8px;">点击上传<br/>1920x1080<br/>16:9比例<br/>JPG格式</span>
+              </div>
+              <!-- 上传控件 -->
+              <div style="flex:1;">
+                <input type="file" id="r-cover-image" accept="image/jpeg,image/jpg" style="display:none;" />
+                <button type="button" id="btn-upload-cover" class="btn small" style="margin-bottom:8px;">选择照片</button>
+                <button type="button" id="btn-remove-cover" class="btn small ghost" style="display:none; margin-bottom:8px;">删除照片</button>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:8px;">
+                  <div>建议规格：1920x1080 像素，16:9比例，JPG格式</div>
+                  <div>文件大小：不超过 400KB</div>
+                  <div id="recipe-cover-info" style="margin-top:4px; color:var(--text-primary);"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="section-title">食谱描述</div>
           <div style="margin-bottom:12px;">
             <textarea id="r-description" placeholder="输入食谱描述（可选）" rows="3" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; font-family:inherit; resize:vertical;"></textarea>
