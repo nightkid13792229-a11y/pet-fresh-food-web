@@ -10321,10 +10321,13 @@ function formatRecipeDetails(recipe) {
       const unit = item.unit || (ingredient ? ingredient.unit : 'g');
       const weight = parseFloat(item.weight) || 0;
       
-      // 确定分类：如果有ingredient就用ingredient的分类，否则默认为'食材'
-      let classification = ingredient ? ingredient.classification : '食材';
+      // 确定分类：如果有ingredient就用ingredient的分类
+      // 如果找不到ingredient，标记为需要查询（不默认分类为'食材'）
+      let classification = ingredient ? ingredient.classification : null;
+      const needsQuery = !ingredient; // 标记是否需要查询
       
       // 计算重量（用于占比计算，只计算单位为g的食材）
+      // 只有确认是食材且单位为g时才计算
       let weightInG = 0;
       if (classification === '食材' && unit === 'g') {
         weightInG = weight;
@@ -10336,9 +10339,10 @@ function formatRecipeDetails(recipe) {
         name: ingredientName || '未知食材',
         weight: weight,
         unit: unit,
-        classification: classification,
+        classification: classification, // 可能是 null
         ingredient: ingredient,
-        weightInG: weightInG
+        weightInG: weightInG,
+        needsQuery: needsQuery // 新增字段：标记是否需要查询
       });
     });
     
@@ -10365,7 +10369,14 @@ function formatRecipeDetails(recipe) {
       
       // 重量占比或营养素信息（第四列）
       let fourthColumn = '-';
-      if (item.classification === '食材') {
+      
+      // 如果标记为需要查询，先显示"加载中..."并标记为需要查询
+      if (item.needsQuery && item.name) {
+        // 标记为需要查询，不区分是食材还是营养补充剂
+        // 在异步查询时，会根据查询结果判断分类
+        fourthColumn = `<span data-ingredient-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
+        console.log(`[formatRecipeDetails] 食材 "${item.name}" 未找到，标记为需要查询`);
+      } else if (item.classification === '食材') {
         // 食材：显示重量占比（不显示"重量占比："文字）
         if (totalWeightForPercent > 0 && item.weightInG > 0) {
           const weightPercent = ((item.weightInG / totalWeightForPercent) * 100).toFixed(2);
@@ -10681,11 +10692,15 @@ function renderRecipesList() {
       if (!recipe) return;
       wrap.insertAdjacentHTML('beforeend', formatRecipeDetails(recipe));
       
-      // 异步查询并更新标记的营养补充剂
+      // 异步查询并更新标记的食材（包括营养补充剂和普通食材）
       const detailsEl = wrap.querySelector('.item-details');
       if (detailsEl) {
+        // 查找所有需要查询的项目（包括旧的data-supplement-query和新的data-ingredient-query）
         const supplementQueries = detailsEl.querySelectorAll('[data-supplement-query]');
-        if (supplementQueries.length > 0) {
+        const ingredientQueries = detailsEl.querySelectorAll('[data-ingredient-query]');
+        const allQueries = Array.from(supplementQueries).concat(Array.from(ingredientQueries));
+        
+        if (allQueries.length > 0) {
           (async () => {
             // 计算总重量（用于计算N值）
             let totalWeightForPercent = 0;
@@ -10699,148 +10714,217 @@ function renderRecipesList() {
             });
             const effectiveTotalWeight = totalWeightForPercent > 0 ? totalWeightForPercent : (recipe.totalWeight || 0);
             
-            // 并行查询所有标记的营养补充剂
-            const queries = Array.from(supplementQueries).map(async (el) => {
-              const supplementName = el.getAttribute('data-supplement-query');
-              if (!supplementName) return;
+            // 并行查询所有标记的食材（先尝试营养补充剂，再尝试普通食材）
+            const queries = allQueries.map(async (el) => {
+              // 获取食材名称（支持两种data属性）
+              const ingredientName = el.getAttribute('data-supplement-query') || el.getAttribute('data-ingredient-query');
+              if (!ingredientName) return;
               
-              console.log(`[formatRecipeDetails] 开始查询营养补充剂: "${supplementName}"`);
+              console.log(`[formatRecipeDetails] 开始查询食材: "${ingredientName}"`);
               
               try {
-                // 从后端API查询营养补充剂（使用更精确的查询）
-                const params = new URLSearchParams({
-                  search: supplementName,
-                  classification: '营养补充剂',
-                  pageSize: 10  // 增加返回数量，确保能找到
-                });
-                const response = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+                // 先尝试查询是否为营养补充剂
+                let found = null;
+                let classification = null;
                 
-                console.log(`[formatRecipeDetails] 查询营养补充剂 "${supplementName}" 的API响应:`, {
-                  itemsCount: response.items?.length || 0,
-                  items: response.items?.map(i => ({ name: i.name, id: i.id })) || []
+                // 1. 先查询营养补充剂
+                const supplementParams = new URLSearchParams({
+                  search: ingredientName,
+                  classification: '营养补充剂',
+                  pageSize: 10
+                });
+                const supplementResponse = await backendRequest(`/api/v1/ingredients?${supplementParams.toString()}`);
+                
+                console.log(`[formatRecipeDetails] 查询营养补充剂 "${ingredientName}" 的API响应:`, {
+                  itemsCount: supplementResponse.items?.length || 0,
+                  items: supplementResponse.items?.map(i => ({ name: i.name, id: i.id })) || []
                 });
                 
                 // 在返回结果中精确匹配名称
-                let found = null;
-                if (response.items && response.items.length > 0) {
+                if (supplementResponse.items && supplementResponse.items.length > 0) {
                   // 先尝试精确匹配
-                  found = response.items.find(item => item.name === supplementName);
-                  console.log(`[formatRecipeDetails] 精确匹配结果:`, found ? { name: found.name, id: found.id } : '未找到');
+                  found = supplementResponse.items.find(item => item.name === ingredientName);
                   
                   // 如果精确匹配没找到，尝试去掉空格后匹配
                   if (!found) {
-                    const normalizedName = supplementName.replace(/\s+/g, '');
-                    found = response.items.find(item => {
+                    const normalizedName = ingredientName.replace(/\s+/g, '');
+                    found = supplementResponse.items.find(item => {
                       const itemName = (item.name || '').replace(/\s+/g, '');
                       return itemName === normalizedName;
                     });
-                    console.log(`[formatRecipeDetails] 去掉空格匹配结果:`, found ? { name: found.name, id: found.id } : '未找到');
                   }
                   
                   // 如果还是没找到，尝试模糊匹配
                   if (!found) {
-                    found = response.items.find(item => {
+                    found = supplementResponse.items.find(item => {
                       const itemName = (item.name || '').trim();
-                      const searchName = supplementName.trim();
+                      const searchName = ingredientName.trim();
                       return itemName === searchName || 
                              itemName.includes(searchName) || 
                              searchName.includes(itemName);
                     });
-                    console.log(`[formatRecipeDetails] 模糊匹配结果:`, found ? { name: found.name, id: found.id } : '未找到');
+                  }
+                  
+                  if (found) {
+                    classification = '营养补充剂';
                   }
                 }
                 
-                if (found) {
-                  console.log(`[formatRecipeDetails] 找到营养补充剂 "${supplementName}":`, {
-                    name: found.name,
-                    unitContent: found.unitContent,
-                    nutrientUnit: found.nutrientUnit,
-                    mainNutrient: found.mainNutrient
+                // 2. 如果不是营养补充剂，再查询普通食材
+                if (!found) {
+                  const ingredientParams = new URLSearchParams({
+                    search: ingredientName,
+                    classification: '食材',
+                    pageSize: 10
+                  });
+                  const ingredientResponse = await backendRequest(`/api/v1/ingredients?${ingredientParams.toString()}`);
+                  
+                  console.log(`[formatRecipeDetails] 查询食材 "${ingredientName}" 的API响应:`, {
+                    itemsCount: ingredientResponse.items?.length || 0,
+                    items: ingredientResponse.items?.map(i => ({ name: i.name, id: i.id })) || []
                   });
                   
-                  // 转换为前端格式
-                  const supplement = {
-                    name: found.name,
-                    unitContent: found.unitContent,
-                    nutrientUnit: found.nutrientUnit,
-                    mainNutrient: found.mainNutrient
-                  };
-                  
-                  // 添加到缓存
-                  const supplementId = `ing_${found.id}`;
-                  ingredientCache.set(supplementId, {
-                    id: supplementId,
-                    name: supplement.name,
-                    unitContent: supplement.unitContent,
-                    nutrientUnit: supplement.nutrientUnit,
-                    mainNutrient: supplement.mainNutrient,
-                    classification: '营养补充剂',
-                    _backendId: found.id
-                  });
-                  
-                  // 查找对应的食材项，获取用量
-                  const recipeItem = recipe.ingredients.find(ri => ri.ingredientName === supplementName);
-                  console.log(`[formatRecipeDetails] 查找食谱中的食材项 "${supplementName}":`, {
-                    found: !!recipeItem,
-                    recipeItem: recipeItem ? { ingredientName: recipeItem.ingredientName, weight: recipeItem.weight, unit: recipeItem.unit } : null,
-                    allRecipeIngredients: recipe.ingredients.map(ri => ri.ingredientName)
-                  });
-                  
-                  if (recipeItem && effectiveTotalWeight > 0) {
-                    const unitContent = parseFloat(supplement.unitContent) || 0;
-                    const nutrientUnit = supplement.nutrientUnit || '';
-                    const mainNutrient = supplement.mainNutrient || '';
-                    const itemWeight = parseFloat(recipeItem.weight) || 0;
+                  if (ingredientResponse.items && ingredientResponse.items.length > 0) {
+                    // 先尝试精确匹配
+                    found = ingredientResponse.items.find(item => item.name === ingredientName);
                     
-                    console.log(`[formatRecipeDetails] 计算N值:`, {
-                      unitContent,
-                      itemWeight,
-                      effectiveTotalWeight,
-                      calculatedN: (itemWeight * unitContent / effectiveTotalWeight) * 100
-                    });
-                    
-                    if (unitContent > 0 && itemWeight > 0) {
-                      const N = Math.round((itemWeight * unitContent / effectiveTotalWeight) * 100);
-                      if (N > 0) {
-                        if (nutrientUnit && mainNutrient) {
-                          el.textContent = `每100g饭量添加 ${N} ${nutrientUnit} ${mainNutrient}`;
-                        } else if (nutrientUnit) {
-                          el.textContent = `每100g饭量添加 ${N} ${nutrientUnit}`;
-                        } else if (mainNutrient) {
-                          el.textContent = `每100g饭量添加 ${N} ${mainNutrient}`;
-                        } else {
-                          el.textContent = `每100g饭量添加 ${N} 单位营养素`;
-                        }
-                        el.removeAttribute('data-supplement-query');
-                        el.style.color = 'var(--text-secondary)';
-                        console.log(`[formatRecipeDetails] 成功更新营养补充剂 "${supplementName}" 的显示`);
-                        return;
-                      } else {
-                        console.warn(`[formatRecipeDetails] 营养补充剂 "${supplementName}" 计算出的N为0或负数`);
-                      }
-                    } else {
-                      console.warn(`[formatRecipeDetails] 营养补充剂 "${supplementName}" 数据不完整:`, {
-                        unitContent,
-                        itemWeight
+                    // 如果精确匹配没找到，尝试去掉空格后匹配
+                    if (!found) {
+                      const normalizedName = ingredientName.replace(/\s+/g, '');
+                      found = ingredientResponse.items.find(item => {
+                        const itemName = (item.name || '').replace(/\s+/g, '');
+                        return itemName === normalizedName;
                       });
                     }
-                  } else {
-                    console.warn(`[formatRecipeDetails] 未找到食谱中的食材项或总重量为0:`, {
-                      recipeItemFound: !!recipeItem,
-                      effectiveTotalWeight
-                    });
+                    
+                    // 如果还是没找到，尝试模糊匹配
+                    if (!found) {
+                      found = ingredientResponse.items.find(item => {
+                        const itemName = (item.name || '').trim();
+                        const searchName = ingredientName.trim();
+                        return itemName === searchName || 
+                               itemName.includes(searchName) || 
+                               searchName.includes(itemName);
+                      });
+                    }
+                    
+                    if (found) {
+                      classification = '食材';
+                    }
+                  }
+                }
+                
+                // 3. 如果找到了，根据分类更新显示
+                if (found && classification) {
+                  console.log(`[formatRecipeDetails] 找到${classification === '营养补充剂' ? '营养补充剂' : '食材'} "${ingredientName}":`, {
+                    name: found.name,
+                    classification: classification,
+                    unitContent: found.unitContent,
+                    nutrientUnit: found.nutrientUnit,
+                    mainNutrient: found.mainNutrient
+                  });
+                  
+                  // 添加到缓存
+                  const ingredientId = `ing_${found.id}`;
+                  const cachedIngredient = {
+                    id: ingredientId,
+                    name: found.name,
+                    classification: classification,
+                    unit: found.unit || 'g',
+                    _backendId: found.id
+                  };
+                  
+                  if (classification === '营养补充剂') {
+                    cachedIngredient.unitContent = found.unitContent;
+                    cachedIngredient.nutrientUnit = found.nutrientUnit;
+                    cachedIngredient.mainNutrient = found.mainNutrient;
+                  }
+                  ingredientCache.set(ingredientId, cachedIngredient);
+                  
+                  // 查找对应的食材项，获取用量
+                  const recipeItem = recipe.ingredients.find(ri => ri.ingredientName === ingredientName);
+                  console.log(`[formatRecipeDetails] 查找食谱中的食材项 "${ingredientName}":`, {
+                    found: !!recipeItem,
+                    recipeItem: recipeItem ? { ingredientName: recipeItem.ingredientName, weight: recipeItem.weight, unit: recipeItem.unit } : null
+                  });
+                  
+                  if (classification === '营养补充剂') {
+                    // 营养补充剂：显示每100g饭量添加的营养素
+                    if (recipeItem && effectiveTotalWeight > 0) {
+                      const unitContent = parseFloat(found.unitContent) || 0;
+                      const nutrientUnit = found.nutrientUnit || '';
+                      const mainNutrient = found.mainNutrient || '';
+                      const itemWeight = parseFloat(recipeItem.weight) || 0;
+                      
+                      console.log(`[formatRecipeDetails] 计算N值:`, {
+                        unitContent,
+                        itemWeight,
+                        effectiveTotalWeight,
+                        calculatedN: (itemWeight * unitContent / effectiveTotalWeight) * 100
+                      });
+                      
+                      if (unitContent > 0 && itemWeight > 0) {
+                        const N = Math.round((itemWeight * unitContent / effectiveTotalWeight) * 100);
+                        if (N > 0) {
+                          if (nutrientUnit && mainNutrient) {
+                            el.textContent = `每100g饭量添加 ${N} ${nutrientUnit} ${mainNutrient}`;
+                          } else if (nutrientUnit) {
+                            el.textContent = `每100g饭量添加 ${N} ${nutrientUnit}`;
+                          } else if (mainNutrient) {
+                            el.textContent = `每100g饭量添加 ${N} ${mainNutrient}`;
+                          } else {
+                            el.textContent = `每100g饭量添加 ${N} 单位营养素`;
+                          }
+                          el.removeAttribute('data-supplement-query');
+                          el.removeAttribute('data-ingredient-query');
+                          el.style.color = 'var(--text-secondary)';
+                          console.log(`[formatRecipeDetails] 成功更新营养补充剂 "${ingredientName}" 的显示`);
+                          return;
+                        } else {
+                          console.warn(`[formatRecipeDetails] 营养补充剂 "${ingredientName}" 计算出的N为0或负数`);
+                        }
+                      } else {
+                        console.warn(`[formatRecipeDetails] 营养补充剂 "${ingredientName}" 数据不完整:`, {
+                          unitContent,
+                          itemWeight
+                        });
+                      }
+                    } else {
+                      console.warn(`[formatRecipeDetails] 未找到食谱中的食材项或总重量为0:`, {
+                        recipeItemFound: !!recipeItem,
+                        effectiveTotalWeight
+                      });
+                    }
+                  } else if (classification === '食材') {
+                    // 食材：显示重量占比
+                    if (recipeItem && effectiveTotalWeight > 0) {
+                      const unit = recipeItem.unit || 'g';
+                      const weight = parseFloat(recipeItem.weight) || 0;
+                      
+                      if (unit === 'g' && weight > 0) {
+                        const weightPercent = ((weight / effectiveTotalWeight) * 100).toFixed(2);
+                        el.textContent = `${weightPercent}%`;
+                        el.removeAttribute('data-supplement-query');
+                        el.removeAttribute('data-ingredient-query');
+                        el.style.color = 'var(--text-secondary)';
+                        console.log(`[formatRecipeDetails] 成功更新食材 "${ingredientName}" 的显示`);
+                        return;
+                      }
+                    }
                   }
                 } else {
-                  console.warn(`[formatRecipeDetails] 未找到营养补充剂 "${supplementName}"`);
+                  console.warn(`[formatRecipeDetails] 未找到食材 "${ingredientName}"`);
                 }
                 
                 // 如果查询失败或数据不完整，显示"-"
                 el.textContent = '-';
                 el.removeAttribute('data-supplement-query');
+                el.removeAttribute('data-ingredient-query');
               } catch (error) {
-                console.error(`[formatRecipeDetails] 无法查询营养补充剂 "${supplementName}":`, error);
+                console.error(`[formatRecipeDetails] 无法查询食材 "${ingredientName}":`, error);
                 el.textContent = '-';
                 el.removeAttribute('data-supplement-query');
+                el.removeAttribute('data-ingredient-query');
               }
             });
             
