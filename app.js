@@ -797,45 +797,93 @@ async function backendRequest(path, options = {}) {
   return data;
 }
 
+// 将文件转换为base64（临时方案，用于后端接口未实现时）
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      resolve(event.target.result);
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // 上传食谱封面照片
 async function uploadRecipeCover(formData) {
   if (!backendState.baseUrl) {
     throw new Error('未配置后台接口地址');
   }
   
-  const url = backendState.baseUrl.replace(/\/$/, '') + '/api/v1/recipes/upload-cover';
+  // 尝试多个可能的接口路径
+  const possiblePaths = [
+    '/api/v1/recipes/upload-cover',
+    '/api/v1/upload/recipe-cover',
+    '/api/v1/files/upload',
+    '/api/v1/upload'
+  ];
   
-  const fetchOptions = {
-    method: 'POST',
-    mode: 'cors',
-    credentials: 'include',
-    headers: {
-      // 注意：不要设置 Content-Type，让浏览器自动设置（包含 boundary）
-      ...(backendState.token ? { Authorization: `Bearer ${backendState.token}` } : {})
-    },
-    body: formData
-  };
+  let lastError = null;
   
-  const response = await fetch(url, fetchOptions);
-  
-  if (response.status === 401) {
-    clearBackendAuth(true);
-    throw new Error('登录已过期，请重新登录。');
+  for (const path of possiblePaths) {
+    const url = backendState.baseUrl.replace(/\/$/, '') + path;
+    
+    try {
+      const fetchOptions = {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          // 注意：不要设置 Content-Type，让浏览器自动设置（包含 boundary）
+          ...(backendState.token ? { Authorization: `Bearer ${backendState.token}` } : {})
+        },
+        body: formData
+      };
+      
+      const response = await fetch(url, fetchOptions);
+      
+      if (response.status === 401) {
+        clearBackendAuth(true);
+        throw new Error('登录已过期，请重新登录。');
+      }
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // 处理返回格式 {success: true, data: {...}}
+        if (data && typeof data === 'object' && data.success === true && data.data !== undefined) {
+          return data.data;
+        }
+        
+        return data;
+      } else if (response.status === 404) {
+        // 404错误，尝试下一个路径
+        lastError = new Error(`接口不存在 (${path})`);
+        continue;
+      } else {
+        // 其他错误，直接抛出
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `上传失败 (${response.status})`);
+      }
+    } catch (error) {
+      // 如果是404，继续尝试下一个路径
+      if (error.message && error.message.includes('404')) {
+        lastError = error;
+        continue;
+      }
+      // 其他错误直接抛出
+      throw error;
+    }
   }
   
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `上传失败 (${response.status})`);
+  // 所有路径都失败，抛出最后一个错误
+  if (lastError) {
+    throw new Error(`后端上传接口未实现。尝试的路径: ${possiblePaths.join(', ')}`);
   }
   
-  const data = await response.json();
-  
-  // 处理返回格式 {success: true, data: {...}}
-  if (data && typeof data === 'object' && data.success === true && data.data !== undefined) {
-    return data.data;
-  }
-  
-  return data;
+  throw new Error('上传失败：未知错误');
 }
 
 // 图片压缩函数（支持16:9宽高比，最大1920x1080）
@@ -11941,7 +11989,7 @@ function setupRecipesModule() {
       const getCurrentCoverFile = window.currentCoverFile || (() => null);
       const currentCoverFile = getCurrentCoverFile();
       
-      // 如果有新上传的照片，先上传照片
+      // 如果有新上传的照片，先尝试上传照片
       if (currentCoverFile) {
         try {
           const formData = new FormData();
@@ -11958,27 +12006,65 @@ function setupRecipesModule() {
           }
         } catch (error) {
           console.error('上传封面照片失败:', error);
-          // 如果是404错误，说明后端接口未实现
-          const is404Error = error.message && (error.message.includes('404') || error.message.includes('Not Found'));
-          const errorMessage = is404Error 
-            ? '后端照片上传接口未实现（404错误）'
-            : (error.message || '未知错误');
+          // 如果是404错误，说明后端接口未实现，使用base64降级方案
+          const is404Error = error.message && (error.message.includes('404') || error.message.includes('Not Found') || error.message.includes('接口未实现'));
           
-          // 询问用户是否继续保存（不包含封面照片）
-          const continueWithoutCover = confirm(
-            '上传封面照片失败: ' + errorMessage + 
-            '\n\n是否继续保存食谱（不包含封面照片）？\n\n点击"确定"继续保存，点击"取消"返回编辑。'
-          );
-          if (!continueWithoutCover) {
-            // 用户选择不继续，恢复按钮状态并返回
-            if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = originalBtnText;
+          if (is404Error) {
+            // 后端接口未实现，使用base64降级方案
+            console.warn('后端上传接口未实现，使用base64降级方案');
+            try {
+              const base64Data = await fileToBase64(currentCoverFile);
+              // 检查base64数据大小（如果超过500KB，提示用户）
+              const base64Size = (base64Data.length * 3) / 4; // base64编码后大小约为原文件的1.33倍
+              if (base64Size > 500 * 1024) {
+                const useBase64 = confirm(
+                  '后端照片上传接口未实现。\n\n' +
+                  '图片较大（' + Math.round(base64Size / 1024) + 'KB），使用base64存储可能会影响性能。\n\n' +
+                  '是否使用base64存储图片？\n\n' +
+                  '点击"确定"使用base64存储，点击"取消"跳过封面照片。'
+                );
+                if (useBase64) {
+                  coverImageUrl = base64Data;
+                  console.log('✓ 使用base64存储封面照片');
+                } else {
+                  console.log('用户选择跳过封面照片');
+                }
+              } else {
+                // 图片较小，直接使用base64
+                coverImageUrl = base64Data;
+                console.log('✓ 使用base64存储封面照片（临时方案）');
+              }
+            } catch (base64Error) {
+              console.error('转换为base64失败:', base64Error);
+              const continueWithoutCover = confirm(
+                '上传封面照片失败: 后端接口未实现，且无法转换为base64格式。\n\n' +
+                '是否继续保存食谱（不包含封面照片）？\n\n' +
+                '点击"确定"继续保存，点击"取消"返回编辑。'
+              );
+              if (!continueWithoutCover) {
+                if (submitBtn) {
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = originalBtnText;
+                }
+                return;
+              }
             }
-            return;
+          } else {
+            // 其他错误，询问用户是否继续保存
+            const continueWithoutCover = confirm(
+              '上传封面照片失败: ' + (error.message || '未知错误') + 
+              '\n\n是否继续保存食谱（不包含封面照片）？\n\n' +
+              '点击"确定"继续保存，点击"取消"返回编辑。'
+            );
+            if (!continueWithoutCover) {
+              if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+              }
+              return;
+            }
+            console.log('用户选择跳过封面照片上传，继续保存食谱');
           }
-          // 用户选择继续，coverImageUrl 保持为 null
-          console.log('用户选择跳过封面照片上传，继续保存食谱');
         }
       } else {
         // 如果是编辑模式，检查是否有现有的封面照片URL
