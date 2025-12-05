@@ -10396,10 +10396,11 @@ function formatRecipeDetails(recipe) {
           });
         }
         
-        // 如果还是找不到，标记需要从后端查询（在渲染完成后异步查询）
+        // 如果找不到supplement，或者找到了但数据不完整（unitContent为0或null），标记需要从后端查询
         if (!supplement && item.name) {
           // 添加 data 属性标记，用于后续异步查询
           fourthColumn = `<span data-supplement-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
+          console.log(`[formatRecipeDetails] 营养补充剂 "${item.name}" 未找到，标记为需要查询`);
         } else if (supplement) {
           const unitContent = parseFloat(supplement.unitContent) || 0;
           const nutrientUnit = supplement.nutrientUnit || '';
@@ -10427,6 +10428,7 @@ function formatRecipeDetails(recipe) {
           });
           
           // 检查必要的数据是否完整
+          // 如果数据不完整（unitContent为0或null），也标记为需要查询
           if (unitContent > 0 && effectiveTotalWeight > 0 && item.weight > 0) {
             // N = 该营养补充剂在食谱中的用量 * 该营养补充剂营养素含量 / 食谱总重量 * 100
             const N = Math.round((item.weight * unitContent / effectiveTotalWeight) * 100);
@@ -10443,15 +10445,17 @@ function formatRecipeDetails(recipe) {
                 fourthColumn = `每100g饭量添加 ${N} 单位营养素`;
               }
             } else {
-              console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 计算出的N为0或负数:`, {
+              console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 计算出的N为0或负数，标记为需要查询:`, {
                 weight: item.weight,
                 unitContent,
                 totalWeight: effectiveTotalWeight,
                 calculatedN: (item.weight * unitContent / effectiveTotalWeight) * 100
               });
+              // 数据不完整，标记为需要查询
+              fourthColumn = `<span data-supplement-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
             }
           } else {
-            console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 数据不完整:`, {
+            console.warn(`[formatRecipeDetails] 营养补充剂 "${item.name}" 数据不完整，标记为需要查询:`, {
               unitContent,
               totalWeight: effectiveTotalWeight,
               totalWeightForPercent,
@@ -10460,6 +10464,8 @@ function formatRecipeDetails(recipe) {
               hasNutrientUnit: !!nutrientUnit,
               hasMainNutrient: !!mainNutrient
             });
+            // 数据不完整，标记为需要查询
+            fourthColumn = `<span data-supplement-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
           }
         } else {
           // 调试信息：如果找不到营养补充剂，在控制台输出
