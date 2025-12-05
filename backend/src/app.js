@@ -83,8 +83,14 @@ app.use('/uploads', express.static(uploadsDir, {
   lastModified: true
 }));
 
-// Routes
-app.use('/api/v1', routes);
+// 添加路由调试日志
+app.use('/api/v1', (req, res, next) => {
+  if (req.path.includes('upload-cover')) {
+    console.log('[app.js] 收到上传请求:', req.method, req.path, req.url);
+    console.log('[app.js] 请求头:', JSON.stringify(req.headers, null, 2));
+  }
+  next();
+}, routes);
 
 // Healthcheck for infra
 app.get('/health', (_req, res) => {
