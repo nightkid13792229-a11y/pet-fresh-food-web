@@ -11536,8 +11536,24 @@ function openRecipeForm(id = null, recipeData = null) {
     
     if (recipe.coverImageUrl) {
       if (coverImage) {
-        coverImage.src = recipe.coverImageUrl;
+        // 如果 coverImageUrl 是相对路径，拼接完整的后端URL
+        let imageUrl = recipe.coverImageUrl;
+        if (imageUrl.startsWith('/uploads/')) {
+          // 相对路径，需要拼接后端baseUrl
+          const baseUrl = backendState.baseUrl || 'http://8.137.166.134:3000';
+          imageUrl = baseUrl.replace(/\/$/, '') + imageUrl;
+        } else if (imageUrl.startsWith('data:image')) {
+          // base64格式，直接使用
+          // imageUrl 已经是完整的base64数据
+        } else if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+          // 其他相对路径，也拼接baseUrl
+          const baseUrl = backendState.baseUrl || 'http://8.137.166.134:3000';
+          imageUrl = baseUrl.replace(/\/$/, '') + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+        }
+        
+        coverImage.src = imageUrl;
         coverImage.style.display = 'block';
+        console.log('[openRecipeForm] 加载封面照片:', imageUrl);
       }
       if (coverPlaceholder) coverPlaceholder.style.display = 'none';
       if (removeCoverBtn) removeCoverBtn.style.display = 'inline-block';
