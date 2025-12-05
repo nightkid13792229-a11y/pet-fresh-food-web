@@ -5351,12 +5351,64 @@ function renderIngredientsList() {
 }
 
 function paginatedIngredients() {
-  // 如果使用后端数据，直接返回当前页数据（后端已处理分页和搜索）
+  // 如果使用后端数据，也需要在前端进行搜索过滤（作为补充和验证，确保全字段搜索）
   if (backendState.token && store.totalIngredients !== undefined) {
+    const searchEl = $('ingredient-search');
+    const categoryFilterEl = $('ingredient-category-filter');
+    const nameFilterEl = $('ingredient-name-filter');
+    
+    const searchQ = (searchEl?.value || '').trim().toLowerCase();
+    const categoryFilter = (categoryFilterEl?.value || '').trim();
+    const nameFilter = (nameFilterEl?.value || '').trim();
+    
+    // 即使使用后端数据，也在前端进行搜索过滤（确保全字段搜索）
+    let filtered = store.ingredients;
+    
+    if (searchQ) {
+      const searchLower = searchQ.toLowerCase();
+      filtered = filtered.filter(ing => {
+        const searchableText = [
+          String(ing.code || ''),
+          String(ing.name || ''),
+          String(ing.brand || ''),
+          String(ing.category || ''),
+          String(ing.classification || ''),
+          String(ing.source || ''),
+          String(ing.model || ''),
+          String(ing.description || ''),
+          String(ing.mainFunction || ''),
+          String(ing.subject || ''),
+          String(ing.part || ''),
+          String(ing.originType || ''),
+          String(ing.mainNutrient || ''),
+          String(ing.nutrientUnit || ''),
+          String(ing.unit || '')
+        ].join(' ').toLowerCase();
+        
+        return searchableText.includes(searchLower);
+      });
+    }
+    
+    if (categoryFilter) {
+      filtered = filtered.filter(ing => ing.category === categoryFilter);
+    }
+    
+    if (nameFilter) {
+      filtered = filtered.filter(ing => ing.name === nameFilter);
+    }
+    
+    // 分页
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / (store.ingredientPageSize || 10)));
+    if (store.ingredientPage > totalPages) store.ingredientPage = totalPages;
+    
+    const start = (store.ingredientPage - 1) * (store.ingredientPageSize || 10);
+    const pageItems = filtered.slice(start, start + (store.ingredientPageSize || 10));
+    
     return {
-      pageItems: store.ingredients,
-      total: store.totalIngredients || store.ingredients.length,
-      totalPages: store.ingredientTotalPages || 1
+      pageItems: pageItems,
+      total: total,
+      totalPages: totalPages
     };
   }
   
