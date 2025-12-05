@@ -3162,8 +3162,10 @@ async function loadIngredientsFromBackend() {
     const originType = $('ingredient-origin-type-filter')?.value || '';
     const classification = ''; // 预留，暂时不使用
     
+    const requestedPage = store.ingredientPage || 1;
+    console.log(`[loadIngredientsFromBackend] 请求页码: ${requestedPage}`);
     const params = new URLSearchParams({
-      page: store.ingredientPage || 1,
+      page: requestedPage,
       pageSize: store.ingredientPageSize || 10
     });
     
@@ -9154,17 +9156,25 @@ function setupIngredientsModule() {
   });
   
   const nextBtn = $('ingredients-next');
-  if (nextBtn) nextBtn.addEventListener('click', async () => {
-    const { totalPages } = paginatedIngredients();
-    if (store.ingredientPage < totalPages) {
-      store.ingredientPage++;
-      if (backendState.token) {
-        await loadIngredientsFromBackend();  // 使用后端数据时，重新加载
-      } else {
-        renderIngredientsList();  // 本地数据只需要重新渲染
+  if (nextBtn) {
+    // 移除旧的事件监听器（如果存在），避免重复绑定
+    const newNextBtn = nextBtn.cloneNode(true);
+    nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+    newNextBtn.addEventListener('click', async () => {
+      const { totalPages } = paginatedIngredients();
+      console.log(`[分页] 点击下一页，当前页: ${store.ingredientPage}, 总页数: ${totalPages}`);
+      if (store.ingredientPage < totalPages) {
+        const oldPage = store.ingredientPage;
+        store.ingredientPage++;
+        console.log(`[分页] 页码从 ${oldPage} 增加到 ${store.ingredientPage}`);
+        if (backendState.token) {
+          await loadIngredientsFromBackend();  // 使用后端数据时，重新加载
+        } else {
+          renderIngredientsList();  // 本地数据只需要重新渲染
+        }
       }
-    }
-  });
+    });
+  }
   
   // 价格自动计算
   const priceFields = ['i-cost', 'i-quantity', 'i-unit', 'i-ediblePortion', 'i-unitContent', 'i-nutrientUnit'];
@@ -10468,10 +10478,14 @@ function formatRecipeDetails(recipe) {
             fourthColumn = `<span data-supplement-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
           }
         } else {
-          // 调试信息：如果找不到营养补充剂，在控制台输出
-          console.warn(`[formatRecipeDetails] 未找到营养补充剂: "${item.name}"`, {
-            allSupplements: store.ingredients.filter(i => i.classification === '营养补充剂').map(i => i.name)
-          });
+          // 如果既找不到supplement，也没有item.name，或者supplement为null/undefined但没有进入前面的分支
+          // 这种情况应该标记为需要查询
+          if (item.name) {
+            console.warn(`[formatRecipeDetails] 未找到营养补充剂: "${item.name}"，标记为需要查询`, {
+              allSupplements: store.ingredients.filter(i => i.classification === '营养补充剂').map(i => i.name)
+            });
+            fourthColumn = `<span data-supplement-query="${escapeHtml(item.name)}" style="color:var(--text-secondary);">加载中...</span>`;
+          }
         }
       }
       html += `<div style="color:var(--text-secondary); font-size:12px;">${fourthColumn}</div>`;
