@@ -3201,6 +3201,9 @@ async function loadRecipesFromBackend() {
       const firstRecipe = data.items[0];
       console.log('[loadRecipesFromBackend] 第一个食谱的完整数据:', JSON.stringify(firstRecipe, null, 2));
       console.log('[loadRecipesFromBackend] 第一个食谱的 keys:', Object.keys(firstRecipe));
+      console.log('[loadRecipesFromBackend] coverImageUrl 存在:', 'coverImageUrl' in firstRecipe);
+      console.log('[loadRecipesFromBackend] coverImageUrl 值:', firstRecipe.coverImageUrl);
+      console.log('[loadRecipesFromBackend] coverImageUrl 类型:', typeof firstRecipe.coverImageUrl);
       console.log('[loadRecipesFromBackend] ingredients 存在:', 'ingredients' in firstRecipe);
       console.log('[loadRecipesFromBackend] ingredients 值:', firstRecipe.ingredients);
       console.log('[loadRecipesFromBackend] ingredients 类型:', typeof firstRecipe.ingredients);
@@ -11546,8 +11549,7 @@ function openRecipeForm(id = null, recipeData = null) {
     console.log('[openRecipeForm] 检查封面照片 - 完整recipe对象:', recipe);
     
     // 检查封面照片URL（包括 null、undefined、空字符串的情况）
-    const hasCoverImage = recipe.coverImageUrl && 
-                         recipe.coverImageUrl !== null && 
+    const hasCoverImage = recipe.coverImageUrl !== null && 
                          recipe.coverImageUrl !== undefined && 
                          String(recipe.coverImageUrl).trim() !== '';
     
