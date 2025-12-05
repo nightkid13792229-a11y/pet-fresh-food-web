@@ -29,6 +29,10 @@ build/
 *.min.js
 *.min.css
 
+# 上传的文件
+backend/uploads/
+uploads/
+
 # 备份文件
 *.bak
 backup/

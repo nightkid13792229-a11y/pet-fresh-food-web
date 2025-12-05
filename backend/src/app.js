@@ -2,6 +2,9 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import 'express-async-errors';
 
 import config from './config/index.js';
@@ -9,6 +12,9 @@ import routes from './routes/index.js';
 import requestLogger from './middleware/requestLogger.js';
 import errorHandler from './middleware/errorHandler.js';
 import notFound from './middleware/notFound.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 
@@ -68,6 +74,14 @@ if (config.env !== 'test') {
   app.use(morgan('tiny', { stream: config.logger.stream }));
 }
 app.use(requestLogger);
+
+// 静态文件服务：提供上传的文件访问
+const uploadsDir = path.join(__dirname, '../uploads');
+app.use('/uploads', express.static(uploadsDir, {
+  maxAge: '1y', // 缓存1年
+  etag: true,
+  lastModified: true
+}));
 
 // Routes
 app.use('/api/v1', routes);
