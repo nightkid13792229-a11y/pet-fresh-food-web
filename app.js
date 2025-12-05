@@ -3169,14 +3169,26 @@ async function loadIngredientsFromBackend() {
       pageSize: store.ingredientPageSize || 10
     });
     
-    if (search) params.append('search', search);
+    if (search) {
+      params.append('search', search);
+      console.log(`[loadIngredientsFromBackend] 搜索关键词: "${search}"`);
+    }
     if (category) params.append('category', category);
     if (subject) params.append('subject', subject);
     if (part) params.append('part', part);
     if (originType) params.append('originType', originType);
     if (classification) params.append('classification', classification);
     
-    const data = await backendRequest(`/api/v1/ingredients?${params.toString()}`);
+    const apiUrl = `/api/v1/ingredients?${params.toString()}`;
+    console.log(`[loadIngredientsFromBackend] API URL: ${apiUrl}`);
+    const data = await backendRequest(apiUrl);
+    console.log(`[loadIngredientsFromBackend] API响应:`, {
+      itemsCount: data.items?.length || 0,
+      total: data.total || 0,
+      totalPages: data.totalPages || 0,
+      hasSearch: !!search,
+      searchTerm: search
+    });
     
     // 转换数据格式（将后端返回的数据转换为前端格式）
     const ingredients = (data.items || []).map(ing => {
@@ -3240,6 +3252,98 @@ async function loadIngredientsFromBackend() {
     store.ingredients = ingredients;
     store.totalIngredients = data.total || 0;
     store.ingredientTotalPages = data.totalPages || 1;
+    
+    // 后备方案：如果后端搜索返回0条记录，但搜索关键词不为空，尝试加载所有数据然后在前端搜索
+    if (ingredients.length === 0 && search && search.trim()) {
+      console.log(`[loadIngredientsFromBackend] 后端搜索返回0条记录，尝试加载所有数据并在前端搜索: "${search}"`);
+      try {
+        // 加载所有数据（不带搜索参数）
+        const allDataParams = new URLSearchParams({
+          page: 1,
+          pageSize: 10000  // 加载所有数据
+        });
+        // 只保留筛选条件，不包含搜索关键词
+        if (category) allDataParams.append('category', category);
+        if (subject) allDataParams.append('subject', subject);
+        if (part) allDataParams.append('part', part);
+        if (originType) allDataParams.append('originType', originType);
+        if (classification) allDataParams.append('classification', classification);
+        
+        const allData = await backendRequest(`/api/v1/ingredients?${allDataParams.toString()}`);
+        const allItems = (allData.items || []).map(ing => {
+          const sourceValue = (ing.source !== null && ing.source !== undefined && ing.source !== '') 
+            ? String(ing.source).trim() 
+            : '';
+          
+          return {
+            id: `ing_${ing.id}`,
+            code: ing.code || '',
+            category: ing.category || '',
+            name: ing.name || '',
+            brand: ing.brand || '',
+            source: sourceValue,
+            cost: ing.cost || null,
+            quantity: ing.quantity || null,
+            unit: ing.unit || 'g',
+            pricePer500: ing.pricePer500 || null,
+            ediblePortion: ing.ediblePortion !== undefined ? ing.ediblePortion : 1.0,
+            ediblePricePer500: ing.ediblePricePer500 || null,
+            weightPerUnit: ing.weightPerUnit || null,
+            classification: ing.classification || null,
+            description: ing.description || '',
+            mainFunction: ing.mainFunction || '',
+            subject: ing.subject || null,
+            part: ing.part || null,
+            originType: ing.originType || null,
+            model: ing.model || null,
+            mainNutrient: (ing.mainNutrient !== null && ing.mainNutrient !== undefined && ing.mainNutrient !== '') ? ing.mainNutrient : null,
+            unitContent: (ing.unitContent !== null && ing.unitContent !== undefined) ? ing.unitContent : null,
+            nutrientUnit: (ing.nutrientUnit !== null && ing.nutrientUnit !== undefined && ing.nutrientUnit !== '') ? ing.nutrientUnit : null,
+            pricePer100NutrientUnit: (ing.pricePer100NutrientUnit !== null && ing.pricePer100NutrientUnit !== undefined) ? ing.pricePer100NutrientUnit : null,
+            createdAt: ing.createdAt ? new Date(ing.createdAt).getTime() : Date.now(),
+            updatedAt: ing.updatedAt ? new Date(ing.updatedAt).getTime() : Date.now(),
+            _backendId: ing.id
+          };
+        });
+        
+        // 在前端进行全字段搜索
+        const searchLower = search.toLowerCase();
+        const filtered = allItems.filter(ing => {
+          const searchableText = [
+            String(ing.code || ''),
+            String(ing.name || ''),
+            String(ing.brand || ''),
+            String(ing.category || ''),
+            String(ing.classification || ''),
+            String(ing.source || ''),
+            String(ing.model || ''),
+            String(ing.description || ''),
+            String(ing.mainFunction || ''),
+            String(ing.subject || ''),
+            String(ing.part || ''),
+            String(ing.originType || ''),
+            String(ing.mainNutrient || ''),
+            String(ing.nutrientUnit || ''),
+            String(ing.unit || '')
+          ].join(' ').toLowerCase();
+          
+          return searchableText.includes(searchLower);
+        });
+        
+        console.log(`[loadIngredientsFromBackend] 前端搜索找到 ${filtered.length} 条匹配记录`);
+        
+        if (filtered.length > 0) {
+          // 更新store为前端搜索结果
+          store.ingredients = filtered;
+          store.totalIngredients = filtered.length;
+          store.ingredientTotalPages = Math.max(1, Math.ceil(filtered.length / (store.ingredientPageSize || 10)));
+          // 重置页码
+          store.ingredientPage = 1;
+        }
+      } catch (fallbackError) {
+        console.error('[loadIngredientsFromBackend] 后备搜索方案失败:', fallbackError);
+      }
+    }
     
     // 从加载的原料中提取所有已使用的采购渠道，并添加到下拉框选项
     const usedSources = new Set();
