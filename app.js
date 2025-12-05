@@ -11853,6 +11853,13 @@ function setupRecipesModule() {
     reader.readAsDataURL(file);
   }
   
+  // 点击预览区域或上传按钮都可以触发文件选择
+  if (coverPreview && coverImageInput) {
+    coverPreview.addEventListener('click', () => {
+      coverImageInput.click();
+    });
+  }
+  
   if (uploadCoverBtn && coverImageInput) {
     uploadCoverBtn.addEventListener('click', () => {
       coverImageInput.click();
