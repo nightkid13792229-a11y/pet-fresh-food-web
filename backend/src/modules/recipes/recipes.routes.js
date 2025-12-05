@@ -24,14 +24,14 @@ router.use(authenticate);
 // 列表查询（支持分页、搜索、筛选）
 router.get('/', validate(listRecipesQuerySchema, 'query'), listRecipesController);
 
-// 获取单个食谱
-router.get('/:id', getRecipeController);
-
 // 创建、更新、删除需要管理员或员工权限
 router.use(authorize('admin', 'employee'));
 
-// 上传食谱封面照片（需要在其他路由之前，避免被/:id匹配）
+// 上传食谱封面照片（必须在 /:id 路由之前，避免被参数路由匹配）
 router.post('/upload-cover', upload.single('file'), uploadRecipeCoverController);
+
+// 获取单个食谱（必须在 /upload-cover 之后）
+router.get('/:id', getRecipeController);
 
 router.post('/', validate(createRecipeSchema), createRecipeController);
 router.put('/:id', validate(updateRecipeSchema), updateRecipeController);
