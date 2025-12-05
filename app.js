@@ -3239,12 +3239,16 @@ async function loadRecipesFromBackend() {
         ingredients = [];
       }
       
+      // 调试：检查后端返回的封面照片URL
+      console.log('[loadRecipesFromBackend] 食谱封面照片 - recipe.coverImageUrl:', recipe.coverImageUrl);
+      console.log('[loadRecipesFromBackend] 食谱封面照片 - recipe.coverImageUrl 类型:', typeof recipe.coverImageUrl);
+      
       return {
         id: `recipe_${recipe.id}`, // 使用recipe_前缀避免ID冲突
         code: recipe.code || '',
         name: recipe.name || '',
         description: recipe.description || '',
-        coverImageUrl: recipe.coverImageUrl || null,
+        coverImageUrl: recipe.coverImageUrl || null, // 保留 null 或空字符串，不转换为 null
         lifeStage: recipe.lifeStage || null,
         recipeType: recipe.recipeType || 'standard',
         software: recipe.software || 'ADF',
@@ -11534,7 +11538,22 @@ function openRecipeForm(id = null, recipeData = null) {
     const setCurrentCoverFile = window.setCurrentCoverFile;
     const clearCurrentCoverFile = window.clearCurrentCoverFile;
     
-    if (recipe.coverImageUrl) {
+    // 调试：检查封面照片URL
+    console.log('[openRecipeForm] 检查封面照片 - recipe.coverImageUrl:', recipe.coverImageUrl);
+    console.log('[openRecipeForm] 检查封面照片 - recipe.coverImageUrl 类型:', typeof recipe.coverImageUrl);
+    console.log('[openRecipeForm] 检查封面照片 - recipe.coverImageUrl 是否为真值:', !!recipe.coverImageUrl);
+    console.log('[openRecipeForm] 检查封面照片 - coverImage 元素:', coverImage);
+    console.log('[openRecipeForm] 检查封面照片 - 完整recipe对象:', recipe);
+    
+    // 检查封面照片URL（包括 null、undefined、空字符串的情况）
+    const hasCoverImage = recipe.coverImageUrl && 
+                         recipe.coverImageUrl !== null && 
+                         recipe.coverImageUrl !== undefined && 
+                         String(recipe.coverImageUrl).trim() !== '';
+    
+    console.log('[openRecipeForm] 检查封面照片 - hasCoverImage:', hasCoverImage);
+    
+    if (hasCoverImage) {
       if (coverImage) {
         // 如果 coverImageUrl 是相对路径，拼接完整的后端URL
         let imageUrl = recipe.coverImageUrl;
