@@ -5266,14 +5266,36 @@ function paginatedIngredients() {
   const nameFilter = (nameFilterEl?.value || '').trim();
   
   const filtered = store.ingredients.filter(ing => {
-    const matchSearch = !searchQ || 
-      (ing.name || '').toLowerCase().includes(searchQ) ||
-      (ing.brand || '').toLowerCase().includes(searchQ);
+    if (searchQ) {
+      const searchLower = searchQ.toLowerCase();
+      // 将所有文本字段合并为一个字符串进行搜索
+      const searchableText = [
+        ing.code || '',
+        ing.name || '',
+        ing.brand || '',
+        ing.category || '',
+        ing.classification || '',
+        ing.source || '',
+        ing.model || '',
+        ing.description || '',
+        ing.mainFunction || '',
+        ing.subject || '',
+        ing.part || '',
+        ing.originType || '',
+        ing.mainNutrient || '',
+        ing.nutrientUnit || '',
+        ing.unit || ''
+      ].join(' ').toLowerCase();
+      
+      if (!searchableText.includes(searchLower)) {
+        return false;
+      }
+    }
     
     const matchCategory = !categoryFilter || ing.category === categoryFilter;
     const matchName = !nameFilter || ing.name === nameFilter;
     
-    return matchSearch && matchCategory && matchName;
+    return matchCategory && matchName;
   });
   
   const total = filtered.length;
@@ -5464,14 +5486,30 @@ async function searchIngredientForForm(query) {
       allIngredients = store.ingredients || [];
     }
     
-    // 搜索匹配的原料
+    // 搜索匹配的原料（全字段搜索）
     console.log('[searchIngredientForForm] Searching for:', searchText, 'in', allIngredients.length, 'ingredients');
     const matched = allIngredients.filter(ing => {
-      const nameMatch = (ing.name || '').toLowerCase().includes(searchText);
-      const brandMatch = (ing.brand || '').toLowerCase().includes(searchText);
-      const categoryMatch = (ing.category || '').toLowerCase().includes(searchText);
-      const classificationMatch = (ing.classification || '').toLowerCase().includes(searchText);
-      return nameMatch || brandMatch || categoryMatch || classificationMatch;
+      const searchLower = searchText.toLowerCase();
+      // 将所有文本字段合并为一个字符串进行搜索
+      const searchableText = [
+        ing.code || '',
+        ing.name || '',
+        ing.brand || '',
+        ing.category || '',
+        ing.classification || '',
+        ing.source || '',
+        ing.model || '',
+        ing.description || '',
+        ing.mainFunction || '',
+        ing.subject || '',
+        ing.part || '',
+        ing.originType || '',
+        ing.mainNutrient || '',
+        ing.nutrientUnit || '',
+        ing.unit || ''
+      ].join(' ').toLowerCase();
+      
+      return searchableText.includes(searchLower);
     }).slice(0, 20); // 最多显示20个结果
     
     console.log('[searchIngredientForForm] Found', matched.length, 'matches');
